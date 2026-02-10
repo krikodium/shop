@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Shop - Sistema de gestión con consignación
 
-## Getting Started
+Sistema de gestión para un shop de productos (decoración / diseño de interiores) con **inventario propio**, **punto de venta** y **consignación** (rendición a proveedores).
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Next.js 16** (App Router) + **TypeScript**
+- **Tailwind CSS** + **Shadcn/ui**
+- **Prisma 7** + **PostgreSQL**
+- **React Hook Form** + **Zod**
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Requisitos
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Node.js 18+
+- PostgreSQL (local o remoto)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Configuración
 
-## Learn More
+1. **Clonar / abrir el proyecto** y instalar dependencias (ya hecho si creaste con create-next-app):
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Variables de entorno**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   Copiá `.env.example` a `.env` y configurá la base de datos:
 
-## Deploy on Vercel
+   ```env
+   DATABASE_URL="postgresql://USUARIO:PASSWORD@HOST:5432/NOMBRE_BD"
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   Ejemplo local:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   ```env
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/shop"
+   ```
+
+3. **Crear la base de datos y aplicar migraciones**
+
+   ```bash
+   npx prisma migrate dev --name init
+   ```
+
+   (Opcional) Cargar datos de prueba:
+
+   ```bash
+   npx prisma db seed
+   ```
+
+   Si querés usar seed, agregá en `package.json`:
+
+   ```json
+   "prisma": { "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts" }
+   ```
+
+4. **Arrancar el servidor**
+
+   ```bash
+   npm run dev
+   ```
+
+   Abrí [http://localhost:3000](http://localhost:3000). La raíz es el **dashboard** con enlaces a cada módulo.
+
+## Estructura del proyecto
+
+- **Dashboard** (`/`): acceso rápido a ventas, productos, consignación, etc.
+- **Proveedores** (`/proveedores`): CRUD. Tipo Regular o Consignación; comisión por defecto para consignación.
+- **Productos** (`/productos`): CRUD. Soporte “en consignación”, proveedor, comisión, stock, categoría.
+- **Ventas** (`/ventas`, `/ventas/nueva`): listado y punto de venta (Fase 2).
+- **Consignación** (`/consignacion`): dashboard, deudas y rendiciones (Fase 3).
+- **Clientes** y **Compras**: placeholders para fases posteriores.
+
+Las **APIs** están en `/api/proveedores`, `/api/productos`, `/api/categorias`. La lógica de **cálculo de costos y consignación** está en `src/lib/calculadores/`.
+
+## Prisma 7 y PostgreSQL
+
+Este proyecto usa **Prisma 7** con el **adapter `@prisma/adapter-pg`**. La URL se toma de `DATABASE_URL` en `.env`; la configuración del cliente está en `src/lib/prisma.ts`. No hace falta configurar la URL en el schema (va en `prisma.config.ts` si usás la CLI de Prisma).
+
+## Próximos pasos (según tu spec)
+
+- **Fase 2**: Punto de venta (buscador, carrito, cálculo de costos/márgenes, API de ventas, actualización de stock).
+- **Fase 3**: Consignación (dashboard de deudas, generación de rendiciones, PDF).
+- **Fase 4**: Órdenes de compra y movimientos de stock.
+- **Fase 5**: Clientes y reportes.
+
+Si querés, el siguiente paso puede ser implementar el **punto de venta** (Fase 2) o el **módulo de consignación** (Fase 3).
