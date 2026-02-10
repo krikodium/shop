@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import type { ItemVentaInput } from "@/types";
 import type { TotalesVenta } from "@/types";
 
@@ -39,12 +40,12 @@ interface CarritoVentaProps {
 }
 
 const METODOS_PAGO = [
-  { value: "EFECTIVO", label: "Efectivo" },
-  { value: "TARJETA_DEBITO", label: "Tarjeta débito" },
-  { value: "TARJETA_CREDITO", label: "Tarjeta crédito" },
-  { value: "TRANSFERENCIA", label: "Transferencia" },
-  { value: "MERCADOPAGO", label: "Mercado Pago" },
-  { value: "MULTIPLE", label: "Múltiple" },
+  { value: "EFECTIVO", label: "Efectivo", short: "Efectivo" },
+  { value: "TARJETA_DEBITO", label: "Tarjeta débito", short: "Débito" },
+  { value: "TARJETA_CREDITO", label: "Tarjeta crédito", short: "Crédito" },
+  { value: "TRANSFERENCIA", label: "Transferencia", short: "Transf." },
+  { value: "MERCADOPAGO", label: "Mercado Pago", short: "MP" },
+  { value: "MULTIPLE", label: "Múltiple", short: "Múltiple" },
 ] as const;
 
 export function CarritoVenta({
@@ -140,24 +141,24 @@ export function CarritoVenta({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border bg-card p-4">
-        <h3 className="mb-3 font-semibold">Carrito</h3>
-        <ul className="space-y-2 max-h-64 overflow-auto">
+      <div className="rounded-lg border bg-card p-3 md:p-4">
+        <h3 className="mb-2 text-sm font-semibold md:mb-3">Carrito</h3>
+        <ul className="max-h-48 space-y-1.5 overflow-auto md:max-h-64 md:space-y-2">
           {items.map((item, i) => (
             <li
               key={`${item.productoId}-${i}`}
-              className="flex items-center justify-between gap-2 rounded border p-2 text-sm"
+              className="flex items-center justify-between gap-2 rounded border p-2 text-sm touch-manipulation"
             >
               <div className="min-w-0 flex-1">
                 <span className="font-medium line-clamp-1">{item.productoNombre}</span>
                 <span className="text-muted-foreground"> {item.productoSku}</span>
                 {item.esConsignacion && (
                   <Badge variant="secondary" className="ml-1 text-xs">
-                    Consig.
+                    C
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <input
                   type="number"
                   min={1}
@@ -167,15 +168,15 @@ export function CarritoVenta({
                     const v = parseInt(e.target.value, 10);
                     if (!isNaN(v) && v >= 1) onCantidadChange(i, v);
                   }}
-                  className="w-14 rounded border px-1 py-0.5 text-center"
+                  className="w-12 rounded border px-1 py-1 text-center text-base tabular-nums md:w-14 md:py-0.5"
                 />
-                <span className="w-16 text-right font-medium">
+                <span className="w-14 text-right font-medium tabular-nums md:w-16">
                   ${item.subtotal.toFixed(2)}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0 text-destructive"
+                  className="h-8 w-8 shrink-0 p-0 text-destructive touch-manipulation md:h-7 md:w-7"
                   onClick={() => onQuitar(i)}
                 >
                   ×
@@ -186,10 +187,11 @@ export function CarritoVenta({
         </ul>
       </div>
 
-      <div className="space-y-2 rounded-lg border bg-card p-4">
+      <div className="space-y-3 rounded-lg border bg-card p-3 md:p-4">
+        {/* Cliente: compacto en mobile */}
         <div>
-          <label className="mb-1 block text-sm">Cliente</label>
-          <div className="flex gap-2">
+          <label className="mb-1 block text-xs font-medium md:text-sm">Cliente</label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Select
               value={clienteId}
               onValueChange={(v) => {
@@ -197,7 +199,7 @@ export function CarritoVenta({
                 if (v !== "__none__") setClienteNombre("");
               }}
             >
-              <SelectTrigger className="flex-1">
+              <SelectTrigger className="min-h-10 flex-1 touch-manipulation">
                 <SelectValue placeholder="Sin cliente" />
               </SelectTrigger>
               <SelectContent>
@@ -211,15 +213,15 @@ export function CarritoVenta({
             </Select>
             <Dialog open={modalClienteOpen} onOpenChange={setModalClienteOpen}>
               <DialogTrigger asChild>
-                <Button type="button" variant="outline" size="sm">
-                  Cargar datos
+                <Button type="button" variant="outline" size="sm" className="min-h-10 touch-manipulation">
+                  + Nuevo
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-[min(95vw,400px)]">
                 <DialogHeader>
-                  <DialogTitle>Cargar datos del cliente</DialogTitle>
+                  <DialogTitle>Cliente rápido</DialogTitle>
                   <p className="text-sm text-muted-foreground">
-                    Nombre, email, teléfono y DNI. Ningún campo es obligatorio, pero agregá al menos uno.
+                    Nombre o teléfono. Al menos uno.
                   </p>
                 </DialogHeader>
                 <div className="grid gap-3 py-4">
@@ -230,25 +232,7 @@ export function CarritoVenta({
                       placeholder="Nombre"
                       value={formNombre}
                       onChange={(e) => setFormNombre(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="modal-dni">DNI</Label>
-                    <Input
-                      id="modal-dni"
-                      placeholder="DNI"
-                      value={formDni}
-                      onChange={(e) => setFormDni(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="modal-email">Email</Label>
-                    <Input
-                      id="modal-email"
-                      type="email"
-                      placeholder="email@ejemplo.com"
-                      value={formEmail}
-                      onChange={(e) => setFormEmail(e.target.value)}
+                      className="min-h-11 text-base"
                     />
                   </div>
                   <div>
@@ -256,16 +240,48 @@ export function CarritoVenta({
                     <Input
                       id="modal-telefono"
                       placeholder="Teléfono"
+                      type="tel"
+                      inputMode="numeric"
                       value={formTelefono}
                       onChange={(e) => setFormTelefono(e.target.value)}
+                      className="min-h-11 text-base"
                     />
                   </div>
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm text-muted-foreground">
+                      Más datos (opcional)
+                    </summary>
+                    <div className="mt-3 grid gap-3">
+                      <div>
+                        <Label htmlFor="modal-dni">DNI</Label>
+                        <Input
+                          id="modal-dni"
+                          placeholder="DNI"
+                          value={formDni}
+                          onChange={(e) => setFormDni(e.target.value)}
+                          className="min-h-11"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="modal-email">Email</Label>
+                        <Input
+                          id="modal-email"
+                          type="email"
+                          placeholder="email@ejemplo.com"
+                          value={formEmail}
+                          onChange={(e) => setFormEmail(e.target.value)}
+                          className="min-h-11"
+                        />
+                      </div>
+                    </div>
+                  </details>
                   {errorCliente && (
                     <p className="text-sm text-destructive">{errorCliente}</p>
                   )}
                   <Button
                     onClick={handleCargarDatosCliente}
                     disabled={guardandoCliente}
+                    className="min-h-11 w-full touch-manipulation"
                   >
                     {guardandoCliente ? "Guardando…" : "Guardar y asignar"}
                   </Button>
@@ -278,62 +294,85 @@ export function CarritoVenta({
               placeholder="Nombre (ej: Mostrador)"
               value={clienteNombre}
               onChange={(e) => setClienteNombre(e.target.value)}
-              className="mt-1"
+              className="mt-2 min-h-10 text-base md:mt-1"
             />
           )}
         </div>
+
+        {/* Método de pago: chips en mobile */}
+        <div>
+          <label className="mb-1.5 block text-xs font-medium md:text-sm">Método de pago</label>
+          <div className="flex flex-wrap gap-1.5 md:block">
+            {METODOS_PAGO.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => setMetodoPago(m.value)}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-sm font-medium transition-colors touch-manipulation md:hidden",
+                  metodoPago === m.value ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"
+                )}
+              >
+                {m.short}
+              </button>
+            ))}
+            <div className="hidden md:block">
+              <Select value={metodoPago} onValueChange={setMetodoPago}>
+                <SelectTrigger className="min-h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {METODOS_PAGO.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* Descuento compacto */}
         <div className="flex items-center justify-between gap-2">
-          <label className="text-sm">Descuento ($)</label>
+          <label className="text-xs md:text-sm">Descuento ($)</label>
           <input
             type="number"
             min={0}
             step={0.01}
             value={descuento}
             onChange={(e) => onDescuentoChange(parseFloat(e.target.value) || 0)}
-            className="w-24 rounded border px-2 py-1 text-right"
+            className="w-20 rounded border px-2 py-1.5 text-right text-base tabular-nums min-h-10 md:w-24 md:py-1"
           />
         </div>
-        <div className="flex justify-between text-sm">
-          <span>Subtotal</span>
-          <span>${totales.subtotal.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between font-medium">
-          <span>Total</span>
-          <span>${totales.total.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Ganancia</span>
-          <span className="text-green-600">${totales.gananciaBruta.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Margen</span>
-          <span>{totales.margenPorcentaje.toFixed(1)}%</span>
-        </div>
-        {totales.deudaConsignacion > 0 && (
-          <div className="flex justify-between text-sm text-amber-600">
-            <span>Deuda consignación</span>
-            <span>${totales.deudaConsignacion.toFixed(2)}</span>
-          </div>
-        )}
 
-        <div className="pt-2">
-          <label className="mb-1 block text-sm">Método de pago</label>
-          <Select value={metodoPago} onValueChange={setMetodoPago}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {METODOS_PAGO.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="space-y-0.5 border-t pt-3">
+          <div className="flex justify-between text-sm">
+            <span>Subtotal</span>
+            <span className="tabular-nums">${totales.subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between font-semibold text-base">
+            <span>Total</span>
+            <span className="tabular-nums">${totales.total.toFixed(2)}</span>
+          </div>
+          <div className="hidden justify-between text-xs text-muted-foreground md:flex">
+            <span>Ganancia</span>
+            <span className="text-green-600">${totales.gananciaBruta.toFixed(2)}</span>
+          </div>
+          <div className="hidden justify-between text-xs text-muted-foreground md:flex">
+            <span>Margen</span>
+            <span>{totales.margenPorcentaje.toFixed(1)}%</span>
+          </div>
+          {totales.deudaConsignacion > 0 && (
+            <div className="flex justify-between text-xs text-amber-600">
+              <span>Deuda consig.</span>
+              <span>${totales.deudaConsignacion.toFixed(2)}</span>
+            </div>
+          )}
         </div>
 
         <Button
-          className="w-full"
+          className="h-12 w-full text-base font-semibold touch-manipulation md:h-10"
           size="lg"
           onClick={handleConfirmar}
           disabled={isLoading}

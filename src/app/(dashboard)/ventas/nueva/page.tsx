@@ -111,15 +111,16 @@ export default function NuevaVentaPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Nueva venta</h1>
+    <div className="space-y-4 md:space-y-6">
+      <h1 className="text-xl font-bold md:text-2xl">Nueva venta</h1>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      {/* Mobile: carrito fijo abajo, productos arriba */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-3 lg:gap-6">
+        <div className="min-h-0 lg:col-span-2">
           <ProductosGridPaginado onAgregar={agregarProducto} />
         </div>
 
-        <div>
+        <div className="lg:sticky lg:top-4 lg:self-start">
           <CarritoVenta
             items={items}
             totales={totales}

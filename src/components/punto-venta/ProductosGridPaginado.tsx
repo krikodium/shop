@@ -79,7 +79,7 @@ export function ProductosGridPaginado({ onAgregar }: ProductosGridPaginadoProps)
           setQuery(e.target.value);
           setPage(1);
         }}
-        className="text-sm"
+        className="min-h-11 text-base md:text-sm"
       />
 
       {loading ? (
@@ -97,16 +97,16 @@ export function ProductosGridPaginado({ onAgregar }: ProductosGridPaginadoProps)
                 type="button"
                 onClick={() => handleAgregar(p)}
                 disabled={p.stockActual <= 0}
-                className="flex flex-col items-stretch rounded border bg-card p-2 text-left transition-colors hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex min-h-[72px] flex-col items-stretch justify-between rounded-lg border bg-card p-3 text-left transition-colors active:scale-[0.98] hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation md:min-h-0 md:p-2"
               >
-                <span className="truncate text-xs font-medium" title={p.nombre}>
+                <span className="truncate text-sm font-medium md:text-xs" title={p.nombre}>
                   {p.nombre}
                 </span>
                 <span className="truncate text-[10px] text-muted-foreground">
                   {p.sku}
                 </span>
                 <div className="mt-1 flex items-center justify-between gap-1">
-                  <span className="text-xs font-semibold">
+                  <span className="text-sm font-semibold md:text-xs">
                     ${Number(p.precioVenta).toFixed(0)}
                   </span>
                   {p.enConsignacion && (
@@ -123,7 +123,7 @@ export function ProductosGridPaginado({ onAgregar }: ProductosGridPaginadoProps)
           </div>
 
           {totalPaginas > 1 && (
-            <div className="flex items-center justify-between border-t pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2">
               <span className="text-xs text-muted-foreground">
                 {total} producto{total !== 1 ? "s" : ""} • Pág. {page} / {totalPaginas}
               </span>
@@ -133,6 +133,7 @@ export function ProductosGridPaginado({ onAgregar }: ProductosGridPaginadoProps)
                   size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
+                  className="min-h-9 min-w-9 touch-manipulation"
                 >
                   ←
                 </Button>
@@ -141,6 +142,7 @@ export function ProductosGridPaginado({ onAgregar }: ProductosGridPaginadoProps)
                   size="sm"
                   onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
                   disabled={page >= totalPaginas}
+                  className="min-h-9 min-w-9 touch-manipulation"
                 >
                   →
                 </Button>

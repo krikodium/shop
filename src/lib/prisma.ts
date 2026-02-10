@@ -7,7 +7,7 @@ function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL no está definida. Configurá la URL de PostgreSQL en .env"
+      "DATABASE_URL no está definida. Configurá la URL de PostgreSQL en .env localmente o en Variables de entorno de Vercel (Project Settings → Environment Variables)."
     );
   }
   const adapter = new PrismaPg({ connectionString });

@@ -97,6 +97,7 @@ export default function ClienteDetallePage() {
           <ClienteForm
             defaultValues={clienteToFormValues(cliente)}
             onSubmit={handleSubmit}
+            variant="full"
           />
         </div>
 

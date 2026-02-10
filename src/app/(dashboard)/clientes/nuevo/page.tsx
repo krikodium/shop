@@ -23,9 +23,10 @@ export default function NuevoClientePage() {
   };
 
   return (
-    <div className="max-w-lg space-y-6">
-      <h1 className="text-2xl font-bold">Nuevo cliente</h1>
-      <ClienteForm onSubmit={handleSubmit} />
+    <div className="max-w-lg space-y-4 md:space-y-6">
+      <h1 className="text-xl font-bold md:text-2xl">Nuevo cliente</h1>
+      <p className="text-sm text-muted-foreground">Nombre y teléfono. El resto es opcional.</p>
+      <ClienteForm onSubmit={handleSubmit} variant="quick" />
     </div>
   );
 }
