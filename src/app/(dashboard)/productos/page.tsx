@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,10 +23,15 @@ import { ProductosTable } from "./ProductosTable";
 import type { Categoria, Proveedor } from "@prisma/client";
 
 export default function ProductosPage() {
+  const searchParams = useSearchParams();
+  const proveedorIdFromUrl = searchParams.get("proveedorId");
+
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [filtroCategoria, setFiltroCategoria] = useState<string>("__all__");
-  const [filtroProveedor, setFiltroProveedor] = useState<string>("__all__");
+  const [filtroProveedor, setFiltroProveedor] = useState<string>(
+    proveedorIdFromUrl ?? "__all__"
+  );
   const [filtroConsignacion, setFiltroConsignacion] = useState<string>("__all__");
   const [filtroStock, setFiltroStock] = useState<string>("__all__");
   const [filtroBusqueda, setFiltroBusqueda] = useState("");
@@ -47,6 +53,10 @@ export default function ProductosPage() {
       setProveedores(Array.isArray(provs) ? provs : []);
     });
   }, []);
+
+  useEffect(() => {
+    if (proveedorIdFromUrl) setFiltroProveedor(proveedorIdFromUrl);
+  }, [proveedorIdFromUrl]);
 
   const handleCargaMasiva = async () => {
     if (!archivo) return;
@@ -91,7 +101,10 @@ export default function ProductosPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">Productos</h1>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight md:text-2xl">Productos</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Catálogo e inventario</p>
+        </div>
         <div className="flex gap-2">
           <Dialog open={modalCarga} onOpenChange={setModalCarga}>
             <DialogTrigger asChild>
@@ -101,9 +114,9 @@ export default function ProductosPage() {
               <DialogHeader>
                 <DialogTitle>Carga masiva desde Excel</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 py-2">
+              <div className="space-y-5 pt-4">
                 {/* Instrucciones */}
-                <div className="rounded-lg border bg-muted/30 p-4 text-sm space-y-3">
+                <div className="rounded-lg border bg-muted/30 p-4 text-sm space-y-4">
                   <p className="font-medium">Instrucciones</p>
                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                     <li>La primera fila debe contener los encabezados exactos.</li>
@@ -112,12 +125,17 @@ export default function ProductosPage() {
                     <li>Precio venta es obligatorio y debe ser mayor a 0.</li>
                     <li>Categoría y Proveedor: usar el nombre exacto como está en el sistema.</li>
                     <li>Consignación: S, Si, Yes, 1 o True para sí; cualquier otro valor = no.</li>
+                    <li>
+                      <strong>Porcentaje consignación (propio)</strong>: solo si Consignación = S — porcentaje
+                      que se queda el negocio; el proveedor recibe el resto. Vacío = usar el % por defecto
+                      del proveedor en ventas (si no hay, la lógica del sistema).
+                    </li>
                     <li>Imagen URL: URL completa de la imagen (ej: https://...). Dejar vacío si no tiene.</li>
                   </ul>
                 </div>
 
                 {/* Descargas */}
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                   <p className="font-medium text-sm">Descargar modelo</p>
                   <div className="flex gap-2 flex-wrap">
                     <a
@@ -143,7 +161,7 @@ export default function ProductosPage() {
                 </div>
 
                 {/* Importar */}
-                <div className="space-y-2 pt-2 border-t">
+                <div className="space-y-3 pt-4 border-t">
                   <p className="font-medium text-sm">Importar archivo</p>
                   <Input
                     type="file"

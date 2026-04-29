@@ -3,8 +3,23 @@ import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 
 /**
+ * Celda vacía → null (usa % default del proveedor en ventas). Texto inválido o fuera de 0–100 → rechazado.
+ */
+function parsePorcentajePropio(raw: string): { ok: true; value: number | null } | { ok: false } {
+  const s = raw.trim();
+  if (s === "") return { ok: true, value: null };
+  const normalized = s.replace(/%/g, "").replace(",", ".").trim();
+  const n = parseFloat(normalized);
+  if (Number.isNaN(n) || n < 0 || n > 100) return { ok: false };
+  return { ok: true, value: n };
+}
+
+/**
  * POST: Carga masiva de productos desde Excel.
- * Formato esperado: SKU, Nombre, Descripción, Categoría, Precio compra, Precio venta, Stock, Stock mínimo, Proveedor, Consignación (S/N), Imagen URL
+ * Formato esperado (encabezados): SKU, Nombre, Descripción, Categoría, Precio compra,
+ * Precio venta, Stock, Stock mínimo, Proveedor, Consignación (S/N),
+ * Porcentaje consignación (propio) — % que se queda el local; el resto va al proveedor —
+ * Imagen URL.
  * La primera fila debe ser encabezados.
  */
 export async function POST(request: Request) {
@@ -40,7 +55,7 @@ export async function POST(request: Request) {
     };
 
     const colSku = getCol(["sku", "codigo", "código", "codigo"]);
-    const colNombre = getCol(["nombre", "producto", "descripcion"]);
+    const colNombre = getCol(["nombre", "producto"]);
     const colDesc = getCol(["descripcion", "descripción"]);
     const colCategoria = getCol(["categoria", "categoría"]);
     const colPrecioCompra = getCol(["precio compra", "precio_compra", "costo", "preciocompra"]);
@@ -49,6 +64,18 @@ export async function POST(request: Request) {
     const colStockMin = getCol(["stock mínimo", "stock_minimo", "stock minimo"]);
     const colProveedor = getCol(["proveedor", "proveedor_id"]);
     const colConsignacion = getCol(["consignacion", "consignación", "en consignacion"]);
+    const colPorcentajePropio = getCol([
+      "porcentaje consignación (propio)",
+      "porcentaje consignacion (propio)",
+      "porcentaje consignación",
+      "porcentaje consignacion",
+      "% consignacion",
+      "% consignación",
+      "comision consignacion",
+      "comisión consignacion",
+      "comision shop",
+      "comisión shop",
+    ]);
     const colImagen = getCol(["imagen", "imagen_url", "foto", "url imagen", "imagen url"]);
 
     if (colSku < 0 || colNombre < 0) {
@@ -97,6 +124,19 @@ export async function POST(request: Request) {
       const consignacionCell = get(colConsignacion).toLowerCase();
       const enConsignacion = ["s", "si", "yes", "1", "true"].includes(consignacionCell);
 
+      let comisionConsignacion: number | null = null;
+      if (enConsignacion) {
+        const rawPct = colPorcentajePropio >= 0 ? get(colPorcentajePropio) : "";
+        const parsed = parsePorcentajePropio(rawPct);
+        if (!parsed.ok) {
+          errores.push(
+            `Fila ${i + 1}: Porcentaje consignación (propio) inválido para ${sku} (usar número entre 0 y 100, o vacío)`
+          );
+          continue;
+        }
+        comisionConsignacion = parsed.value;
+      }
+
       try {
         await prisma.producto.create({
           data: {
@@ -107,6 +147,7 @@ export async function POST(request: Request) {
             precioCompra: colPrecioCompra >= 0 ? parseFloat(get(colPrecioCompra)) || null : null,
             precioVenta,
             enConsignacion,
+            comisionConsignacion,
             stockActual: colStock >= 0 ? Math.max(0, parseInt(get(colStock), 10) || 0) : 0,
             stockMinimo: colStockMin >= 0 ? Math.max(0, parseInt(get(colStockMin), 10) || 5) : 5,
             proveedorId,

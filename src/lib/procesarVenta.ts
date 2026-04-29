@@ -29,6 +29,13 @@ export interface VentaInput {
   metodoPago: string;
   notas?: string;
   usuarioId?: string | null;
+  ignorarStock?: boolean;
+  metodoPagoSecundario?: string | null;
+  montoPago1Ars?: number | null;
+  montoPago2Ars?: number | null;
+  usdPago1?: number | null;
+  usdPago2?: number | null;
+  cotizacionUsd?: number | null;
 }
 
 export async function procesarVenta(input: VentaInput) {
@@ -63,18 +70,23 @@ export async function procesarVenta(input: VentaInput) {
       if (!producto) {
         throw new Error(`Producto no encontrado: ${item.productoNombre}`);
       }
-      if (producto.stockActual < item.cantidad) {
+      if (!input.ignorarStock && producto.stockActual < item.cantidad) {
         throw new Error(
           `Stock insuficiente para ${item.productoNombre}. Disponible: ${producto.stockActual}`
         );
       }
     }
 
-    // 3. Crear venta
+    // 3. Crear venta — con el adapter/driver actual Prisma solo acepta relaciones (cliente/user), no FKs sueltas
     const venta = await tx.venta.create({
       data: {
         numeroVenta,
-        clienteId: input.clienteId ?? null,
+        ...(input.clienteId
+          ? { cliente: { connect: { id: input.clienteId } } }
+          : {}),
+        ...(input.usuarioId
+          ? { user: { connect: { id: input.usuarioId } } }
+          : {}),
         clienteNombre: input.clienteNombre ?? null,
         subtotal: new Prisma.Decimal(subtotal),
         descuento: new Prisma.Decimal(input.descuento),
@@ -86,7 +98,22 @@ export async function procesarVenta(input: VentaInput) {
         metodoPago: input.metodoPago as "EFECTIVO" | "TARJETA_DEBITO" | "TARJETA_CREDITO" | "TRANSFERENCIA" | "MERCADOPAGO" | "MULTIPLE",
         estadoPago: "PAGADO",
         notas: input.notas ?? null,
-        usuarioId: input.usuarioId ?? null,
+        metodoPagoSecundario: input.metodoPagoSecundario
+          ? (input.metodoPagoSecundario as
+              | "EFECTIVO"
+              | "TARJETA_DEBITO"
+              | "TARJETA_CREDITO"
+              | "TRANSFERENCIA"
+              | "MERCADOPAGO")
+          : null,
+        montoPago1Ars:
+          input.montoPago1Ars != null ? new Prisma.Decimal(input.montoPago1Ars) : null,
+        montoPago2Ars:
+          input.montoPago2Ars != null ? new Prisma.Decimal(input.montoPago2Ars) : null,
+        usdPago1: input.usdPago1 != null ? new Prisma.Decimal(input.usdPago1) : null,
+        usdPago2: input.usdPago2 != null ? new Prisma.Decimal(input.usdPago2) : null,
+        cotizacionUsd:
+          input.cotizacionUsd != null ? new Prisma.Decimal(input.cotizacionUsd) : null,
       },
     });
 

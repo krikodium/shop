@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 import type { Proveedor } from "@prisma/client";
 
 interface ProveedorConCount extends Proveedor {
@@ -33,21 +34,22 @@ export function ProveedoresTable() {
   }, []);
 
   if (loading) {
-    return <p className="text-muted-foreground">Cargando proveedores…</p>;
+    return <TableSkeleton rows={6} cols={5} />;
   }
 
   if (proveedores.length === 0) {
     return (
-      <p className="text-muted-foreground">
+      <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center text-muted-foreground">
         No hay proveedores.{" "}
-        <Link href="/proveedores/nuevo" className="text-primary underline">
+        <Link href="/proveedores/nuevo" className="font-medium text-primary hover:underline">
           Crear uno
         </Link>
-      </p>
+      </div>
     );
   }
 
   return (
+    <div className="rounded-lg border bg-card overflow-hidden shadow-sm">
     <Table>
       <TableHeader>
         <TableRow>
@@ -84,5 +86,6 @@ export function ProveedoresTable() {
         ))}
       </TableBody>
     </Table>
+    </div>
   );
 }

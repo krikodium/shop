@@ -30,6 +30,19 @@ export interface CostosItemVenta {
   proveedorId: string | null;
 }
 
+/** Opciones al confirmar venta desde el carrito (pago dividido ARS/USD) */
+export type OpcionesProcesarVenta = {
+  metodoPago: string;
+  clienteId?: string | null;
+  clienteNombre?: string;
+  metodoPagoSecundario?: string | null;
+  montoPago1Ars?: number;
+  montoPago2Ars?: number;
+  usdPago1?: number | null;
+  usdPago2?: number | null;
+  cotizacionUsd?: number | null;
+};
+
 // Totales de una venta
 export interface TotalesVenta {
   subtotal: number;
@@ -40,7 +53,7 @@ export interface TotalesVenta {
   margenPorcentaje: number;
 }
 
-// Producto con proveedor para cálculos
+// Producto con proveedor y categoría (listados POS / API)
 export type ProductoConProveedor = Prisma.ProductoGetPayload<{
-  include: { proveedor: true };
+  include: { proveedor: true; categoria: true };
 }>;

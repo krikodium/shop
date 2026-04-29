@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { calcularPreviewRendicion } from "@/lib/calculadores/consignacionCalculator";
-import { itemsNoRendidos } from "@/lib/consignacionHelpers";
+import {
+  itemsNoRendidos,
+  normalizarRangoFechas,
+  validarCreacionRendicion,
+} from "@/lib/consignacionHelpers";
 
 /**
  * POST /api/consignacion/rendiciones/preview
@@ -21,8 +25,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const fDesde = new Date(fechaDesde);
-    const fHasta = new Date(fechaHasta);
+    const { desde: fDesde, hasta: fHasta } = normalizarRangoFechas(
+      new Date(fechaDesde),
+      new Date(fechaHasta)
+    );
 
     const items = await itemsNoRendidos(proveedorId, fDesde, fHasta);
 
@@ -52,12 +58,27 @@ export async function POST(request: Request) {
       select: { nombre: true },
     });
 
+    const validacion = await validarCreacionRendicion(proveedorId);
+
     return NextResponse.json({
       ...preview,
       proveedorNombre: proveedor?.nombre ?? "",
       fechaDesde: fDesde.toISOString(),
       fechaHasta: fHasta.toISOString(),
       todasRendidas: hayVentasEnPeriodo > 0 && items.length === 0,
+      restriccionMes: {
+        permitido: validacion.permitido,
+        motivo: validacion.motivo,
+        esUltimaSemana: validacion.esUltimaSemana,
+        diasParaUltimaSemana: validacion.diasParaUltimaSemana,
+        rendicionExistenteEnMes: validacion.rendicionExistenteEnMes
+          ? {
+              id: validacion.rendicionExistenteEnMes.id,
+              numeroRendicion: validacion.rendicionExistenteEnMes.numeroRendicion,
+              fechaRendicion: validacion.rendicionExistenteEnMes.fechaRendicion.toISOString(),
+            }
+          : null,
+      },
     });
   } catch (error) {
     console.error("Error en preview de rendición:", error);

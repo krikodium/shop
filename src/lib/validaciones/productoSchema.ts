@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+/** URL http(s) o ruta local del sitio (ej. /uploads/... tras subir archivo). Sin blobs en BD. */
+function imagenUrlValida(val: string): boolean {
+  if (!val || val.trim() === "") return true;
+  if (val.includes("..")) return false;
+  if (val.startsWith("/")) {
+    if (val.startsWith("//")) return false; // evita URLs protocol-relative
+    return val.length >= 2;
+  }
+  try {
+    const u = new URL(val);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export const productoSchema = z.object({
   sku: z.string().min(1, "SKU requerido"),
   nombre: z.string().min(1, "Nombre requerido"),
@@ -12,7 +28,13 @@ export const productoSchema = z.object({
   stockActual: z.coerce.number().int().min(0).default(0),
   stockMinimo: z.coerce.number().int().min(0).default(5),
   proveedorId: z.string().optional().nullable(),
-  imagenUrl: z.string().url().optional().nullable().or(z.literal("")),
+  imagenUrl: z.preprocess(
+    (v) => (v === null || v === undefined ? "" : v),
+    z.string().refine(imagenUrlValida, {
+      message:
+        "Imagen: URL https://… o ruta local /uploads/… (no uses rutas con ..)",
+    })
+  ),
   activo: z.boolean().default(true),
 });
 

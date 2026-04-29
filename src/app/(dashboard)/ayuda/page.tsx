@@ -1,20 +1,27 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { HelpCircle, BookOpen } from "lucide-react";
 
 export default function AyudaPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Ayuda</h1>
-        <p className="text-muted-foreground">
+        <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <HelpCircle className="h-7 w-7 text-primary" />
+          Ayuda
+        </h1>
+        <p className="mt-1 text-muted-foreground">
           Guía paso a paso para usar el sistema de gestión
         </p>
       </div>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>¿Cómo funciona el dashboard?</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            ¿Cómo funciona el dashboard?
+          </CardTitle>
           <p className="text-sm text-muted-foreground">
             El sistema está organizado en módulos. Acá te explicamos el flujo general y cada sección.
           </p>
@@ -71,6 +78,10 @@ export default function AyudaPage() {
                 Aplicá descuento (opcional) y elegí el método de pago.
               </li>
               <li>
+                <strong>Pesos y dólares:</strong> Podés marcar <strong>Dividir en dos pagos</strong> y elegir ARS o USD por tramo.
+                Si usás USD, indicá la cotización (ARS por 1 USD) en ese momento; el total en pesos de la venta no cambia. No hay un tipo de cambio global en el sistema.
+              </li>
+              <li>
                 Hacé clic en <strong>Confirmar venta</strong>.
               </li>
               <li>
@@ -101,14 +112,14 @@ export default function AyudaPage() {
                 <Link href="/consignacion" className="text-primary underline">
                   Consignación
                 </Link>
-                ves el dashboard de deudas por proveedor.
+                ves el dashboard de deudas por proveedor (montos en ARS).
               </li>
               <li>
                 <strong>Rendiciones:</strong> En{" "}
                 <Link href="/consignacion/rendiciones/nueva" className="text-primary underline">
                   Nueva rendición
                 </Link>
-                elegís el proveedor y generás el documento con las ventas pendientes. Podés descargar el PDF para entregar.
+                elegís el proveedor y generás el documento con las ventas pendientes. Si el proveedor liquida en dólares (o lo elegís en el momento), indicás el tipo de cambio al confirmar y el sistema guarda el equivalente en USD. Podés descargar el PDF para entregar.
               </li>
               <li>
                 Al confirmar una rendición, esas ventas quedan marcadas como rendidas y no se incluyen en futuras rendiciones.
@@ -145,7 +156,12 @@ export default function AyudaPage() {
               tenés tres pestañas:
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              <li><strong>Ventas:</strong> Total vendido, cantidad, ganancia, margen y desglose por método de pago.</li>
+              <li>
+                <strong>Ventas:</strong> Total en ARS, cantidad, ganancia, margen, desglose por método de pago, bloque <strong>USD</strong> (suma de dólares cobrados, cantidad de ventas con USD y equivalente ARS usando la cotización guardada por venta).
+              </li>
+              <li>
+                <strong>Exportar CSV:</strong> Botón <strong>CSV ventas</strong> descarga el listado del período con columnas de total ARS, métodos, USD y cotización (útil para Excel).
+              </li>
               <li><strong>Inventario:</strong> Valor del stock (costo y venta) y productos con stock bajo.</li>
               <li><strong>Rentabilidad:</strong> Ganancia total y rentabilidad por producto.</li>
             </ul>
@@ -192,12 +208,12 @@ export default function AyudaPage() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Link href="/">
           <Button variant="outline">Volver al dashboard</Button>
         </Link>
         <Link href="/ventas/nueva">
-          <Button>Ir a nueva venta</Button>
+          <Button className="shadow-sm">Ir a nueva venta</Button>
         </Link>
       </div>
     </div>

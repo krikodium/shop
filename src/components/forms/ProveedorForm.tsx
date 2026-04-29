@@ -38,6 +38,7 @@ const defaultEmpty: ProveedorFormValues = {
   direccion: "",
   tipoProveedor: "REGULAR",
   comisionPorDefecto: null,
+  liquidacionUsd: false,
 };
 
 /** Convierte un proveedor (API/Prisma) a valores del formulario */
@@ -50,6 +51,7 @@ export function proveedorToFormValues(p: Proveedor): ProveedorFormValues {
     direccion: p.direccion ?? "",
     tipoProveedor: p.tipoProveedor,
     comisionPorDefecto: p.comisionPorDefecto != null ? Number(p.comisionPorDefecto) : null,
+    liquidacionUsd: Boolean(p.liquidacionUsd),
   };
 }
 
@@ -107,31 +109,57 @@ export function ProveedorForm({
           )}
         />
         {tipoConsignacion && (
-          <FormField
-            control={form.control}
-            name="comisionPorDefecto"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Comisión del shop (%)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                    placeholder="30"
-                    value={field.value ?? ""}
-                    onChange={(e) =>
-                      field.onChange(
-                        e.target.value === "" ? null : Number(e.target.value)
-                      )
-                    }
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <>
+            <FormField
+              control={form.control}
+              name="comisionPorDefecto"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Comisión del shop (%)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      placeholder="30"
+                      value={field.value ?? ""}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value === "" ? null : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="liquidacionUsd"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start gap-3 space-y-0 rounded-lg border border-border/60 p-4">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-input"
+                      checked={field.value}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                    />
+                  </FormControl>
+                  <div className="space-y-1">
+                    <FormLabel className="!mt-0">
+                      Liquidar rendiciones en dólares (USD)
+                    </FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      Al generar la rendición vas a indicar el tipo de cambio ARS por USD en ese momento.
+                    </p>
+                  </div>
+                </FormItem>
+              )}
+            />
+          </>
         )}
         <FormField
           control={form.control}

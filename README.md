@@ -64,24 +64,30 @@ Sistema de gestión para un shop de productos (decoración / diseño de interior
 
 ## Estructura del proyecto
 
-- **Dashboard** (`/`): acceso rápido a ventas, productos, consignación, etc.
+- **Dashboard** (`/`): KPIs del mes, gráficos de ventas, últimos movimientos.
 - **Proveedores** (`/proveedores`): CRUD. Tipo Regular o Consignación; comisión por defecto para consignación.
 - **Productos** (`/productos`): CRUD. Soporte “en consignación”, proveedor, comisión, stock, categoría.
-- **Ventas** (`/ventas`, `/ventas/nueva`): listado y punto de venta (Fase 2).
+- **Ventas** (`/ventas`, `/ventas/nueva`): Listado con filtros, punto de venta, ticket imprimible, anulación.
 - **Consignación** (`/consignacion`): dashboard, deudas y rendiciones (Fase 3).
-- **Clientes** y **Compras**: placeholders para fases posteriores.
+- **Clientes** (`/clientes`): CRUD y clientes rápidos desde el punto de venta.
+- **Compras** (`/compras`): Órdenes de compra, recepción parcial.
+- **Caja chica** (`/caja-chica`): Apertura/cierre, ingresos y egresos.
+- **Reportes** (`/reportes`): Ventas, inventario y rentabilidad por período.
+- **Usuarios** (`/usuarios`): Gestión de roles (Admin, Vendedor, Viewer).
 
-Las **APIs** están en `/api/proveedores`, `/api/productos`, `/api/categorias`. La lógica de **cálculo de costos y consignación** está en `src/lib/calculadores/`.
+Las **APIs** están bajo `/api/`. Constantes compartidas en `src/lib/constants.ts`.
 
 ## Prisma 7 y PostgreSQL
 
 Este proyecto usa **Prisma 7** con el **adapter `@prisma/adapter-pg`**. La URL se toma de `DATABASE_URL` en `.env`; la configuración del cliente está en `src/lib/prisma.ts`. No hace falta configurar la URL en el schema (va en `prisma.config.ts` si usás la CLI de Prisma).
 
-## Próximos pasos (según tu spec)
+## Estado de implementación
 
-- **Fase 2**: Punto de venta (buscador, carrito, cálculo de costos/márgenes, API de ventas, actualización de stock).
-- **Fase 3**: Consignación (dashboard de deudas, generación de rendiciones, PDF).
+Todas las fases del spec están implementadas:
+
+- **Fase 2**: Punto de venta (buscador, carrito, descuento por %, cálculo de costos/márgenes, actualización de stock).
+- **Fase 3**: Consignación (dashboard de deudas, rendiciones, PDF).
 - **Fase 4**: Órdenes de compra y movimientos de stock.
 - **Fase 5**: Clientes y reportes.
 
-Si querés, el siguiente paso puede ser implementar el **punto de venta** (Fase 2) o el **módulo de consignación** (Fase 3).
+**Funcionalidades adicionales**: Anulación de ventas (con devolución de stock), caja chica, usuarios y roles, estadísticas de vendedores, toasts (Sonner), skeletons de carga, ticket imprimible.

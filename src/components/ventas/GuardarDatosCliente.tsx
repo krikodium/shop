@@ -62,19 +62,19 @@ export function GuardarDatosCliente({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="space-y-2 pb-2">
         <CardTitle className="text-base">Guardar datos del cliente</CardTitle>
         <p className="text-sm text-muted-foreground">
           Podés guardar nombre, email, teléfono y DNI para futuras difusiones. Ningún campo es obligatorio.
         </p>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-5">
         {guardado ? (
           <p className="text-sm text-green-600">Datos guardados correctamente.</p>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
                 <Label htmlFor="nombre">Nombre</Label>
                 <Input
                   id="nombre"
@@ -83,7 +83,7 @@ export function GuardarDatosCliente({
                   onChange={(e) => setNombre(e.target.value)}
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="dni">DNI</Label>
                 <Input
                   id="dni"
@@ -92,7 +92,7 @@ export function GuardarDatosCliente({
                   onChange={(e) => setDni(e.target.value)}
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
@@ -102,7 +102,7 @@ export function GuardarDatosCliente({
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="telefono">Teléfono</Label>
                 <Input
                   id="telefono"
@@ -112,11 +112,11 @@ export function GuardarDatosCliente({
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground pt-1">
               Estos datos permitirán en el futuro enviar difusiones por email y teléfono automáticamente.
             </p>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button onClick={handleGuardar} disabled={loading}>
+            <Button onClick={handleGuardar} disabled={loading} className="mt-2">
               {loading ? "Guardando…" : "Guardar"}
             </Button>
           </>

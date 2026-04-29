@@ -12,6 +12,7 @@ const HEADERS = [
   "Stock mínimo",
   "Proveedor",
   "Consignación",
+  "Porcentaje consignación (propio)",
   "Imagen URL",
 ];
 
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
   const rows: string[][] = [HEADERS];
 
   if (modelo === "prueba") {
-    // Ejemplo 1: con URL de imagen de prueba
+    // Ejemplo 1: consignación con % propio e imagen
     rows.push([
       "PROD-001",
       "Producto con imagen",
@@ -33,10 +34,11 @@ export async function GET(request: Request) {
       "10",
       "5",
       "",
-      "N",
+      "S",
+      "30",
       "https://placehold.co/200x200?text=Producto",
     ]);
-    // Ejemplo 2: sin URL de imagen
+    // Ejemplo 2: sin consignación ni URL
     rows.push([
       "PROD-002",
       "Producto sin imagen",
@@ -48,6 +50,7 @@ export async function GET(request: Request) {
       "3",
       "",
       "N",
+      "",
       "",
     ]);
   } else {
@@ -64,11 +67,12 @@ export async function GET(request: Request) {
       "",
       "N",
       "",
+      "",
     ]);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = HEADERS.map((_, i) => ({ wch: i === 1 ? 30 : i === 10 ? 40 : 15 }));
+  ws["!cols"] = HEADERS.map((_, i) => ({ wch: i === 1 ? 30 : i === 11 ? 40 : 15 }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Productos");
 

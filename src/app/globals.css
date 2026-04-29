@@ -49,13 +49,14 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --background: oklch(0.99 0.002 240);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /* Primary: teal/verde azulado como color de marca */
+  --primary: oklch(0.45 0.12 195);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -74,7 +75,7 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary: oklch(0.45 0.12 195);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
@@ -131,8 +132,47 @@
   }
 }
 
+/* Skeleton shimmer para carga profesional */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.97 0 0) 25%,
+    oklch(0.93 0 0) 50%,
+    oklch(0.97 0 0) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.dark .animate-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.269 0 0) 25%,
+    oklch(0.32 0 0) 50%,
+    oklch(0.269 0 0) 75%
+  );
+}
+
 @media print {
   .print\:hidden {
     display: none !important;
+  }
+  /* Solo mostrar ticket al imprimir */
+  body * {
+    visibility: hidden;
+  }
+  #ticket-venta,
+  #ticket-venta * {
+    visibility: visible;
+  }
+  #ticket-venta {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: block !important;
   }
 }

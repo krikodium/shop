@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 interface OrdenRow {
   id: string;
@@ -45,16 +46,16 @@ export function ComprasTable() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-muted-foreground">Cargando…</p>;
+  if (loading) return <TableSkeleton rows={6} cols={6} />;
 
   if (ordenes.length === 0) {
     return (
-      <p className="text-muted-foreground">
+      <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center text-muted-foreground">
         No hay órdenes.{" "}
-        <Link href="/compras/nueva" className="text-primary underline">
+        <Link href="/compras/nueva" className="font-medium text-primary hover:underline">
           Crear una
         </Link>
-      </p>
+      </div>
     );
   }
 
@@ -62,6 +63,7 @@ export function ComprasTable() {
     e === "RECIBIDO" ? "default" : e === "CANCELADO" ? "destructive" : "secondary";
 
   return (
+    <div className="rounded-lg border bg-card overflow-hidden shadow-sm">
     <Table>
       <TableHeader>
         <TableRow>
@@ -81,7 +83,7 @@ export function ComprasTable() {
             <TableCell>
               {new Date(o.fecha).toLocaleDateString()}
             </TableCell>
-            <TableCell>${o.total.toFixed(2)}</TableCell>
+            <TableCell className="tabular-nums">${o.total.toFixed(2)}</TableCell>
             <TableCell>
               <Badge variant={estadoVariant(o.estado)}>{o.estado}</Badge>
             </TableCell>
@@ -96,5 +98,6 @@ export function ComprasTable() {
         ))}
       </TableBody>
     </Table>
+    </div>
   );
 }

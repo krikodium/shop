@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { totalesPendientesPosterioresACierre } from "@/lib/consignacionHelpers";
 
 /**
  * GET /api/consignacion/rendiciones/[id]
+ * Incluye `contexto`: deuda por ventas posteriores al período y otras rendiciones del mismo mes (fecha de generación).
  */
 export async function GET(
   _request: Request,
@@ -20,7 +22,52 @@ export async function GET(
         { status: 404 }
       );
     }
-    return NextResponse.json(rendicion);
+
+    const [posteriores, otrasMismoMes] = await Promise.all([
+      totalesPendientesPosterioresACierre(
+        rendicion.proveedorId,
+        rendicion.fechaHasta
+      ),
+      (() => {
+        const fr = new Date(rendicion.fechaRendicion);
+        const y = fr.getFullYear();
+        const m = fr.getMonth();
+        const inicioMes = new Date(y, m, 1, 0, 0, 0, 0);
+        const finMes = new Date(y, m + 1, 0, 23, 59, 59, 999);
+        return prisma.rendicion.findMany({
+          where: {
+            proveedorId: rendicion.proveedorId,
+            id: { not: id },
+            fechaRendicion: { gte: inicioMes, lte: finMes },
+          },
+          select: {
+            id: true,
+            numeroRendicion: true,
+            fechaDesde: true,
+            fechaHasta: true,
+            fechaRendicion: true,
+            totalARendir: true,
+          },
+          orderBy: { fechaRendicion: "asc" },
+        });
+      })(),
+    ]);
+
+    return NextResponse.json({
+      ...rendicion,
+      contexto: {
+        deudaPendientePosterior: posteriores.deudaPendiente,
+        totalVendidoBrutoPosterior: posteriores.totalVendidoBruto,
+        otrasRendicionesMismoMesGeneracion: otrasMismoMes.map((r) => ({
+          id: r.id,
+          numeroRendicion: r.numeroRendicion,
+          fechaDesde: r.fechaDesde.toISOString(),
+          fechaHasta: r.fechaHasta.toISOString(),
+          fechaRendicion: r.fechaRendicion.toISOString(),
+          totalARendir: Number(r.totalARendir),
+        })),
+      },
+    });
   } catch (error) {
     console.error("Error obteniendo rendición:", error);
     return NextResponse.json(

@@ -15,20 +15,38 @@ const itemVentaSchema = z.object({
   proveedorId: z.string().nullable(),
 });
 
+const metodoPagoEnum = z.enum([
+  "EFECTIVO",
+  "TARJETA_DEBITO",
+  "TARJETA_CREDITO",
+  "TRANSFERENCIA",
+  "MERCADOPAGO",
+  "MULTIPLE",
+]);
+
+const metodoPagoIndividualEnum = z.enum([
+  "EFECTIVO",
+  "TARJETA_DEBITO",
+  "TARJETA_CREDITO",
+  "TRANSFERENCIA",
+  "MERCADOPAGO",
+]);
+
 export const ventaSchema = z.object({
   clienteId: z.string().optional().nullable(),
   clienteNombre: z.string().optional(),
   items: z.array(itemVentaSchema).min(1, "Agregar al menos un producto"),
   descuento: z.number().min(0).default(0),
-  metodoPago: z.enum([
-    "EFECTIVO",
-    "TARJETA_DEBITO",
-    "TARJETA_CREDITO",
-    "TRANSFERENCIA",
-    "MERCADOPAGO",
-    "MULTIPLE",
-  ]),
+  metodoPago: metodoPagoEnum,
   notas: z.string().optional(),
+  ignorarStock: z.boolean().optional(),
+  /** Pago dividido: segundo método y montos en ARS (suma = total de la venta) */
+  metodoPagoSecundario: metodoPagoIndividualEnum.optional().nullable(),
+  montoPago1Ars: z.number().min(0).optional().nullable(),
+  montoPago2Ars: z.number().min(0).optional().nullable(),
+  usdPago1: z.number().min(0).optional().nullable(),
+  usdPago2: z.number().min(0).optional().nullable(),
+  cotizacionUsd: z.number().min(0).optional().nullable(),
 });
 
 export type VentaFormValues = z.infer<typeof ventaSchema>;

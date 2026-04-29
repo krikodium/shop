@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 import type { Cliente } from "@prisma/client";
 
 export function ClientesTable() {
@@ -28,17 +29,17 @@ export function ClientesTable() {
   }, []);
 
   if (loading) {
-    return <p className="text-muted-foreground">Cargando clientes…</p>;
+    return <TableSkeleton rows={6} cols={6} />;
   }
 
   if (clientes.length === 0) {
     return (
-      <p className="text-muted-foreground">
+      <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center text-muted-foreground">
         No hay clientes.{" "}
-        <Link href="/clientes/nuevo" className="text-primary underline">
+        <Link href="/clientes/nuevo" className="font-medium text-primary hover:underline">
           Crear uno
         </Link>
-      </p>
+      </div>
     );
   }
 
@@ -51,6 +52,7 @@ export function ClientesTable() {
   };
 
   return (
+    <div className="rounded-lg border bg-card overflow-hidden shadow-sm">
     <Table>
       <TableHeader>
         <TableRow>
@@ -70,8 +72,8 @@ export function ClientesTable() {
               {c.telefono || c.email || "—"}
             </TableCell>
             <TableCell>{c.cantidadCompras}</TableCell>
-            <TableCell>{formatMoney(Number(c.totalCompras))}</TableCell>
-            <TableCell>{formatMoney(Number(c.ticketPromedio))}</TableCell>
+            <TableCell className="tabular-nums">{formatMoney(Number(c.totalCompras))}</TableCell>
+            <TableCell className="tabular-nums">{formatMoney(Number(c.ticketPromedio))}</TableCell>
             <TableCell>
               <Link href={`/clientes/${c.id}`}>
                 <Button variant="ghost" size="sm">
@@ -83,5 +85,6 @@ export function ClientesTable() {
         ))}
       </TableBody>
     </Table>
+    </div>
   );
 }

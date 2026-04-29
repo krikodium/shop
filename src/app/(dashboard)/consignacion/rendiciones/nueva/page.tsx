@@ -4,16 +4,10 @@ import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RendicionParams, RendicionPreview } from "@/components/consignacion";
+import { ArrowLeft, AlertTriangle, Lock, Calendar } from "lucide-react";
 import type { Proveedor } from "@prisma/client";
+import { parseCurrencyInput } from "@/lib/formatCurrency";
 
 interface PreviewItem {
   ventaId: string;
@@ -26,6 +20,18 @@ interface PreviewItem {
   montoProveedor: number;
 }
 
+interface RestriccionMes {
+  permitido: boolean;
+  motivo: string | null;
+  esUltimaSemana: boolean;
+  diasParaUltimaSemana: number;
+  rendicionExistenteEnMes: {
+    id: string;
+    numeroRendicion: string;
+    fechaRendicion: string;
+  } | null;
+}
+
 interface PreviewData {
   totalVendido: number;
   comisionShop: number;
@@ -35,6 +41,7 @@ interface PreviewData {
   fechaDesde: string;
   fechaHasta: string;
   todasRendidas?: boolean;
+  restriccionMes?: RestriccionMes;
 }
 
 function NuevaRendicionContent() {
@@ -49,6 +56,10 @@ function NuevaRendicionContent() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [monedaLiquidacion, setMonedaLiquidacion] = useState<"ARS" | "USD">("ARS");
+  const [cotizacionUsd, setCotizacionUsd] = useState("");
+  const [restriccion, setRestriccion] = useState<RestriccionMes | null>(null);
+  const [loadingRestriccion, setLoadingRestriccion] = useState(false);
 
   useEffect(() => {
     fetch("/api/proveedores")
@@ -64,16 +75,80 @@ function NuevaRendicionContent() {
           setProveedorId(provs[0].id);
         }
       });
-  }, [proveedorIdParam, proveedorId]);
+  }, [proveedorIdParam]);
 
   useEffect(() => {
-    const hoy = new Date().toISOString().slice(0, 10);
-    const haceUnMes = new Date();
-    haceUnMes.setMonth(haceUnMes.getMonth() - 1);
-    const desde = haceUnMes.toISOString().slice(0, 10);
-    setFechaDesde((prev) => prev || desde);
-    setFechaHasta((prev) => prev || hoy);
-  }, []);
+    const p = proveedores.find((x) => x.id === proveedorId);
+    if (!p) return;
+    setMonedaLiquidacion(p.liquidacionUsd ? "USD" : "ARS");
+    setCotizacionUsd("");
+  }, [proveedorId, proveedores]);
+
+  // Fechas por defecto
+  useEffect(() => {
+    const toYMD = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+    const hoy = new Date();
+    const hoyStr = toYMD(hoy);
+
+    if (!proveedorId) {
+      const haceUnMes = new Date();
+      haceUnMes.setMonth(haceUnMes.getMonth() - 1);
+      setFechaDesde(toYMD(haceUnMes));
+      setFechaHasta(hoyStr);
+      return;
+    }
+
+    fetch(`/api/consignacion/rendiciones?proveedorId=${proveedorId}`)
+      .then((r) => r.json())
+      .then((rendiciones: Array<{ fechaHasta: string }>) => {
+        const list = Array.isArray(rendiciones) ? rendiciones : [];
+        const ultima = list.length > 0
+          ? list.reduce((a, b) =>
+              new Date(b.fechaHasta) > new Date(a.fechaHasta) ? b : a
+            )
+          : null;
+        if (ultima?.fechaHasta) {
+          const diaSiguiente = new Date(ultima.fechaHasta);
+          diaSiguiente.setDate(diaSiguiente.getDate() + 1);
+          setFechaDesde(toYMD(diaSiguiente));
+          setFechaHasta(hoyStr);
+        } else {
+          const haceUnMes = new Date();
+          haceUnMes.setMonth(haceUnMes.getMonth() - 1);
+          setFechaDesde(toYMD(haceUnMes));
+          setFechaHasta(hoyStr);
+        }
+      })
+      .catch(() => {
+        const haceUnMes = new Date();
+        haceUnMes.setMonth(haceUnMes.getMonth() - 1);
+        setFechaDesde(toYMD(haceUnMes));
+        setFechaHasta(hoyStr);
+      });
+  }, [proveedorId]);
+
+  useEffect(() => {
+    if (!proveedorId) {
+      setRestriccion(null);
+      return;
+    }
+    setLoadingRestriccion(true);
+    fetch("/api/consignacion/deudas")
+      .then((r) => r.json())
+      .then((deudas: Array<{ proveedorId: string; restriccionRendicion: RestriccionMes }>) => {
+        const match = (Array.isArray(deudas) ? deudas : []).find(
+          (d) => d.proveedorId === proveedorId
+        );
+        setRestriccion(match?.restriccionRendicion ?? null);
+      })
+      .catch(() => setRestriccion(null))
+      .finally(() => setLoadingRestriccion(false));
+  }, [proveedorId]);
 
   const calcularPreview = async () => {
     if (!proveedorId || !fechaDesde || !fechaHasta) {
@@ -98,6 +173,7 @@ function NuevaRendicionContent() {
       }
       const data = await res.json();
       setPreview(data);
+      if (data.restriccionMes) setRestriccion(data.restriccionMes);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error");
       setPreview(null);
@@ -118,6 +194,9 @@ function NuevaRendicionContent() {
           proveedorId,
           fechaDesde,
           fechaHasta,
+          monedaLiquidacion,
+          cotizacionUsd:
+            monedaLiquidacion === "USD" ? parseCurrencyInput(cotizacionUsd) : null,
         }),
       });
       if (!res.ok) {
@@ -135,143 +214,79 @@ function NuevaRendicionContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <Link href="/consignacion">
-        <Button variant="ghost">← Consignación</Button>
-      </Link>
-      <h1 className="text-2xl font-bold">Nueva rendición</h1>
+    <div className="space-y-10 pb-20">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+            <Link href="/consignacion" className="group flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-2">
+                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+                <span className="text-xs font-bold uppercase tracking-wider">Volver al Dashboard</span>
+            </Link>
+            <h1 className="text-3xl font-black tracking-tighter sm:text-4xl text-foreground">
+                Nueva Rendición
+            </h1>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Parámetros</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[200px]">
-            <label className="mb-1 block text-sm">Proveedor</label>
-            <Select value={proveedorId} onValueChange={(v) => setProveedorId(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar" />
-              </SelectTrigger>
-              <SelectContent>
-                {proveedores.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm">Desde</label>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              className="rounded border px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm">Hasta</label>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              className="rounded border px-3 py-2"
-            />
-          </div>
-          <Button onClick={calcularPreview} disabled={isLoading}>
-            {isLoading ? "Calculando…" : "Calcular"}
-          </Button>
-        </CardContent>
-      </Card>
+      <RendicionParams 
+        proveedores={proveedores}
+        proveedorId={proveedorId}
+        setProveedorId={setProveedorId}
+        fechaDesde={fechaDesde}
+        setFechaDesde={setFechaDesde}
+        fechaHasta={fechaHasta}
+        setFechaHasta={setFechaHasta}
+        onCalculate={calcularPreview}
+        isLoading={isLoading}
+        bloqueado={restriccion ? !restriccion.permitido : false}
+      />
 
-      {error && <p className="text-destructive">{error}</p>}
+      {restriccion && !restriccion.permitido && (
+        <div className="rounded-lg bg-amber-500/10 p-5 border border-amber-500/20 space-y-2">
+            <p className="text-sm font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                <Lock className="h-4 w-4 shrink-0" />
+                Rendición no disponible
+            </p>
+            <p className="text-sm text-amber-700/80 dark:text-amber-400/80">
+                {restriccion.motivo}
+            </p>
+            {restriccion.diasParaUltimaSemana > 0 && (
+              <p className="text-xs text-amber-600/60 dark:text-amber-500/60 flex items-center gap-1.5 mt-1">
+                <Calendar className="h-3 w-3" />
+                La deuda de consignación se sigue acumulando y se incluirá en la próxima rendición.
+              </p>
+            )}
+        </div>
+      )}
+
+      {restriccion?.permitido && restriccion.rendicionExistenteEnMes && (
+        <div className="rounded-lg bg-blue-500/10 p-4 border border-blue-500/20">
+            <p className="text-sm text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                <Calendar className="h-4 w-4 shrink-0" />
+                Ya existe una rendición este mes ({restriccion.rendicionExistenteEnMes.numeroRendicion}). 
+                Estás en la última semana del mes, por lo que podés generar una rendición adicional.
+            </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg bg-red-500/10 p-4 border border-red-500/20">
+            <p className="text-sm font-bold text-red-600 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                {error}
+            </p>
+        </div>
+      )}
 
       {preview && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumen de rendición</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {preview.proveedorNombre} •{" "}
-              {new Date(preview.fechaDesde).toLocaleDateString()} -{" "}
-              {new Date(preview.fechaHasta).toLocaleDateString()}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {preview.todasRendidas && (
-              <p className="rounded bg-amber-100 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-                Todas las ventas de este período ya fueron incluidas en rendiciones anteriores.
-                No hay monto nuevo a rendir.
-              </p>
-            )}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Total vendido</p>
-                <p className="text-2xl font-bold">${preview.totalVendido.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Comisión shop</p>
-                <p className="text-2xl font-bold text-green-600">
-                  ${preview.comisionShop.toFixed(2)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">A rendir al proveedor</p>
-                <p className="text-2xl font-bold text-amber-600">
-                  ${preview.totalARendir.toFixed(2)}
-                </p>
-              </div>
-            </div>
-
-            {preview.items.length > 0 && !preview.todasRendidas && (
-              <>
-                <div className="text-sm font-medium">Detalle de items</div>
-                <div className="max-h-64 overflow-auto rounded border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="p-2 text-left">Producto</th>
-                        <th className="p-2 text-right">Cant.</th>
-                        <th className="p-2 text-right">P. venta</th>
-                        <th className="p-2 text-right">Total</th>
-                        <th className="p-2 text-right">A proveedor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {preview.items.map((item, i) => (
-                        <tr key={i} className="border-b">
-                          <td className="p-2">{item.productoNombre}</td>
-                          <td className="p-2 text-right">{item.cantidad}</td>
-                          <td className="p-2 text-right">
-                            ${item.precioVenta.toFixed(2)}
-                          </td>
-                          <td className="p-2 text-right">
-                            ${item.totalVenta.toFixed(2)}
-                          </td>
-                          <td className="p-2 text-right">
-                            ${item.montoProveedor.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <Button
-                  onClick={confirmarRendicion}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  {isLoading ? "Creando…" : "Confirmar y generar rendición"}
-                </Button>
-              </>
-            )}
-            {preview.todasRendidas && preview.items.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Seleccioná otro rango de fechas para ver ventas pendientes de rendir.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <RendicionPreview
+          preview={preview}
+          onConfirm={confirmarRendicion}
+          isLoading={isLoading}
+          monedaLiquidacion={monedaLiquidacion}
+          onMonedaLiquidacionChange={setMonedaLiquidacion}
+          cotizacionUsd={cotizacionUsd}
+          onCotizacionUsdChange={setCotizacionUsd}
+        />
       )}
     </div>
   );

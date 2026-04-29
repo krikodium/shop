@@ -39,11 +39,21 @@ export default function NuevoProductoPage() {
     router.refresh();
   };
 
-  if (loading) return <p className="text-muted-foreground">Cargando…</p>;
+  if (loading) {
+    return (
+      <div className="max-w-2xl space-y-6 animate-in fade-in duration-300">
+        <div className="h-8 w-48 animate-skeleton-shimmer rounded" />
+        <div className="h-96 animate-skeleton-shimmer rounded-lg" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold">Nuevo producto</h1>
+    <div className="max-w-2xl space-y-6 animate-in fade-in duration-300">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Nuevo producto</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Crear un nuevo producto en el catálogo</p>
+      </div>
       <ProductoForm
         categorias={categorias}
         proveedores={proveedores}

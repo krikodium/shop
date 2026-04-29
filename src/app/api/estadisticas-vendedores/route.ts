@@ -55,6 +55,7 @@ export async function GET(request: Request) {
         const ventas = await prisma.venta.count({
           where: {
             usuarioId: v.id,
+            anulada: false,
             fecha: { gte: fechaDesde, lte: fechaHasta },
           },
         });
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
         const totalVentas = await prisma.venta.aggregate({
           where: {
             usuarioId: v.id,
+            anulada: false,
             fecha: { gte: fechaDesde, lte: fechaHasta },
           },
           _sum: { total: true },

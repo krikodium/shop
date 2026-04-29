@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { METODO_PAGO_LABEL } from "@/lib/constants";
+import { totalDeudaConsignacionPendiente } from "@/lib/consignacionHelpers";
+import { ventaFindManySafe } from "@/lib/ventaFindManySafe";
 
 function getInicioMes() {
   const hoy = new Date();
@@ -23,20 +25,62 @@ export async function GET() {
     const inicioDia = getInicioDia();
     const finDia = getFinDia();
 
-    // Ventas del mes
-    const ventasMes = await prisma.venta.findMany({
-      where: { fecha: { gte: inicioMes } },
-      select: {
+    type VentaMesFila = {
+      total: unknown;
+      gananciaBruta: unknown;
+      metodoPago: string;
+      metodoPagoSecundario: string | null;
+      montoPago1Ars: unknown;
+      montoPago2Ars: unknown;
+      usdPago1: unknown;
+      usdPago2: unknown;
+      fecha: Date;
+    };
+    type VentaMesBasica = Pick<
+      VentaMesFila,
+      "total" | "gananciaBruta" | "metodoPago" | "fecha"
+    >;
+
+    const ventasMes = await ventaFindManySafe<VentaMesFila, VentaMesBasica>(prisma, {
+      where: { fecha: { gte: inicioMes }, anulada: false },
+      selectFull: {
+        total: true,
+        gananciaBruta: true,
+        metodoPago: true,
+        metodoPagoSecundario: true,
+        montoPago1Ars: true,
+        montoPago2Ars: true,
+        usdPago1: true,
+        usdPago2: true,
+        fecha: true,
+      },
+      selectBasic: {
         total: true,
         gananciaBruta: true,
         metodoPago: true,
         fecha: true,
       },
+      mapBasic: (rows) =>
+        rows.map((v) => ({
+          ...v,
+          metodoPagoSecundario: null,
+          montoPago1Ars: null,
+          montoPago2Ars: null,
+          usdPago1: null,
+          usdPago2: null,
+        })),
     });
 
     const totalVentasMes = ventasMes.reduce((s, v) => s + Number(v.total), 0);
     const totalGananciaMes = ventasMes.reduce((s, v) => s + Number(v.gananciaBruta), 0);
     const cantidadVentasMes = ventasMes.length;
+
+    const sumaUsdVenta = (v: VentaMesFila) =>
+      (v.usdPago1 != null ? Number(v.usdPago1) : 0) +
+      (v.usdPago2 != null ? Number(v.usdPago2) : 0);
+
+    const totalUsdRecibidoMes = ventasMes.reduce((s, v) => s + sumaUsdVenta(v), 0);
+    const ventasConUsdMes = ventasMes.filter((v) => sumaUsdVenta(v) > 0).length;
 
     // Ventas de hoy
     const ventasHoy = ventasMes.filter(
@@ -44,6 +88,8 @@ export async function GET() {
     );
     const totalVentasHoy = ventasHoy.reduce((s, v) => s + Number(v.total), 0);
     const cantidadVentasHoy = ventasHoy.length;
+    const totalUsdRecibidoHoy = ventasHoy.reduce((s, v) => s + sumaUsdVenta(v), 0);
+    const ventasConUsdHoy = ventasHoy.filter((v) => sumaUsdVenta(v) > 0).length;
 
     // Ventas por día (últimos 14 días, incluyendo hoy)
     const hoy = new Date();
@@ -53,6 +99,7 @@ export async function GET() {
 
     // Traer TODAS las ventas recientes (sin filtrar por fecha en query para evitar problemas de timezone)
     const ventasParaGrafico = await prisma.venta.findMany({
+      where: { anulada: false },
       orderBy: { fecha: "desc" },
       take: 500,
       select: { fecha: true, total: true },
@@ -97,29 +144,34 @@ export async function GET() {
         cantidad: data.cantidad,
       }));
 
-    // Por método de pago (mes)
+    // Por método de pago (mes): si hay pago dividido, reparte montos entre métodos
     const porMetodoPago = ventasMes.reduce(
       (acc, v) => {
-        const metodo = v.metodoPago;
-        if (!acc[metodo]) acc[metodo] = { total: 0, cantidad: 0 };
-        acc[metodo].total += Number(v.total);
-        acc[metodo].cantidad += 1;
+        const total = Number(v.total);
+        const sec = v.metodoPagoSecundario;
+        const m1 = v.montoPago1Ars != null ? Number(v.montoPago1Ars) : null;
+        const m2 = v.montoPago2Ars != null ? Number(v.montoPago2Ars) : null;
+        if (sec && m1 != null && m2 != null) {
+          const add = (metodo: string, monto: number, cuentaVenta: boolean) => {
+            if (!acc[metodo]) acc[metodo] = { total: 0, cantidad: 0 };
+            acc[metodo].total += monto;
+            if (cuentaVenta) acc[metodo].cantidad += 1;
+          };
+          add(v.metodoPago, m1, true);
+          add(sec, m2, false);
+        } else {
+          const metodo = v.metodoPago;
+          if (!acc[metodo]) acc[metodo] = { total: 0, cantidad: 0 };
+          acc[metodo].total += total;
+          acc[metodo].cantidad += 1;
+        }
         return acc;
       },
       {} as Record<string, { total: number; cantidad: number }>
     );
 
-    const METODOS_LABEL: Record<string, string> = {
-      EFECTIVO: "Efectivo",
-      TARJETA_DEBITO: "Tarjeta débito",
-      TARJETA_CREDITO: "Tarjeta crédito",
-      TRANSFERENCIA: "Transferencia",
-      MERCADOPAGO: "Mercado Pago",
-      MULTIPLE: "Múltiple",
-    };
-
     const metodoPagoChart = Object.entries(porMetodoPago).map(([metodo, data]) => ({
-      name: METODOS_LABEL[metodo] ?? metodo,
+      name: METODO_PAGO_LABEL[metodo] ?? metodo,
       value: data.total,
       cantidad: data.cantidad,
     }));
@@ -139,28 +191,60 @@ export async function GET() {
     );
 
     // Últimas ventas
-    const ultimasVentas = await prisma.venta.findMany({
-      take: 5,
-      orderBy: { fecha: "desc" },
-      select: {
-        id: true,
-        numeroVenta: true,
-        fecha: true,
-        total: true,
-      },
-    });
+    let ultimasVentasJson: Array<{
+      id: string;
+      numeroVenta: string;
+      fecha: Date;
+      total: unknown;
+      tieneUsd: boolean;
+      pagoDividido: boolean;
+    }>;
+    try {
+      const ultimasVentas = await prisma.venta.findMany({
+        where: { anulada: false },
+        take: 5,
+        orderBy: { fecha: "desc" },
+        select: {
+          id: true,
+          numeroVenta: true,
+          fecha: true,
+          total: true,
+          usdPago1: true,
+          usdPago2: true,
+          metodoPagoSecundario: true,
+        },
+      });
+      ultimasVentasJson = ultimasVentas.map((v) => ({
+        id: v.id,
+        numeroVenta: v.numeroVenta,
+        fecha: v.fecha,
+        total: v.total,
+        tieneUsd:
+          (v.usdPago1 != null && Number(v.usdPago1) > 0) ||
+          (v.usdPago2 != null && Number(v.usdPago2) > 0),
+        pagoDividido: Boolean(v.metodoPagoSecundario),
+      }));
+    } catch {
+      const ultimasVentas = await prisma.venta.findMany({
+        where: { anulada: false },
+        take: 5,
+        orderBy: { fecha: "desc" },
+        select: {
+          id: true,
+          numeroVenta: true,
+          fecha: true,
+          total: true,
+        },
+      });
+      ultimasVentasJson = ultimasVentas.map((v) => ({
+        ...v,
+        tieneUsd: false,
+        pagoDividido: false,
+      }));
+    }
 
-    // Deuda consignación (suma de ventas con items en consignación)
-    const ventasConConsignacion = await prisma.venta.findMany({
-      where: {
-        items: { some: { esConsignacion: true } },
-      },
-      select: { deudaConsignacion: true },
-    });
-    const totalDeudaConsignacion = ventasConConsignacion.reduce(
-      (s, v) => s + Number(v.deudaConsignacion ?? 0),
-      0
-    );
+    // Deuda consignación pendiente (solo items NO rendidos en rendiciones previas)
+    const totalDeudaConsignacion = await totalDeudaConsignacionPendiente();
 
     // Resumen inventario
     const [totalProductos, productosActivos] = await Promise.all([
@@ -179,11 +263,15 @@ export async function GET() {
         totalProductos,
         productosActivos,
         productosBajoStock: productosBajoStock.length,
+        totalUsdRecibidoMes,
+        ventasConUsdMes,
+        totalUsdRecibidoHoy,
+        ventasConUsdHoy,
       },
       ventasUltimos14Dias,
       metodoPagoChart,
       productosBajoStock: productosBajoStock.slice(0, 5),
-      ultimasVentas,
+      ultimasVentas: ultimasVentasJson,
     });
   } catch (error) {
     console.error("Error dashboard:", error);

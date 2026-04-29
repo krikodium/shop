@@ -18,27 +18,33 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Header móvil */}
-      <header className="flex items-center justify-between border-b bg-card px-4 py-3 lg:hidden">
+      <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 shadow-sm lg:hidden">
         <MobileNav />
-        <Link href="/" className="font-semibold text-lg">
+        <Link href="/" className="font-semibold text-lg tracking-tight">
           Shop
         </Link>
         <Link
           href="/ventas/nueva"
-          className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+          className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
         >
           + Venta
         </Link>
       </header>
 
       {/* Sidebar desktop */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-card p-4 lg:flex">
-        <Link href="/" className="mb-6 block font-semibold text-lg">
-          Shop
-        </Link>
-        <SidebarNav />
-        <div className="mt-auto pt-4 border-t border-border">
-          <UserMenu />
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
+        <div className="border-b border-border px-5 py-5">
+          <Link href="/" className="font-semibold text-lg tracking-tight">
+            Shop
+          </Link>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <SidebarNav />
+          </div>
+          <div className="mt-auto border-t border-border pt-4">
+            <UserMenu />
+          </div>
         </div>
       </aside>
 

@@ -6,6 +6,7 @@ import { z } from "zod";
 const movimientoSchema = z.object({
   tipo: z.enum(["INGRESO", "EGRESO"]),
   monto: z.number().positive(),
+  moneda: z.enum(["ARS", "USD"]).default("ARS"),
   concepto: z.string().optional(),
 });
 
@@ -19,8 +20,22 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
     const cajaId = searchParams.get("cajaId");
+    const todas = searchParams.get("todas") === "true";
 
     const isAdmin = session.user.role === "ADMIN";
+
+    if (todas && isAdmin) {
+      const cajas = await prisma.cajaChica.findMany({
+        include: {
+          movimientos: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { fechaApertura: "desc" },
+        take: 100,
+      });
+      return NextResponse.json(cajas);
+    }
+
     const targetUserId = userId && isAdmin ? userId : session.user.id;
 
     if (!targetUserId) {
@@ -75,9 +90,16 @@ export async function POST(request: Request) {
 
     if (accion === "abrir") {
       const montoInicial = Number(body.montoInicial ?? 0);
-      if (montoInicial < 0) {
+      const montoInicialUsd = Number(body.montoInicialUsd ?? 0);
+      if (montoInicial < 0 || montoInicialUsd < 0) {
         return NextResponse.json(
-          { error: "Monto inicial debe ser positivo" },
+          { error: "Los montos iniciales deben ser positivos" },
+          { status: 400 }
+        );
+      }
+      if (montoInicial === 0 && montoInicialUsd === 0) {
+        return NextResponse.json(
+          { error: "Ingresá al menos un monto inicial (ARS o USD)" },
           { status: 400 }
         );
       }
@@ -98,7 +120,8 @@ export async function POST(request: Request) {
       const caja = await prisma.cajaChica.create({
         data: {
           userId: session.user.id,
-          montoInicial: montoInicial,
+          montoInicial,
+          montoInicialUsd: montoInicialUsd || undefined,
           estado: "ABIERTA",
         },
       });
@@ -123,12 +146,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Caja no encontrada o cerrada" }, { status: 404 });
       }
 
-      const monto = data.tipo === "EGRESO" ? -data.monto : data.monto;
       const mov = await prisma.movimientoCaja.create({
         data: {
           cajaId,
           tipo: data.tipo,
           monto: Math.abs(data.monto),
+          moneda: data.moneda ?? "ARS",
           concepto: data.concepto ?? null,
         },
       });

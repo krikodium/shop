@@ -5,6 +5,18 @@ import { productoSchema } from "@/lib/validaciones/productoSchema";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const idsParam = searchParams.get("ids");
+    if (idsParam) {
+      const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean);
+      if (ids.length > 0) {
+        const stocks = await prisma.producto.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, nombre: true, stockActual: true },
+        });
+        return NextResponse.json(stocks);
+      }
+    }
+
     const categoriaId = searchParams.get("categoriaId");
     const proveedorId = searchParams.get("proveedorId");
     const enConsignacion = searchParams.get("enConsignacion");

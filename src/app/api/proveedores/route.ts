@@ -34,6 +34,8 @@ export async function POST(request: Request) {
         direccion: data.direccion ?? null,
         tipoProveedor: data.tipoProveedor,
         comisionPorDefecto: data.comisionPorDefecto ?? null,
+        liquidacionUsd:
+          data.tipoProveedor === "CONSIGNACION" ? (data.liquidacionUsd ?? false) : false,
       },
     });
     return NextResponse.json(proveedor, { status: 201 });

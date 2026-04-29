@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ClienteForm } from "@/components/forms/ClienteForm";
 import type { ClienteFormValues } from "@/lib/validaciones/clienteSchema";
 
@@ -15,9 +16,12 @@ export default function NuevoClientePage() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error ?? "Error al crear cliente");
+      const msg = err.error ?? "Error al crear cliente";
+      toast.error(msg);
+      throw new Error(msg);
     }
     const cliente = await res.json();
+    toast.success("Cliente creado correctamente");
     router.push(`/clientes/${cliente.id}`);
     router.refresh();
   };

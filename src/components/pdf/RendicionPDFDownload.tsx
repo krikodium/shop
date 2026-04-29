@@ -20,6 +20,9 @@ interface RendicionPDFDownloadProps {
   totalVendido: number;
   comisionShop: number;
   totalARendir: number;
+  monedaLiquidacion?: "ARS" | "USD";
+  cotizacionUsd?: number | null;
+  totalARendirUsd?: number | null;
   estado: string;
   items: DetalleItem[];
 }

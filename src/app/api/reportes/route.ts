@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { ventaFindManySafe } from "@/lib/ventaFindManySafe";
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
     const fechaHasta = hasta ? new Date(hasta + "T23:59:59.999") : null;
 
     if (tipo === "ventas") {
-      const where: Prisma.VentaWhereInput = {};
+      const where: Prisma.VentaWhereInput = { anulada: false };
       if (fechaDesde || fechaHasta) {
         where.fecha = {
           ...(fechaDesde ? { gte: fechaDesde } : {}),
@@ -22,9 +23,51 @@ export async function GET(request: Request) {
         };
       }
 
-      const ventas = await prisma.venta.findMany({
+      type VentaRepFila = {
+        total: unknown;
+        subtotal: unknown;
+        descuento: unknown;
+        costoTotal: unknown;
+        gananciaBruta: unknown;
+        margenPorcentaje: unknown;
+        metodoPago: string;
+        metodoPagoSecundario: string | null;
+        montoPago1Ars: unknown;
+        montoPago2Ars: unknown;
+        usdPago1: unknown;
+        usdPago2: unknown;
+        cotizacionUsd: unknown;
+        fecha: Date;
+      };
+      type VentaRepBasica = Omit<
+        VentaRepFila,
+        | "metodoPagoSecundario"
+        | "montoPago1Ars"
+        | "montoPago2Ars"
+        | "usdPago1"
+        | "usdPago2"
+        | "cotizacionUsd"
+      >;
+
+      const ventas = await ventaFindManySafe<VentaRepFila, VentaRepBasica>(prisma, {
         where,
-        select: {
+        selectFull: {
+          total: true,
+          subtotal: true,
+          descuento: true,
+          costoTotal: true,
+          gananciaBruta: true,
+          margenPorcentaje: true,
+          metodoPago: true,
+          metodoPagoSecundario: true,
+          montoPago1Ars: true,
+          montoPago2Ars: true,
+          usdPago1: true,
+          usdPago2: true,
+          cotizacionUsd: true,
+          fecha: true,
+        },
+        selectBasic: {
           total: true,
           subtotal: true,
           descuento: true,
@@ -34,6 +77,16 @@ export async function GET(request: Request) {
           metodoPago: true,
           fecha: true,
         },
+        mapBasic: (rows) =>
+          rows.map((v) => ({
+            ...v,
+            metodoPagoSecundario: null,
+            montoPago1Ars: null,
+            montoPago2Ars: null,
+            usdPago1: null,
+            usdPago2: null,
+            cotizacionUsd: null,
+          })),
       });
 
       const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0);
@@ -45,14 +98,43 @@ export async function GET(request: Request) {
 
       const porMetodoPago = ventas.reduce(
         (acc, v) => {
-          const metodo = v.metodoPago;
-          if (!acc[metodo]) acc[metodo] = { cantidad: 0, total: 0 };
-          acc[metodo].cantidad += 1;
-          acc[metodo].total += Number(v.total);
+          const total = Number(v.total);
+          const sec = v.metodoPagoSecundario;
+          const m1 = v.montoPago1Ars != null ? Number(v.montoPago1Ars) : null;
+          const m2 = v.montoPago2Ars != null ? Number(v.montoPago2Ars) : null;
+          if (sec && m1 != null && m2 != null) {
+            const add = (metodo: string, monto: number, cuentaVenta: boolean) => {
+              if (!acc[metodo]) acc[metodo] = { cantidad: 0, total: 0 };
+              acc[metodo].total += monto;
+              if (cuentaVenta) acc[metodo].cantidad += 1;
+            };
+            add(v.metodoPago, m1, true);
+            add(sec, m2, false);
+          } else {
+            const metodo = v.metodoPago;
+            if (!acc[metodo]) acc[metodo] = { cantidad: 0, total: 0 };
+            acc[metodo].cantidad += 1;
+            acc[metodo].total += total;
+          }
           return acc;
         },
         {} as Record<string, { cantidad: number; total: number }>
       );
+
+      let totalUsdRecibido = 0;
+      let equivalenteArsDesdeUsd = 0;
+      let ventasConUsd = 0;
+      for (const v of ventas) {
+        const u1 = v.usdPago1 != null ? Number(v.usdPago1) : 0;
+        const u2 = v.usdPago2 != null ? Number(v.usdPago2) : 0;
+        const sumUsd = u1 + u2;
+        if (sumUsd > 0) {
+          ventasConUsd += 1;
+          totalUsdRecibido += sumUsd;
+          const cot = v.cotizacionUsd != null ? Number(v.cotizacionUsd) : 0;
+          if (cot > 0) equivalenteArsDesdeUsd += sumUsd * cot;
+        }
+      }
 
       return NextResponse.json({
         totalVentas,
@@ -61,6 +143,12 @@ export async function GET(request: Request) {
         totalGanancia,
         margenPromedio: margenProm,
         porMetodoPago,
+        usd: {
+          totalUsdRecibido,
+          ventasConUsd,
+          /** Suma de (USD × cotización) por venta donde hubo USD y cotización guardada */
+          equivalenteArsDesdeUsd,
+        },
       });
     }
 
@@ -99,7 +187,7 @@ export async function GET(request: Request) {
     }
 
     if (tipo === "rentabilidad") {
-      const where: Prisma.VentaWhereInput = {};
+      const where: Prisma.VentaWhereInput = { anulada: false };
       if (fechaDesde || fechaHasta) {
         where.fecha = {
           ...(fechaDesde ? { gte: fechaDesde } : {}),

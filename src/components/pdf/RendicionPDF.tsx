@@ -129,6 +129,9 @@ interface RendicionPDFProps {
   totalVendido: number;
   comisionShop: number;
   totalARendir: number;
+  monedaLiquidacion?: "ARS" | "USD";
+  cotizacionUsd?: number | null;
+  totalARendirUsd?: number | null;
   estado: string;
   items: DetalleItem[];
 }
@@ -141,6 +144,9 @@ export function RendicionPDF({
   totalVendido,
   comisionShop,
   totalARendir,
+  monedaLiquidacion = "ARS",
+  cotizacionUsd = null,
+  totalARendirUsd = null,
   estado,
   items,
 }: RendicionPDFProps) {
@@ -176,9 +182,25 @@ export function RendicionPDF({
             <Text>${comisionShop.toFixed(2)}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={{ fontWeight: "bold" }}>Total a rendir al proveedor</Text>
+            <Text style={{ fontWeight: "bold" }}>Total a rendir al proveedor (ARS)</Text>
             <Text style={{ fontWeight: "bold" }}>${totalARendir.toFixed(2)}</Text>
           </View>
+          {monedaLiquidacion === "USD" &&
+            cotizacionUsd != null &&
+            totalARendirUsd != null && (
+              <>
+                <View style={styles.row}>
+                  <Text>Cotización (ARS/USD)</Text>
+                  <Text>{cotizacionUsd.toFixed(4)}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={{ fontWeight: "bold" }}>Equivalente liquidación USD</Text>
+                  <Text style={{ fontWeight: "bold" }}>
+                    US$ {totalARendirUsd.toFixed(2)}
+                  </Text>
+                </View>
+              </>
+            )}
         </View>
 
         <View style={[styles.section, { marginTop: 24 }]}>

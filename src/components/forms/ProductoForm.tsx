@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -24,6 +25,7 @@ import {
 import type { ProductoFormValues } from "@/lib/validaciones/productoSchema";
 import { productoSchema } from "@/lib/validaciones/productoSchema";
 import type { Producto, Categoria, Proveedor } from "@prisma/client";
+import { toast } from "sonner";
 
 interface ProductoFormProps {
   defaultValues?: ProductoFormValues;
@@ -174,17 +176,11 @@ export function ProductoForm({
               <FormItem>
                 <FormLabel>Precio de compra</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={0.01}
+                  <CurrencyInput
+                    value={field.value ?? null}
+                    onChange={field.onChange}
+                    nullable
                     placeholder="0"
-                    value={field.value ?? ""}
-                    onChange={(e) =>
-                      field.onChange(
-                        e.target.value === "" ? null : Number(e.target.value)
-                      )
-                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -198,12 +194,10 @@ export function ProductoForm({
               <FormItem>
                 <FormLabel>Precio de venta *</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    {...field}
-                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  <CurrencyInput
+                    value={field.value ?? 0}
+                    onChange={field.onChange}
+                    placeholder="0"
                   />
                 </FormControl>
                 <FormMessage />
@@ -296,12 +290,13 @@ export function ProductoForm({
             <FormItem>
               <FormLabel>Imagen</FormLabel>
               <FormControl>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input
                     placeholder="URL de imagen o subir archivo"
                     value={field.value ?? ""}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
+                    className="min-w-0"
                   />
                   <input
                     type="file"
@@ -309,21 +304,38 @@ export function ProductoForm({
                     className="hidden"
                     id="producto-imagen"
                     onChange={async (e) => {
-                      const file = e.target.files?.[0];
+                      const input = e.target;
+                      const file = input.files?.[0];
                       if (!file) return;
                       const formData = new FormData();
                       formData.append("file", file);
-                      const res = await fetch("/api/upload", {
-                        method: "POST",
-                        body: formData,
-                      });
-                      const data = await res.json();
-                      if (data.url) field.onChange(data.url);
+                      try {
+                        const res = await fetch("/api/upload", {
+                          method: "POST",
+                          body: formData,
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          toast.error(
+                            typeof data.error === "string"
+                              ? data.error
+                              : "No se pudo subir la imagen"
+                          );
+                          input.value = "";
+                          return;
+                        }
+                        if (data.url) field.onChange(data.url);
+                      } catch {
+                        toast.error("Error de red al subir la imagen");
+                      } finally {
+                        input.value = "";
+                      }
                     }}
                   />
                   <Button
                     type="button"
                     variant="outline"
+                    className="shrink-0"
                     onClick={() => document.getElementById("producto-imagen")?.click()}
                   >
                     Subir

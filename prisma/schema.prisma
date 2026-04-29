@@ -5,6 +5,7 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// URL de conexión: prisma.config.ts (Prisma 7+)
 datasource db {
   provider = "postgresql"
 }
@@ -23,6 +24,8 @@ model Proveedor {
 
   // Para proveedores en consignación
   comisionPorDefecto Decimal?  @db.Decimal(5, 2) // % que se queda el shop (ej: 30.00)
+  /// Preferencia: al generar rendición, liquidar en USD (el TC se ingresa en ese momento)
+  liquidacionUsd    Boolean   @default(false)
 
   productos         Producto[]
   ordenesCompra     OrdenCompra[]
@@ -115,6 +118,18 @@ model Venta {
   // PAGO
   metodoPago      MetodoPago
   estadoPago      EstadoPago @default(PENDIENTE)
+  /// Segundo método cuando la venta se divide en dos pagos (ej. USD + ARS)
+  metodoPagoSecundario MetodoPago?
+  /// Monto en ARS imputado al primer método (obligatorio si hay segundo método)
+  montoPago1Ars   Decimal?  @db.Decimal(12, 2)
+  /// Monto en ARS imputado al segundo método
+  montoPago2Ars   Decimal?  @db.Decimal(12, 2)
+  /// USD recibidos en el primer tramo (si aplica)
+  usdPago1        Decimal?  @db.Decimal(12, 2)
+  /// USD recibidos en el segundo tramo (si aplica)
+  usdPago2        Decimal?  @db.Decimal(12, 2)
+  /// Cotización ARS por 1 USD usada al registrar (referencia)
+  cotizacionUsd   Decimal?  @db.Decimal(12, 4)
 
   // RELACIONES
   items           ItemVenta[]
@@ -124,6 +139,7 @@ model Venta {
   usuario         String?   // Nombre (legacy)
   usuarioId       String?   // Usuario que registró la venta
   user            User?     @relation(fields: [usuarioId], references: [id])
+  anulada         Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -197,7 +213,14 @@ model Rendicion {
   // TOTALES
   totalVendido    Decimal   @db.Decimal(10, 2) // Total precio venta de productos vendidos
   comisionShop    Decimal   @db.Decimal(10, 2) // Lo que se queda el shop
-  totalARendir    Decimal   @db.Decimal(10, 2) // Lo que se le paga al proveedor
+  totalARendir    Decimal   @db.Decimal(10, 2) // Lo que se le paga al proveedor (siempre en ARS de referencia de ventas)
+
+  /// Moneda en que se liquida al proveedor (ARS o USD); el TC solo aplica si es USD
+  monedaLiquidacion MonedaLiquidacion @default(ARS)
+  /// Cotización ARS por 1 USD al generar la rendición (obligatoria si monedaLiquidacion = USD)
+  cotizacionUsd     Decimal?  @db.Decimal(12, 4)
+  /// Equivalente en USD del neto a rendir (totalARendir / cotizacionUsd) cuando liquida en USD
+  totalARendirUsd   Decimal?  @db.Decimal(12, 2)
 
   // ESTADO
   estado          EstadoRendicion @default(PENDIENTE)
@@ -219,6 +242,11 @@ enum EstadoRendicion {
   PENDIENTE
   PAGADO
   PARCIAL
+}
+
+enum MonedaLiquidacion {
+  ARS
+  USD
 }
 
 // ============================================
@@ -383,19 +411,20 @@ model JornadaLaboral {
 // CAJA CHICA
 // ============================================
 model CajaChica {
-  id            String    @id @default(cuid())
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String
+  id              String    @id @default(cuid())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
 
-  fechaApertura DateTime  @default(now())
-  fechaCierre   DateTime?
-  montoInicial  Decimal   @db.Decimal(10, 2)
-  estado        EstadoCaja @default(ABIERTA)
+  fechaApertura   DateTime  @default(now())
+  fechaCierre     DateTime?
+  montoInicial    Decimal   @db.Decimal(10, 2)
+  montoInicialUsd Decimal?  @db.Decimal(10, 2)
+  estado          EstadoCaja @default(ABIERTA)
 
-  movimientos   MovimientoCaja[]
+  movimientos     MovimientoCaja[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([userId])
   @@index([fechaApertura])
@@ -408,6 +437,7 @@ model MovimientoCaja {
 
   tipo      TipoMovimientoCaja
   monto     Decimal  @db.Decimal(10, 2)
+  moneda    String   @default("ARS")
   concepto  String?
   fecha     DateTime @default(now())
 

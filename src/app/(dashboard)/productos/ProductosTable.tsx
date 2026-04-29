@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 import type { Producto, Categoria, Proveedor } from "@prisma/client";
 
 interface ProductoConRelaciones extends Producto {
@@ -41,21 +42,22 @@ export function ProductosTable({ queryParams = "", onRefresh }: ProductosTablePr
   }, [queryParams]);
 
   if (loading) {
-    return <p className="text-muted-foreground">Cargando productos…</p>;
+    return <TableSkeleton rows={8} cols={8} />;
   }
 
   if (productos.length === 0) {
     return (
-      <p className="text-muted-foreground">
+      <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center text-muted-foreground">
         No hay productos.{" "}
-        <Link href="/productos/nuevo" className="text-primary underline">
+        <Link href="/productos/nuevo" className="font-medium text-primary hover:underline">
           Crear uno
         </Link>
-      </p>
+      </div>
     );
   }
 
   return (
+    <div className="rounded-lg border bg-card overflow-hidden shadow-sm">
     <Table>
       <TableHeader>
         <TableRow>
@@ -86,7 +88,7 @@ export function ProductosTable({ queryParams = "", onRefresh }: ProductosTablePr
             <TableCell className="font-mono text-sm">{p.sku}</TableCell>
             <TableCell className="font-medium">{p.nombre}</TableCell>
             <TableCell>{p.categoria?.nombre ?? "—"}</TableCell>
-            <TableCell>${Number(p.precioVenta).toFixed(2)}</TableCell>
+            <TableCell className="tabular-nums">${Number(p.precioVenta).toFixed(2)}</TableCell>
             <TableCell>
               <span
                 className={
@@ -114,5 +116,6 @@ export function ProductosTable({ queryParams = "", onRefresh }: ProductosTablePr
         ))}
       </TableBody>
     </Table>
+    </div>
   );
 }

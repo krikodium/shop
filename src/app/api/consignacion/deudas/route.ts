@@ -1,6 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { itemsDeudaPendiente } from "@/lib/consignacionHelpers";
+import {
+  itemsDeudaPendiente,
+  validarCreacionRendicion,
+} from "@/lib/consignacionHelpers";
+
+export interface RestriccionRendicion {
+  permitido: boolean;
+  motivo: string | null;
+  esUltimaSemana: boolean;
+  diasParaUltimaSemana: number;
+  rendicionExistenteEnMes: {
+    id: string;
+    numeroRendicion: string;
+    fechaRendicion: string;
+  } | null;
+}
 
 export interface DeudaProveedor {
   proveedorId: string;
@@ -8,6 +23,7 @@ export interface DeudaProveedor {
   deudaPendiente: number;
   totalVendidoPeriodo: number;
   ultimaRendicion: { fechaHasta: string; totalARendir: number } | null;
+  restriccionRendicion: RestriccionRendicion;
 }
 
 /**
@@ -31,7 +47,10 @@ export async function GET() {
 
     for (const prov of proveedores) {
       const ultimaRendicion = prov.rendiciones[0] ?? null;
-      const items = await itemsDeudaPendiente(prov.id);
+      const [items, validacion] = await Promise.all([
+        itemsDeudaPendiente(prov.id),
+        validarCreacionRendicion(prov.id),
+      ]);
 
       const deudaPendiente = items.reduce(
         (sum, i) => sum + Number(i.deudaProveedor ?? 0),
@@ -53,6 +72,19 @@ export async function GET() {
               totalARendir: Number(ultimaRendicion.totalARendir),
             }
           : null,
+        restriccionRendicion: {
+          permitido: validacion.permitido,
+          motivo: validacion.motivo,
+          esUltimaSemana: validacion.esUltimaSemana,
+          diasParaUltimaSemana: validacion.diasParaUltimaSemana,
+          rendicionExistenteEnMes: validacion.rendicionExistenteEnMes
+            ? {
+                id: validacion.rendicionExistenteEnMes.id,
+                numeroRendicion: validacion.rendicionExistenteEnMes.numeroRendicion,
+                fechaRendicion: validacion.rendicionExistenteEnMes.fechaRendicion.toISOString(),
+              }
+            : null,
+        },
       });
     }
 

@@ -226,8 +226,8 @@ export default function UsuariosPage() {
               {editingId ? "Editar usuario" : "Nuevo usuario"}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
+          <form onSubmit={handleSubmit} className="space-y-5 pt-4">
+            <div className="space-y-2">
               <Label>Email</Label>
               <Input
                 value={form.email}
@@ -237,14 +237,14 @@ export default function UsuariosPage() {
                 disabled={!!editingId}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label>Nombre</Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label>Contraseña {editingId && "(dejar vacío para no cambiar)"}</Label>
               <Input
                 value={form.password}
@@ -254,7 +254,7 @@ export default function UsuariosPage() {
                 minLength={6}
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label>Rol</Label>
               <Select
                 value={form.role}
@@ -273,7 +273,7 @@ export default function UsuariosPage() {
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
+              <div className="space-y-2">
                 <Label>Horario entrada</Label>
                 <Input
                   type="time"
@@ -283,7 +283,7 @@ export default function UsuariosPage() {
                   }
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label>Horario salida</Label>
                 <Input
                   type="time"
