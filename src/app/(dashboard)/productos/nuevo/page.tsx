@@ -1,64 +1,17 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { ProductoForm, productoToFormValues } from "@/components/forms/ProductoForm";
-import type { ProductoFormValues } from "@/lib/validaciones/productoSchema";
+import { prisma } from "@/lib/prisma";
+import { NuevoProductoCliente } from "@/components/productos/NuevoProductoCliente";
 import type { Categoria, Proveedor } from "@prisma/client";
 
-export default function NuevoProductoPage() {
-  const router = useRouter();
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [loading, setLoading] = useState(true);
+export default async function NuevoProductoPage() {
+  const [categoriasRaw, proveedoresRaw] = await Promise.all([
+    prisma.categoria.findMany({ orderBy: { nombre: "asc" } }),
+    prisma.proveedor.findMany({ orderBy: { nombre: "asc" } }),
+  ]);
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/categorias").then((r) => r.json()),
-      fetch("/api/proveedores").then((r) => r.json()),
-    ])
-      .then(([cats, provs]) => {
-        setCategorias(Array.isArray(cats) ? cats : []);
-        setProveedores(Array.isArray(provs) ? provs : []);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleSubmit = async (data: ProductoFormValues) => {
-    const res = await fetch("/api/productos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error ?? "Error al crear producto");
-    }
-    const producto = await res.json();
-    router.push(`/productos/${producto.id}/editar`);
-    router.refresh();
-  };
-
-  if (loading) {
-    return (
-      <div className="max-w-2xl space-y-6 animate-in fade-in duration-300">
-        <div className="h-8 w-48 animate-skeleton-shimmer rounded" />
-        <div className="h-96 animate-skeleton-shimmer rounded-lg" />
-      </div>
-    );
-  }
+  const categorias = JSON.parse(JSON.stringify(categoriasRaw)) as Categoria[];
+  const proveedores = JSON.parse(JSON.stringify(proveedoresRaw)) as Proveedor[];
 
   return (
-    <div className="max-w-2xl space-y-6 animate-in fade-in duration-300">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Nuevo producto</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Crear un nuevo producto en el catálogo</p>
-      </div>
-      <ProductoForm
-        categorias={categorias}
-        proveedores={proveedores}
-        onSubmit={handleSubmit}
-      />
-    </div>
+    <NuevoProductoCliente categorias={categorias} proveedores={proveedores} />
   );
 }

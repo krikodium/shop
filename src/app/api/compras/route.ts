@@ -10,21 +10,87 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const proveedorId = searchParams.get("proveedorId");
     const estado = searchParams.get("estado");
+    const q = searchParams.get("q")?.trim();
+    const fechaDesde = searchParams.get("fechaDesde");
+    const fechaHasta = searchParams.get("fechaHasta");
+    const montoMin = searchParams.get("montoMin");
+    const montoMax = searchParams.get("montoMax");
+    const page = Math.max(1, Number(searchParams.get("page") ?? 1) || 1);
+    const pageSize = Math.min(
+      100,
+      Math.max(10, Number(searchParams.get("pageSize") ?? 20) || 20)
+    );
 
-    const ordenes = await prisma.ordenCompra.findMany({
-      where: {
-        ...(proveedorId ? { proveedorId } : {}),
-        ...(estado ? { estado: estado as "PENDIENTE" | "PARCIAL" | "RECIBIDO" | "CANCELADO" } : {}),
+    const where: Prisma.OrdenCompraWhereInput = {};
+
+    if (proveedorId) where.proveedorId = proveedorId;
+    if (estado) {
+      where.estado = estado as "PENDIENTE" | "PARCIAL" | "RECIBIDO" | "CANCELADO";
+    }
+    if (q) {
+      where.OR = [
+        { numeroOrden: { contains: q, mode: "insensitive" } },
+        { proveedor: { nombre: { contains: q, mode: "insensitive" } } },
+      ];
+    }
+    if (fechaDesde || fechaHasta) {
+      where.fecha = {
+        ...(fechaDesde ? { gte: new Date(`${fechaDesde}T00:00:00`) } : {}),
+        ...(fechaHasta ? { lte: new Date(`${fechaHasta}T23:59:59`) } : {}),
+      };
+    }
+    if (montoMin || montoMax) {
+      where.total = {
+        ...(montoMin ? { gte: new Prisma.Decimal(montoMin) } : {}),
+        ...(montoMax ? { lte: new Prisma.Decimal(montoMax) } : {}),
+      };
+    }
+
+    const [ordenes, total] = await prisma.$transaction([
+      prisma.ordenCompra.findMany({
+        where,
+        select: {
+          id: true,
+          numeroOrden: true,
+          fecha: true,
+          total: true,
+          estado: true,
+          proveedor: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+          _count: {
+            select: {
+              items: true,
+            },
+          },
+        },
+        orderBy: { fecha: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.ordenCompra.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      data: ordenes.map((orden) => ({
+        id: orden.id,
+        numeroOrden: orden.numeroOrden,
+        fecha: orden.fecha,
+        total: orden.total,
+        estado: orden.estado,
+        proveedor: orden.proveedor,
+        itemsCount: orden._count.items,
+      })),
+      meta: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
       },
-      include: {
-        proveedor: true,
-        items: { include: { producto: true } },
-      },
-      orderBy: { fecha: "desc" },
-      take: 50,
     });
-
-    return NextResponse.json(ordenes);
   } catch (error) {
     console.error("Error listando órdenes:", error);
     return NextResponse.json(

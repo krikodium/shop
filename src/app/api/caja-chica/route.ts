@@ -117,12 +117,19 @@ export async function POST(request: Request) {
         );
       }
 
-      const caja = await prisma.cajaChica.create({
+      const created = await prisma.cajaChica.create({
         data: {
           userId: session.user.id,
           montoInicial,
           montoInicialUsd: montoInicialUsd || undefined,
           estado: "ABIERTA",
+        },
+      });
+      const caja = await prisma.cajaChica.findUnique({
+        where: { id: created.id },
+        include: {
+          movimientos: true,
+          user: { select: { id: true, name: true, email: true } },
         },
       });
       return NextResponse.json(caja, { status: 201 });
@@ -155,7 +162,17 @@ export async function POST(request: Request) {
           concepto: data.concepto ?? null,
         },
       });
-      return NextResponse.json(mov, { status: 201 });
+      const cajaActualizada = await prisma.cajaChica.findFirst({
+        where: { id: cajaId },
+        include: {
+          movimientos: { orderBy: { fecha: "desc" } },
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
+      return NextResponse.json(
+        { movimiento: mov, caja: cajaActualizada },
+        { status: 201 }
+      );
     }
 
     return NextResponse.json({ error: "Acción no válida" }, { status: 400 });

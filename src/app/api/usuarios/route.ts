@@ -11,6 +11,7 @@ const createSchema = z.object({
   role: z.enum(["ADMIN", "VENDEDOR", "VIEWER"]).default("VENDEDOR"),
   horarioEntrada: z.string().optional().nullable(),
   horarioSalida: z.string().optional().nullable(),
+  diasTrabajo: z.string().optional().nullable(),
 });
 
 export async function GET() {
@@ -31,6 +32,7 @@ export async function GET() {
         role: true,
         horarioEntrada: true,
         horarioSalida: true,
+        diasTrabajo: true,
         createdAt: true,
       },
       orderBy: { name: "asc" },
@@ -77,6 +79,7 @@ export async function POST(request: Request) {
         role: data.role,
         horarioEntrada: data.horarioEntrada ?? null,
         horarioSalida: data.horarioSalida ?? null,
+        diasTrabajo: data.diasTrabajo ?? null,
       },
       select: {
         id: true,
@@ -85,6 +88,8 @@ export async function POST(request: Request) {
         role: true,
         horarioEntrada: true,
         horarioSalida: true,
+        diasTrabajo: true,
+        createdAt: true,
       },
     });
     return NextResponse.json(user, { status: 201 });

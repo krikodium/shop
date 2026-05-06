@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
+class BadRequestError extends Error {}
+
 /**
  * GET /api/compras/[id]
  */
@@ -71,7 +73,16 @@ export async function PATCH(
       });
 
       if (ordenActual.estado === "CANCELADO") {
-        throw new Error("No se puede recibir una orden cancelada");
+        throw new BadRequestError("No se puede recibir una orden cancelada");
+      }
+
+      const itemIdsOrden = new Set(ordenActual.items.map((item) => item.id));
+      const itemIdsInvalidos = recibir
+        .map((item) => item.itemId)
+        .filter((itemId) => !itemIdsOrden.has(itemId));
+
+      if (itemIdsInvalidos.length > 0) {
+        throw new BadRequestError("Hay items que no pertenecen a esta orden");
       }
 
       for (const r of recibir) {
@@ -156,7 +167,7 @@ export async function PATCH(
     console.error("Error recibiendo orden:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Error al recibir" },
-      { status: 500 }
+      { status: error instanceof BadRequestError ? 400 : 500 }
     );
   }
 }

@@ -12,52 +12,42 @@ interface BalanceCardsProps {
 export function BalanceCards({ ars, usd }: BalanceCardsProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Card className="overflow-hidden border-none bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 shadow-md transition-all hover:shadow-lg dark:from-emerald-500/20 dark:to-emerald-500/10">
+      <Card className="border border-border/80 bg-card shadow-sm transition-shadow hover:shadow-md">
         <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Saldo Pesos (ARS)
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Saldo ARS
               </p>
-              <h3 className="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+              <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground sm:text-3xl">
                 {formatARS(ars)}
-              </h3>
+              </p>
+              <p className="text-xs text-muted-foreground">Efectivo en pesos</p>
             </div>
-            <div className="rounded-full bg-emerald-500/20 p-3 text-emerald-600 dark:text-emerald-400">
-              <Wallet className="h-6 w-6" />
+            <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-muted-foreground">
+              <Wallet className="h-5 w-5" aria-hidden />
             </div>
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <p className="text-xs text-muted-foreground italic">Caja activa · Tiempo real</p>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-none bg-gradient-to-br from-blue-500/10 to-blue-500/5 shadow-md transition-all hover:shadow-lg dark:from-blue-500/20 dark:to-blue-500/10">
+      <Card className="border border-border/80 bg-card shadow-sm transition-shadow hover:shadow-md">
         <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Saldo Dólares (USD)
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Saldo USD
               </p>
-              <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+              <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground sm:text-3xl">
                 {formatUSD(usd)}
-              </h3>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {usd !== 0 ? "Saldo en dólares" : "Sin movimientos en USD"}
+              </p>
             </div>
-            <div className="rounded-full bg-blue-500/20 p-3 text-blue-600 dark:text-blue-400">
-              <Landmark className="h-6 w-6" />
+            <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-muted-foreground">
+              <Landmark className="h-5 w-5" aria-hidden />
             </div>
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            {usd > 0 ? (
-                <>
-                    <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                    <p className="text-xs text-muted-foreground italic">Cuenta secundaria activa</p>
-                </>
-            ) : (
-                <p className="text-xs text-muted-foreground italic">Sin movimientos en USD</p>
-            )}
           </div>
         </CardContent>
       </Card>

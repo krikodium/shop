@@ -36,6 +36,28 @@ export const productoSchema = z.object({
     })
   ),
   activo: z.boolean().default(true),
+  partesProveedor: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        parteNombre: z
+          .string()
+          .trim()
+          .min(1, "El nombre de la parte es obligatorio")
+          .max(80, "Máximo 80 caracteres"),
+        proveedorId: z.string().min(1, "Seleccioná un proveedor"),
+        costo: z.coerce.number().min(0, "El costo no puede ser negativo").nullable().optional(),
+        notas: z
+          .string()
+          .trim()
+          .max(240, "Máximo 240 caracteres")
+          .nullable()
+          .optional(),
+        orden: z.coerce.number().int().min(0).optional(),
+      })
+    )
+    .optional()
+    .default([]),
 });
 
 export type ProductoFormValues = z.infer<typeof productoSchema>;

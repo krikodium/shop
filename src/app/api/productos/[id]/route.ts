@@ -13,6 +13,12 @@ export async function GET(
       include: {
         categoria: true,
         proveedor: true,
+        partesProveedor: {
+          include: {
+            proveedor: true,
+          },
+          orderBy: { orden: "asc" },
+        },
       },
     });
     if (!producto) {
@@ -39,28 +45,64 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
     const data = productoSchema.parse(body);
+    const partesProveedor = (data.partesProveedor ?? []).map((parte, index) => ({
+      parteNombre: parte.parteNombre,
+      proveedorId: parte.proveedorId,
+      costo: parte.costo ?? null,
+      notas: parte.notas && parte.notas !== "" ? parte.notas : null,
+      orden: parte.orden ?? index,
+    }));
 
-    const producto = await prisma.producto.update({
-      where: { id },
-      data: {
-        sku: data.sku,
-        nombre: data.nombre,
-        descripcion: data.descripcion ?? null,
-        categoriaId: data.categoriaId || null,
-        precioCompra: data.precioCompra ?? null,
-        precioVenta: data.precioVenta,
-        enConsignacion: data.enConsignacion,
-        comisionConsignacion: data.comisionConsignacion ?? null,
-        stockActual: data.stockActual,
-        stockMinimo: data.stockMinimo,
-        proveedorId: data.proveedorId || null,
-        imagenUrl: data.imagenUrl && data.imagenUrl !== "" ? data.imagenUrl : null,
-        activo: data.activo,
-      },
-      include: {
-        categoria: true,
-        proveedor: true,
-      },
+    const producto = await prisma.$transaction(async (tx) => {
+      await tx.producto.update({
+        where: { id },
+        data: {
+          sku: data.sku,
+          nombre: data.nombre,
+          descripcion: data.descripcion ?? null,
+          categoriaId: data.categoriaId || null,
+          precioCompra: data.precioCompra ?? null,
+          precioVenta: data.precioVenta,
+          enConsignacion: data.enConsignacion,
+          comisionConsignacion: data.comisionConsignacion ?? null,
+          stockActual: data.stockActual,
+          stockMinimo: data.stockMinimo,
+          proveedorId: data.proveedorId || null,
+          imagenUrl: data.imagenUrl && data.imagenUrl !== "" ? data.imagenUrl : null,
+          activo: data.activo,
+        },
+      });
+
+      await tx.productoParteProveedor.deleteMany({
+        where: { productoId: id },
+      });
+
+      if (partesProveedor.length) {
+        await tx.productoParteProveedor.createMany({
+          data: partesProveedor.map((parte) => ({
+            productoId: id,
+            parteNombre: parte.parteNombre,
+            proveedorId: parte.proveedorId,
+            costo: parte.costo,
+            notas: parte.notas,
+            orden: parte.orden,
+          })),
+        });
+      }
+
+      return tx.producto.findUnique({
+        where: { id },
+        include: {
+          categoria: true,
+          proveedor: true,
+          partesProveedor: {
+            include: {
+              proveedor: true,
+            },
+            orderBy: { orden: "asc" },
+          },
+        },
+      });
     });
     return NextResponse.json(producto);
   } catch (error) {

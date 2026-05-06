@@ -88,6 +88,7 @@ export async function PATCH(
         horarioEntrada: true,
         horarioSalida: true,
         diasTrabajo: true,
+        createdAt: true,
       },
     });
     return NextResponse.json(user);

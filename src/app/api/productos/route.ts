@@ -87,6 +87,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const data = productoSchema.parse(body);
+    const partesProveedor = (data.partesProveedor ?? []).map((parte, index) => ({
+      parteNombre: parte.parteNombre,
+      proveedorId: parte.proveedorId,
+      costo: parte.costo ?? null,
+      notas: parte.notas && parte.notas !== "" ? parte.notas : null,
+      orden: parte.orden ?? index,
+    }));
 
     const producto = await prisma.producto.create({
       data: {
@@ -103,10 +110,21 @@ export async function POST(request: Request) {
         proveedorId: data.proveedorId || null,
         imagenUrl: data.imagenUrl && data.imagenUrl !== "" ? data.imagenUrl : null,
         activo: data.activo,
+        partesProveedor: partesProveedor.length
+          ? {
+              create: partesProveedor,
+            }
+          : undefined,
       },
       include: {
         categoria: true,
         proveedor: true,
+        partesProveedor: {
+          include: {
+            proveedor: true,
+          },
+          orderBy: { orden: "asc" },
+        },
       },
     });
     return NextResponse.json(producto, { status: 201 });

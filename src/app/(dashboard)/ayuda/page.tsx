@@ -1,216 +1,248 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { HelpCircle, BookOpen } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  HelpCircle,
+  BookOpen,
+  ShoppingCart,
+  Receipt,
+  Package,
+  Truck,
+  FileStack,
+  Users,
+  ShoppingBag,
+  Wallet,
+  BarChart3,
+  ArrowRight,
+  CheckCircle2,
+} from "lucide-react";
+
+const modulos = [
+  {
+    titulo: "Ventas",
+    descripcion:
+      "Registrá ventas, aplicá descuentos y trabajá con pagos simples o divididos (incluyendo USD).",
+    href: "/ventas",
+    cta: "Ir a ventas",
+    icon: Receipt,
+    pasos: [
+      "Creá una venta desde “Nueva venta”.",
+      "Agregá productos por nombre o SKU.",
+      "Elegí cliente (o sin cliente) y método de pago.",
+      "Confirmá y revisá detalle/ticket en el historial.",
+    ],
+  },
+  {
+    titulo: "Productos e inventario",
+    descripcion:
+      "Gestioná catálogo, stock y precios. Podés cargar productos con proveedor único o desglose por partes.",
+    href: "/productos",
+    cta: "Ir a productos",
+    icon: Package,
+    pasos: [
+      "Creá productos con precio de compra/venta.",
+      "Definí stock actual y stock mínimo.",
+      "Si aplica, usá consignación o partes por proveedor.",
+      "Monitoreá alertas de bajo stock desde dashboard/reportes.",
+    ],
+  },
+  {
+    titulo: "Proveedores y consignación",
+    descripcion:
+      "Administrá proveedores regulares o de consignación y generá rendiciones pendientes.",
+    href: "/consignacion",
+    cta: "Ir a consignación",
+    icon: FileStack,
+    pasos: [
+      "Configurá proveedor como regular o consignación.",
+      "Controlá deuda pendiente por proveedor.",
+      "Generá rendición y descargá documento PDF.",
+      "Las ventas rendidas no vuelven a aparecer pendientes.",
+    ],
+  },
+  {
+    titulo: "Compras",
+    descripcion:
+      "Creá órdenes de compra, seguí estados y recepcioná mercadería para actualizar stock.",
+    href: "/compras",
+    cta: "Ir a compras",
+    icon: ShoppingBag,
+    pasos: [
+      "Generá orden desde “Compras > Nueva orden”.",
+      "Cargá ítems y proveedor.",
+      "Recepcioná total/parcial en el detalle de la orden.",
+      "El stock se ajusta automáticamente.",
+    ],
+  },
+  {
+    titulo: "Clientes",
+    descripcion:
+      "Guardá clientes para historial comercial, CRM básico y seguimiento de compras.",
+    href: "/clientes",
+    cta: "Ir a clientes",
+    icon: Users,
+    pasos: [
+      "Alta manual o desde flujo de venta.",
+      "Consultá datos y comportamiento de compra.",
+      "Actualizá información de contacto cuando sea necesario.",
+    ],
+  },
+  {
+    titulo: "Reportes",
+    descripcion:
+      "Analizá ventas, inventario y rentabilidad con filtros; exportá en CSV y PDF.",
+    href: "/reportes",
+    cta: "Ir a reportes",
+    icon: BarChart3,
+    pasos: [
+      "Elegí rango de fechas o presets rápidos.",
+      "Aplicá filtros por método de pago, proveedor y categoría.",
+      "Activá comparación con período anterior.",
+      "Exportá resultados en CSV o PDF.",
+    ],
+  },
+];
+
+const accesosRapidos = [
+  { href: "/", label: "Inicio", icon: ShoppingCart },
+  { href: "/ventas/nueva", label: "Nueva venta", icon: ShoppingCart },
+  { href: "/productos/nuevo", label: "Nuevo producto", icon: Package },
+  { href: "/proveedores/nuevo", label: "Nuevo proveedor", icon: Truck },
+  { href: "/consignacion/rendiciones/nueva", label: "Nueva rendición", icon: FileStack },
+  { href: "/caja-chica", label: "Caja chica", icon: Wallet },
+];
 
 export default function AyudaPage() {
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <HelpCircle className="h-7 w-7 text-primary" />
-          Ayuda
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Guía paso a paso para usar el sistema de gestión
-        </p>
+    <div className="space-y-6">
+      <div className="rounded-xl border bg-card/70 px-4 py-5 shadow-sm backdrop-blur-sm sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight md:text-2xl">
+              <HelpCircle className="h-6 w-6 text-primary" />
+              Centro de ayuda
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Guía práctica del sistema: configuración inicial, flujo de trabajo y accesos rápidos.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary">Guía operativa</Badge>
+            <Badge variant="outline">Actualizado</Badge>
+          </div>
+        </div>
       </div>
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <BookOpen className="h-5 w-5" />
-            ¿Cómo funciona el dashboard?
+            Inicio rápido (primera vez)
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            El sistema está organizado en módulos. Acá te explicamos el flujo general y cada sección.
-          </p>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <section>
-            <h2 className="mb-2 font-semibold">1. Configuración inicial (primera vez)</h2>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>
-                <strong>Proveedores:</strong> Creá los proveedores desde{" "}
-                <Link href="/proveedores/nuevo" className="text-primary underline">
-                  Proveedores → Nuevo
-                </Link>
-                . Marcá si son regulares (compra directa) o en consignación.
-              </li>
-              <li>
-                <strong>Productos:</strong> Cargá productos desde{" "}
-                <Link href="/productos/nuevo" className="text-primary underline">
-                  Productos → Nuevo
-                </Link>
-                . Asigná precio de compra, precio de venta y, si aplica, si es consignación.
-              </li>
-              <li>
-                <strong>Clientes (opcional):</strong> Podés crear clientes desde{" "}
-                <Link href="/clientes/nuevo" className="text-primary underline">
-                  Clientes → Nuevo
-                </Link>
-                , o cargarlos al momento de la venta.
-              </li>
-            </ol>
-          </section>
+        <CardContent className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+            <p className="font-semibold">1. Cargá proveedores</p>
+            <p className="mt-1 text-muted-foreground">Definí tipo regular o consignación.</p>
+            <Link href="/proveedores/nuevo" className="mt-2 inline-flex text-primary hover:underline">
+              Ir a proveedores
+            </Link>
+          </div>
+          <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+            <p className="font-semibold">2. Cargá productos</p>
+            <p className="mt-1 text-muted-foreground">Precio, stock y vínculo con proveedor.</p>
+            <Link href="/productos/nuevo" className="mt-2 inline-flex text-primary hover:underline">
+              Ir a productos
+            </Link>
+          </div>
+          <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+            <p className="font-semibold">3. Registrá una venta</p>
+            <p className="mt-1 text-muted-foreground">Carrito, cliente y método de pago.</p>
+            <Link href="/ventas/nueva" className="mt-2 inline-flex text-primary hover:underline">
+              Ir a nueva venta
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
-          <section>
-            <h2 className="mb-2 font-semibold">2. Registrar una venta</h2>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>
-                Entrá a{" "}
-                <Link href="/ventas/nueva" className="text-primary underline">
-                  Nueva venta
-                </Link>
-                .
-              </li>
-              <li>
-                Buscá productos por nombre o SKU y hacé clic en uno para agregarlo al carrito.
-              </li>
-              <li>
-                Ajustá cantidades en el carrito si hace falta.
-              </li>
-              <li>
-                Elegí el cliente: seleccioná uno de la lista o "Sin cliente". Si es nuevo, usá{" "}
-                <strong>Cargar datos</strong> para crearlo y asignarlo.
-              </li>
-              <li>
-                Aplicá descuento (opcional) y elegí el método de pago.
-              </li>
-              <li>
-                <strong>Pesos y dólares:</strong> Podés marcar <strong>Dividir en dos pagos</strong> y elegir ARS o USD por tramo.
-                Si usás USD, indicá la cotización (ARS por 1 USD) en ese momento; el total en pesos de la venta no cambia. No hay un tipo de cambio global en el sistema.
-              </li>
-              <li>
-                Hacé clic en <strong>Confirmar venta</strong>.
-              </li>
-              <li>
-                Si no cargaste datos del cliente, podés hacerlo después en el detalle de la venta.
-              </li>
-            </ol>
-          </section>
-
-          <section>
-            <h2 className="mb-2 font-semibold">3. Ver ventas realizadas</h2>
-            <p className="mb-2 text-sm text-muted-foreground">
-              En{" "}
-              <Link href="/ventas" className="text-primary underline">
-                Ventas
+      <div className="grid gap-4 lg:grid-cols-2">
+        {modulos.map((modulo) => (
+          <Card key={modulo.titulo} className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <modulo.icon className="h-4 w-4 text-primary" />
+                {modulo.titulo}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">{modulo.descripcion}</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {modulo.pasos.map((paso) => (
+                  <li key={paso} className="flex gap-2">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary/80" />
+                    <span>{paso}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href={modulo.href}>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  {modulo.cta}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
               </Link>
-              podés ver el listado de todas las ventas. Hacé clic en una para ver el detalle, totales, ganancia y margen.
-            </p>
-          </section>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-          <section>
-            <h2 className="mb-2 font-semibold">4. Consignación y rendiciones</h2>
-            <p className="mb-2 text-sm text-muted-foreground">
-              Si vendés productos en consignación, el sistema lleva el control de la deuda con cada proveedor.
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Preguntas frecuentes</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <div className="rounded-lg border p-3">
+            <p className="font-medium text-foreground">¿Puedo cobrar en ARS y USD en la misma venta?</p>
+            <p className="mt-1">
+              Sí. Activá pago dividido, cargá ambos tramos e ingresá cotización cuando haya USD.
             </p>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>
-                <strong>Consignación:</strong> En{" "}
-                <Link href="/consignacion" className="text-primary underline">
-                  Consignación
-                </Link>
-                ves el dashboard de deudas por proveedor (montos en ARS).
-              </li>
-              <li>
-                <strong>Rendiciones:</strong> En{" "}
-                <Link href="/consignacion/rendiciones/nueva" className="text-primary underline">
-                  Nueva rendición
-                </Link>
-                elegís el proveedor y generás el documento con las ventas pendientes. Si el proveedor liquida en dólares (o lo elegís en el momento), indicás el tipo de cambio al confirmar y el sistema guarda el equivalente en USD. Podés descargar el PDF para entregar.
-              </li>
-              <li>
-                Al confirmar una rendición, esas ventas quedan marcadas como rendidas y no se incluyen en futuras rendiciones.
-              </li>
-            </ol>
-          </section>
-
-          <section>
-            <h2 className="mb-2 font-semibold">5. Compras y stock</h2>
-            <p className="mb-2 text-sm text-muted-foreground">
-              Para productos que comprás (no consignación), usá el módulo de compras.
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="font-medium text-foreground">¿Qué puedo exportar desde reportes?</p>
+            <p className="mt-1">
+              Podés exportar CSV y PDF con filtros activos para auditoría y análisis.
             </p>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>
-                Creá una{" "}
-                <Link href="/compras/nueva" className="text-primary underline">
-                  orden de compra
-                </Link>
-                con proveedor e ítems.
-              </li>
-              <li>
-                Al recibir la mercadería, marcá la recepción en el detalle de la orden. El stock se actualiza automáticamente.
-              </li>
-            </ol>
-          </section>
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="font-medium text-foreground">¿Cómo se actualiza el stock?</p>
+            <p className="mt-1">
+              Baja con ventas y sube al recepcionar órdenes de compra.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
-          <section>
-            <h2 className="mb-2 font-semibold">6. Reportes</h2>
-            <p className="mb-2 text-sm text-muted-foreground">
-              En{" "}
-              <Link href="/reportes" className="text-primary underline">
-                Reportes
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Accesos rápidos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {accesosRapidos.map((acceso) => (
+              <Link key={acceso.href} href={acceso.href}>
+                <Button variant="outline" size="sm" className="w-full justify-start gap-1.5">
+                  <acceso.icon className="h-3.5 w-3.5" />
+                  {acceso.label}
+                </Button>
               </Link>
-              tenés tres pestañas:
-            </p>
-            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              <li>
-                <strong>Ventas:</strong> Total en ARS, cantidad, ganancia, margen, desglose por método de pago, bloque <strong>USD</strong> (suma de dólares cobrados, cantidad de ventas con USD y equivalente ARS usando la cotización guardada por venta).
-              </li>
-              <li>
-                <strong>Exportar CSV:</strong> Botón <strong>CSV ventas</strong> descarga el listado del período con columnas de total ARS, métodos, USD y cotización (útil para Excel).
-              </li>
-              <li><strong>Inventario:</strong> Valor del stock (costo y venta) y productos con stock bajo.</li>
-              <li><strong>Rentabilidad:</strong> Ganancia total y rentabilidad por producto.</li>
-            </ul>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Podés filtrar por rango de fechas en los reportes de ventas y rentabilidad.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="mb-2 font-semibold">Resumen del menú</h2>
-            <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-              <div>
-                <strong>Dashboard</strong> — Inicio y acceso rápido
-              </div>
-              <div>
-                <strong>Nueva venta</strong> — Punto de venta
-              </div>
-              <div>
-                <strong>Ventas</strong> — Historial de ventas
-              </div>
-              <div>
-                <strong>Productos</strong> — Catálogo e inventario
-              </div>
-              <div>
-                <strong>Proveedores</strong> — Proveedores y configuración
-              </div>
-              <div>
-                <strong>Consignación</strong> — Deudas por proveedor
-              </div>
-              <div>
-                <strong>Rendiciones</strong> — Generar y ver rendiciones
-              </div>
-              <div>
-                <strong>Clientes</strong> — Base de clientes
-              </div>
-              <div>
-                <strong>Compras</strong> — Órdenes de compra
-              </div>
-              <div>
-                <strong>Reportes</strong> — Ventas, inventario, rentabilidad
-              </div>
-            </div>
-          </section>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
       <div className="flex flex-wrap gap-2">
         <Link href="/">
-          <Button variant="outline">Volver al dashboard</Button>
+          <Button variant="outline">Volver al inicio</Button>
         </Link>
         <Link href="/ventas/nueva">
           <Button className="shadow-sm">Ir a nueva venta</Button>

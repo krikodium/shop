@@ -137,7 +137,7 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <div>
-          <h1 className="text-xl font-bold tracking-tight md:text-2xl">Dashboard</h1>
+          <h1 className="text-xl font-bold tracking-tight md:text-2xl">Hermanas Caradonti</h1>
           <p className="mt-1 text-muted-foreground">Resumen del mes y actividad reciente</p>
         </div>
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive md:p-5">
@@ -165,25 +165,27 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight md:text-2xl">Dashboard</h1>
-          <p className="mt-1 text-muted-foreground">
-            Resumen del mes (ARS) y dólares registrados en ventas con pago en USD
-          </p>
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="rounded-xl border bg-card/70 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight md:text-2xl">Hermanas Caradonti</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Resumen comercial, actividad reciente y alertas operativas del negocio
+            </p>
+          </div>
+          <Link href="/ventas/nueva" className="w-full sm:w-auto">
+            <Button size="lg" className="w-full gap-2 shadow-sm sm:w-auto">
+              <ShoppingCart className="h-4 w-4" />
+              Nueva venta
+            </Button>
+          </Link>
         </div>
-        <Link href="/ventas/nueva" className="w-full sm:w-auto">
-          <Button size="lg" className="w-full gap-2 shadow-sm sm:w-auto">
-            <ShoppingCart className="h-4 w-4" />
-            Nueva venta
-          </Button>
-        </Link>
       </div>
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="overflow-hidden border-l-4 border-l-primary shadow-sm transition-shadow hover:shadow-md">
+        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Ventas del mes
@@ -198,7 +200,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-l-4 border-l-green-500 shadow-sm transition-shadow hover:shadow-md">
+        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Ganancia del mes
@@ -212,7 +214,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-l-4 border-l-blue-500 shadow-sm transition-shadow hover:shadow-md">
+        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Hoy
@@ -227,7 +229,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-l-4 border-l-amber-500 shadow-sm transition-shadow hover:shadow-md">
+        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Deuda consignación
@@ -247,7 +249,7 @@ export default function DashboardPage() {
 
       {/* USD en ventas (mes / hoy) */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="overflow-hidden border-l-4 border-l-slate-600 shadow-sm transition-shadow hover:shadow-md">
+        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               USD registrados (mes)
@@ -261,7 +263,7 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
-        <Card className="overflow-hidden border-l-4 border-l-sky-600 shadow-sm transition-shadow hover:shadow-md">
+        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               USD registrados (hoy)
@@ -281,9 +283,9 @@ export default function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Ventas últimos 14 días</CardTitle>
+            <CardTitle>Tendencia de ventas (14 días)</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Total vendido por día
+              Evolución diaria de facturación
             </p>
           </CardHeader>
           <CardContent>
@@ -332,9 +334,9 @@ export default function DashboardPage() {
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Ventas por método de pago</CardTitle>
+            <CardTitle>Composición por método de pago</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Distribución del mes
+              Participación de cada medio en el mes
             </p>
           </CardHeader>
           <CardContent>
@@ -395,7 +397,7 @@ export default function DashboardPage() {
                   <li key={v.id}>
                     <Link
                       href={`/ventas/${v.id}`}
-                      className="flex items-center justify-between gap-2 rounded-lg border p-3 transition-colors hover:bg-accent/50"
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-card p-3 transition-colors hover:bg-accent/40"
                     >
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -461,7 +463,7 @@ export default function DashboardPage() {
                   <li key={p.sku}>
                     <Link
                       href={`/productos/${p.id}/editar`}
-                      className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm transition-colors hover:bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
+                      className="flex items-center justify-between rounded-lg border border-amber-300/80 bg-amber-50/70 p-3 text-sm transition-colors hover:bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
                     >
                       <div className="min-w-0">
                         <span className="font-medium">{p.nombre}</span>
@@ -492,57 +494,57 @@ export default function DashboardPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <Link href="/ventas/nueva">
-              <Button size="sm" className="gap-1.5">
+              <Button size="sm" className="w-full justify-start gap-1.5">
                 <ShoppingCart className="h-3.5 w-3.5" />
                 Nueva venta
               </Button>
             </Link>
-            <Link href="/productos">
-              <Button variant="secondary" size="sm" className="gap-1.5">
-                <Package className="h-3.5 w-3.5" />
-                Productos
-              </Button>
-            </Link>
-            <Link href="/proveedores">
-              <Button variant="secondary" size="sm" className="gap-1.5">
-                <Truck className="h-3.5 w-3.5" />
-                Proveedores
-              </Button>
-            </Link>
             <Link href="/ventas">
-              <Button variant="secondary" size="sm" className="gap-1.5">
+              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
                 <Receipt className="h-3.5 w-3.5" />
                 Ventas
               </Button>
             </Link>
-            <Link href="/consignacion">
-              <Button variant="secondary" size="sm" className="gap-1.5">
-                <FileStack className="h-3.5 w-3.5" />
-                Consignación
-              </Button>
-            </Link>
-            <Link href="/clientes">
-              <Button variant="secondary" size="sm" className="gap-1.5">
-                <Users className="h-3.5 w-3.5" />
-                Clientes
+            <Link href="/productos">
+              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
+                <Package className="h-3.5 w-3.5" />
+                Productos
               </Button>
             </Link>
             <Link href="/compras">
-              <Button variant="secondary" size="sm" className="gap-1.5">
+              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
                 <ShoppingBag className="h-3.5 w-3.5" />
                 Compras
               </Button>
             </Link>
+            <Link href="/proveedores">
+              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
+                <Truck className="h-3.5 w-3.5" />
+                Proveedores
+              </Button>
+            </Link>
+            <Link href="/consignacion">
+              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
+                <FileStack className="h-3.5 w-3.5" />
+                Consignación
+              </Button>
+            </Link>
             <Link href="/reportes">
-              <Button variant="secondary" size="sm" className="gap-1.5">
+              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
                 <TrendingUp className="h-3.5 w-3.5" />
                 Reportes
               </Button>
             </Link>
+            <Link href="/clientes">
+              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                Clientes
+              </Button>
+            </Link>
             <Link href="/ayuda">
-              <Button variant="outline" size="sm" className="gap-1.5">
+              <Button variant="outline" size="sm" className="w-full justify-start gap-1.5">
                 <HelpCircle className="h-3.5 w-3.5" />
                 Ayuda
               </Button>

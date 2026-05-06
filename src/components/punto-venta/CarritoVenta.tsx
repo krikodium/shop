@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { METODOS_PAGO, METODOS_PAGO_INDIVIDUAL } from "@/lib/constants";
+import { formatARS } from "@/lib/formatCurrency";
 import type { ItemVentaInput } from "@/types";
 import type { TotalesVenta, OpcionesProcesarVenta } from "@/types";
 
@@ -39,6 +41,49 @@ interface CarritoVentaProps {
   onQuitar: (index: number) => void;
   onProcesar: (opts: OpcionesProcesarVenta) => Promise<void>;
   isLoading?: boolean;
+}
+
+function PanelSection({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("rounded-xl border bg-card p-4 shadow-sm", className)}>
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+        {description && (
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function SummaryRow({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn("font-medium tabular-nums text-foreground", valueClassName)}>
+        {value}
+      </span>
+    </div>
+  );
 }
 
 export function CarritoVenta({
@@ -208,65 +253,83 @@ export function CarritoVenta({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center text-muted-foreground">
-        <p className="font-medium">Carrito vacío</p>
-        <p className="mt-2 text-sm">Buscá productos y agregalos para iniciar la venta</p>
+      <div className="rounded-xl border border-dashed bg-muted/30 p-8 text-center text-muted-foreground shadow-sm">
+        <p className="font-medium text-foreground">Carrito vacío</p>
+        <p className="mt-2 text-sm">Buscá productos y agregalos para iniciar la venta.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border bg-card p-4 shadow-sm">
-        <h3 className="mb-3 text-sm font-semibold">Carrito</h3>
-        <ul className="max-h-52 space-y-2 overflow-auto md:max-h-72">
+      <PanelSection
+        title="Carrito"
+        description={`${items.length} ${items.length === 1 ? "producto" : "productos"} en la venta`}
+      >
+        <ul className="max-h-64 space-y-2 overflow-auto pr-1 md:max-h-80">
           {items.map((item, i) => (
             <li
               key={`${item.productoId}-${i}`}
-              className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3 text-sm transition-colors hover:bg-muted/50 touch-manipulation"
+              className="rounded-xl border bg-background p-3 text-sm transition-colors hover:bg-muted/40 touch-manipulation"
             >
-              <div className="min-w-0 flex-1">
-                <span className="font-semibold leading-tight line-clamp-2">{item.productoNombre}</span>
-                <span className="mt-0.5 block font-mono text-xs text-muted-foreground">{item.productoSku}</span>
-                {item.esConsignacion && (
-                  <Badge variant="secondary" className="mt-1 text-[10px]">
-                    Consig.
-                  </Badge>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                <input
-                  type="number"
-                  min={1}
-                  max={999}
-                  value={item.cantidad}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    if (!isNaN(v) && v >= 1) onCantidadChange(i, v);
-                  }}
-                  className="w-12 rounded-md border bg-background px-1 py-1 text-center text-sm font-semibold tabular-nums md:w-14"
-                />
-                <span className="min-w-[5.5rem] text-right text-sm font-bold tabular-nums text-foreground sm:min-w-[6.5rem] sm:text-base">
-                  ${item.subtotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="line-clamp-2 font-semibold leading-tight">
+                    {item.productoNombre}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {item.productoSku}
+                    </span>
+                    {item.esConsignacion && (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/35 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+                      >
+                        Consignación
+                      </Badge>
+                    )}
+                  </div>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-9 w-9 shrink-0 p-0 text-destructive touch-manipulation md:h-8 md:w-8"
+                  className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => onQuitar(i)}
+                  aria-label={`Quitar ${item.productoNombre}`}
                 >
                   ×
                 </Button>
               </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">Cantidad</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    value={item.cantidad}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (!isNaN(v) && v >= 1) onCantidadChange(i, v);
+                    }}
+                    className="h-10 w-16 rounded-lg border bg-background px-2 text-center text-sm font-semibold tabular-nums outline-none transition-colors focus:border-primary"
+                  />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Subtotal item</p>
+                  <p className="text-base font-bold tabular-nums">{formatARS(item.subtotal)}</p>
+                </div>
+              </div>
             </li>
           ))}
         </ul>
-      </div>
+      </PanelSection>
 
-      <div className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
+      <PanelSection title="Cliente" description="Asigná un cliente o registrá una venta de mostrador">
         {/* Cliente: compacto en mobile */}
         <div>
-          <label className="mb-1 block text-xs font-medium md:text-sm">Cliente</label>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Select
               value={clienteId}
@@ -374,18 +437,27 @@ export function CarritoVenta({
             />
           )}
         </div>
+      </PanelSection>
 
+      <PanelSection
+        title="Cobro"
+        description="Elegí el medio de pago o dividí el total en dos tramos"
+      >
         {/* Pago único o dividido */}
         <div className="space-y-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-muted/25 p-3 text-sm transition-colors hover:bg-muted/40">
             <input
               type="checkbox"
               checked={pagoDividido}
               onChange={(e) => togglePagoDividido(e.target.checked)}
-              className="size-4 rounded border-input"
+              className="mt-0.5 size-4 rounded border-input"
             />
-            <span className="font-medium">Dividir en dos pagos</span>
-            <span className="text-xs text-muted-foreground">(ej. parte en USD y parte en pesos)</span>
+            <span className="grid gap-0.5">
+              <span className="font-medium">Dividir en dos pagos</span>
+              <span className="text-xs text-muted-foreground">
+                Para combinar efectivo, transferencia, tarjeta o USD.
+              </span>
+            </span>
           </label>
 
           {!pagoDividido ? (
@@ -398,8 +470,10 @@ export function CarritoVenta({
                     type="button"
                     onClick={() => setMetodoPago(m.value)}
                     className={cn(
-                      "rounded-lg px-3 py-2 text-sm font-medium transition-colors touch-manipulation md:hidden",
-                      metodoPago === m.value ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"
+                      "rounded-lg border px-3 py-2 text-sm font-medium transition-colors touch-manipulation md:hidden",
+                      metodoPago === m.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background hover:bg-muted"
                     )}
                   >
                     {m.short}
@@ -422,13 +496,13 @@ export function CarritoVenta({
               </div>
             </div>
           ) : (
-            <div className="space-y-4 rounded-xl border-2 border-dashed border-primary/20 bg-gradient-to-b from-muted/40 to-muted/10 p-4 shadow-inner">
-              <div className="rounded-lg bg-background/80 px-3 py-3 text-center shadow-sm">
+            <div className="space-y-4 rounded-xl border border-primary/15 bg-muted/25 p-4">
+              <div className="rounded-lg border bg-background px-3 py-3 text-center shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Total a cobrar (venta)
                 </p>
                 <p className="mt-1 text-lg font-bold tabular-nums tracking-tight text-foreground md:text-xl">
-                  ${totales.total.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatARS(totales.total)}
                 </p>
                 <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                   La suma de los dos tramos en pesos (o USD × cotización) debe coincidir con este total.
@@ -495,9 +569,8 @@ export function CarritoVenta({
                   <div className="rounded-lg bg-primary/10 px-2.5 py-2 text-center">
                     <p className="text-[10px] font-medium text-muted-foreground">Equivalente en pesos</p>
                     <p className="mt-0.5 text-xs font-bold tabular-nums text-primary sm:text-sm">
-                      $ {ars1Preview.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatARS(ars1Preview)}
                     </p>
-                    <p className="text-xs text-muted-foreground">ARS</p>
                   </div>
                 </div>
 
@@ -544,9 +617,8 @@ export function CarritoVenta({
                   <div className="rounded-lg bg-primary/10 px-2.5 py-2 text-center">
                     <p className="text-[10px] font-medium text-muted-foreground">Equivalente en pesos</p>
                     <p className="mt-0.5 text-xs font-bold tabular-nums text-primary sm:text-sm">
-                      $ {ars2Preview.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatARS(ars2Preview)}
                     </p>
-                    <p className="text-xs text-muted-foreground">ARS</p>
                   </div>
                 </div>
               </div>
@@ -565,20 +637,19 @@ export function CarritoVenta({
                 <p className="mt-1.5 text-xs font-bold tabular-nums sm:text-sm">
                   Suma tramos:{" "}
                   <span className="text-foreground">
-                    ${sumaPreview.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatARS(sumaPreview)}
                   </span>
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Total venta:{" "}
                   <span className="font-semibold text-foreground">
-                    ${totales.total.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatARS(totales.total)}
                   </span>
                 </p>
                 {Math.abs(diffPreview) > 0.05 ? (
                   <p className="mt-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
                     Faltan o sobran: {diffPreview > 0 ? "" : "−"}
-                    {Math.abs(diffPreview).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                    ARS
+                    {formatARS(Math.abs(diffPreview))}
                   </p>
                 ) : (
                   <p className="mt-1.5 text-xs font-semibold text-green-700 dark:text-green-400">
@@ -589,65 +660,104 @@ export function CarritoVenta({
             </div>
           )}
         </div>
+      </PanelSection>
 
-        {/* Descuento por porcentaje */}
-        <div className="flex items-center justify-between gap-2">
-          <label className="text-xs md:text-sm">Descuento (%)</label>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={0.5}
-            placeholder="0"
-            value={descuento === 0 ? "" : descuento}
-            onChange={(e) => onDescuentoChange(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-            className="w-20 rounded border px-2 py-1 text-right text-sm tabular-nums min-h-9 md:w-24"
-          />
-        </div>
+      <PanelSection
+        title="Resumen"
+        description="Detalle económico de la venta antes de confirmar"
+        className="border-primary/15"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/25 p-3">
+            <div>
+              <label htmlFor="descuento-venta" className="text-sm font-medium">
+                Descuento
+              </label>
+              <p className="text-xs text-muted-foreground">Porcentaje aplicado al subtotal.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="descuento-venta"
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                placeholder="0"
+                value={descuento === 0 ? "" : descuento}
+                onChange={(e) =>
+                  onDescuentoChange(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))
+                }
+                className="min-h-10 w-20 rounded-lg border bg-background px-2 text-right text-sm font-semibold tabular-nums outline-none transition-colors focus:border-primary md:w-24"
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+          </div>
 
-        <div className="space-y-2 border-t pt-4">
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Subtotal</span>
-            <span className="tabular-nums font-medium text-foreground">${totales.subtotal.toFixed(2)}</span>
+          <div className="space-y-2 rounded-xl border bg-background p-3">
+            <SummaryRow label="Subtotal" value={formatARS(totales.subtotal)} />
+            {descuento > 0 && (
+              <SummaryRow
+                label={`Descuento (${descuento}%)`}
+                value={`− ${formatARS(totales.subtotal - totales.total)}`}
+                valueClassName="text-destructive"
+              />
+            )}
+            <div className="flex items-end justify-between gap-3 border-t pt-3">
+              <span className="text-sm font-bold">Total</span>
+              <span className="text-2xl font-bold tabular-nums tracking-tight text-primary">
+                {formatARS(totales.total)}
+              </span>
+            </div>
           </div>
-          <div className="flex items-baseline justify-between gap-2 border-t pt-2">
-            <span className="text-sm font-bold">Total</span>
-            <span className="text-base font-bold tabular-nums tracking-tight text-primary md:text-lg">
-              ${totales.total.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-3">
+              <p className="text-xs font-medium text-muted-foreground">Ganancia</p>
+              <p className="mt-1 text-base font-bold tabular-nums text-green-700 dark:text-green-300">
+                {formatARS(totales.gananciaBruta)}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-muted/25 p-3">
+              <p className="text-xs font-medium text-muted-foreground">Margen</p>
+              <p className="mt-1 text-base font-bold tabular-nums">
+                {totales.margenPorcentaje.toFixed(1)}%
+              </p>
+            </div>
           </div>
-          <div className="hidden justify-between text-xs text-muted-foreground md:flex">
-            <span>Ganancia</span>
-            <span className="text-green-600">${totales.gananciaBruta.toFixed(2)}</span>
-          </div>
-          <div className="hidden justify-between text-xs text-muted-foreground md:flex">
-            <span>Margen</span>
-            <span>{totales.margenPorcentaje.toFixed(1)}%</span>
-          </div>
+
           {totales.deudaConsignacion > 0 && (
-            <div className="flex justify-between text-xs text-amber-600">
-              <span>Deuda consig.</span>
-              <span>${totales.deudaConsignacion.toFixed(2)}</span>
+            <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                  Deuda consignación
+                </span>
+                <span className="font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                  {formatARS(totales.deudaConsignacion)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Monto estimado a rendir por productos en consignación.
+              </p>
             </div>
           )}
-        </div>
 
-        <Button
-          className="h-10 w-full text-sm font-semibold shadow-sm touch-manipulation"
-          size="default"
-          onClick={handleConfirmar}
-          disabled={
-            isLoading ||
-            (pagoDividido &&
-              (((moneda1 === "USD" || moneda2 === "USD") && cotNum <= 0) ||
-                Math.abs(diffPreview) > 0.05 ||
-                ars1Preview <= 0 ||
-                ars2Preview <= 0))
-          }
-        >
-          {isLoading ? "Procesando..." : "Confirmar venta"}
-        </Button>
-      </div>
+          <Button
+            className="h-12 w-full text-sm font-semibold shadow-sm touch-manipulation"
+            size="default"
+            onClick={handleConfirmar}
+            disabled={
+              isLoading ||
+              (pagoDividido &&
+                (((moneda1 === "USD" || moneda2 === "USD") && cotNum <= 0) ||
+                  Math.abs(diffPreview) > 0.05 ||
+                  ars1Preview <= 0 ||
+                  ars2Preview <= 0))
+            }
+          >
+            {isLoading ? "Procesando..." : "Confirmar venta"}
+          </Button>
+        </div>
+      </PanelSection>
     </div>
   );
 }

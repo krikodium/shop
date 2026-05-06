@@ -12,17 +12,23 @@ import {
   productoToFormValues,
 } from "@/components/forms/ProductoForm";
 import type { ProductoFormValues } from "@/lib/validaciones/productoSchema";
-import type { Categoria, Proveedor, Producto } from "@prisma/client";
+import type {
+  Categoria,
+  Proveedor,
+  Producto,
+  ProductoParteProveedor,
+} from "@prisma/client";
 import { Package, ArrowLeft, AlertTriangle } from "lucide-react";
 
 interface ProductoConRelaciones extends Producto {
   categoria: Categoria | null;
   proveedor: Proveedor | null;
+  partesProveedor: (ProductoParteProveedor & { proveedor: Proveedor })[];
 }
 
 function ProductoEditSkeleton() {
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 animate-in fade-in duration-300 sm:px-6">
+    <div className="mx-auto max-w-4xl space-y-6 px-4 animate-in fade-in duration-300 sm:px-6">
       <div className="flex justify-center sm:justify-start">
         <Skeleton className="h-10 w-24 rounded-md animate-skeleton-shimmer" />
       </div>
@@ -122,7 +128,7 @@ export default function EditarProductoPage() {
 
   if (!producto) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 px-4 animate-in fade-in duration-300 sm:px-6">
+      <div className="mx-auto max-w-4xl space-y-6 px-4 animate-in fade-in duration-300 sm:px-6">
         <div className="flex justify-center sm:justify-start">
           <Link href="/productos">
             <Button variant="ghost" className="gap-2">
@@ -152,7 +158,7 @@ export default function EditarProductoPage() {
   const precioCompra = producto.precioCompra != null ? Number(producto.precioCompra) : null;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500 sm:px-6">
+    <div className="mx-auto max-w-4xl space-y-6 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500 sm:px-6">
       <div className="flex justify-center sm:justify-start">
         <Link href="/productos">
           <Button variant="ghost" className="gap-2">
@@ -232,6 +238,22 @@ export default function EditarProductoPage() {
           </p>
         </CardHeader>
         <CardContent>
+          <div className="mb-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+              <p className="text-muted-foreground">Partes cargadas</p>
+              <p className="font-semibold tabular-nums">{producto.partesProveedor?.length ?? 0}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+              <p className="text-muted-foreground">Proveedores en desglose</p>
+              <p className="font-semibold tabular-nums">
+                {new Set((producto.partesProveedor ?? []).map((p) => p.proveedorId)).size}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+              <p className="text-muted-foreground">Proveedor principal</p>
+              <p className="font-semibold truncate">{producto.proveedor?.nombre ?? "Sin definir"}</p>
+            </div>
+          </div>
           <ProductoForm
             defaultValues={productoToFormValues(producto)}
             categorias={categorias}

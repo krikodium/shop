@@ -28,6 +28,7 @@ model Proveedor {
   liquidacionUsd    Boolean   @default(false)
 
   productos         Producto[]
+  partesProducto    ProductoParteProveedor[]
   ordenesCompra     OrdenCompra[]
   rendiciones       Rendicion[]
 
@@ -66,6 +67,7 @@ model Producto {
   // RELACIONES
   proveedor         Proveedor? @relation(fields: [proveedorId], references: [id])
   proveedorId       String?
+  partesProveedor   ProductoParteProveedor[]
 
   itemsVenta        ItemVenta[]
   itemsOrdenCompra  ItemOrdenCompra[]
@@ -79,6 +81,24 @@ model Producto {
 
   @@index([categoriaId])
   @@index([proveedorId])
+}
+
+model ProductoParteProveedor {
+  id          String    @id @default(cuid())
+  producto    Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  productoId  String
+  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
+  proveedorId String
+  parteNombre String
+  costo       Decimal?  @db.Decimal(10, 2)
+  notas       String?
+  orden       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([productoId])
+  @@index([proveedorId])
+  @@unique([productoId, parteNombre, proveedorId])
 }
 
 model Categoria {

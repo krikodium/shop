@@ -16,7 +16,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="flex h-screen overflow-hidden flex-col lg:flex-row">
       {/* Header móvil */}
       <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 shadow-sm lg:hidden">
         <MobileNav />
@@ -32,7 +32,7 @@ export default async function DashboardLayout({
       </header>
 
       {/* Sidebar desktop */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
+      <aside className="hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
         <div className="border-b border-border px-5 py-5">
           <Link href="/" className="font-semibold text-lg tracking-tight">
             Shop
@@ -48,7 +48,7 @@ export default async function DashboardLayout({
         </div>
       </aside>
 
-      <main className="min-h-0 flex-1 overflow-auto p-4 md:p-6">{children}</main>
+      <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6">{children}</main>
     </div>
   );
 }

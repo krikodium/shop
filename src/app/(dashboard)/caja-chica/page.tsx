@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import {
@@ -15,16 +14,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Wallet, Plus, Users, User, ArrowLeft, MoreHorizontal, ShieldCheck } from "lucide-react";
+import { Wallet, Plus, Users, User, ArrowLeft, ShieldCheck } from "lucide-react";
 import { formatARS, formatUSD } from "@/lib/formatCurrency";
 
-// Modular Components
-import { 
-  BalanceCards, 
-  TransactionForm, 
-  TransactionList, 
-  CajaSelector, 
-  MonthlyClosure 
+import {
+  BalanceCards,
+  TransactionForm,
+  TransactionList,
+  CajaSelector,
+  MonthlyClosure,
+  CajaChicaSkeleton,
 } from "@/components/caja-chica";
 
 interface Movimiento {
@@ -48,6 +47,13 @@ interface CajaChica {
   user?: { id: string; name: string | null; email: string };
 }
 
+function sortCajasPorFecha<T extends { fechaApertura: string }>(list: T[]): T[] {
+  return [...list].sort(
+    (a, b) =>
+      new Date(b.fechaApertura).getTime() - new Date(a.fechaApertura).getTime()
+  );
+}
+
 export default function CajaChicaPage() {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "ADMIN";
@@ -64,12 +70,30 @@ export default function CajaChicaPage() {
   const [montoInicialUsd, setMontoInicialUsd] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cierreMensual, setCierreMensual] = useState<any>(null);
+  const [cierreMensual, setCierreMensual] = useState<unknown>(null);
 
   const cajaActual = vistaAdmin ? cajaSeleccionada : cajas.find((c) => c.estado === "ABIERTA") ?? null;
-  const esMiCaja = cajaActual && session?.user?.id === cajaActual.userId;
+  const esMiCaja = Boolean(cajaActual && session?.user?.id === cajaActual.userId);
 
-  const load = () => {
+  const mergeCajaEnEstado = useCallback((caja: CajaChica) => {
+    setCajas((prev) => {
+      const idx = prev.findIndex((c) => c.id === caja.id);
+      if (idx === -1) return sortCajasPorFecha([caja, ...prev]);
+      const next = [...prev];
+      next[idx] = caja;
+      return next;
+    });
+    setCajasTodas((prev) => {
+      const idx = prev.findIndex((c) => c.id === caja.id);
+      if (idx === -1) return sortCajasPorFecha([caja, ...prev]);
+      const next = [...prev];
+      next[idx] = caja;
+      return next;
+    });
+    setCajaSeleccionada((sel) => (sel?.id === caja.id ? caja : sel));
+  }, []);
+
+  const load = useCallback(() => {
     setLoading(true);
     setError(null);
     Promise.all([
@@ -79,29 +103,33 @@ export default function CajaChicaPage() {
       .then(([misCajas, todas]) => {
         setCajas(Array.isArray(misCajas) ? misCajas : []);
         setCajasTodas(Array.isArray(todas) ? todas : []);
-        
-        // If we are not in admin view, auto-select our open box
-        if (!vistaAdmin) {
-          const abierta = (Array.isArray(misCajas) ? misCajas : []).find(
-            (c: CajaChica) => c.estado === "ABIERTA"
-          );
-          setCajaSeleccionada(abierta ?? null);
-        } else if (cajaSeleccionada) {
-          // Update selected box if it's already selected
-          const updated = (Array.isArray(todas) ? todas : []).find(c => c.id === cajaSeleccionada.id);
-          if (updated) setCajaSeleccionada(updated);
-        }
+
+        setCajaSeleccionada((prev) => {
+          if (!vistaAdmin) {
+            const abierta = (Array.isArray(misCajas) ? misCajas : []).find(
+              (c: CajaChica) => c.estado === "ABIERTA"
+            );
+            return abierta ?? null;
+          }
+          if (prev) {
+            const updated = (Array.isArray(todas) ? todas : []).find(
+              (c: CajaChica) => c.id === prev.id
+            );
+            return updated ?? prev;
+          }
+          return prev;
+        });
       })
       .catch((err) => {
         console.error(err);
         toast.error("Error al cargar datos");
       })
       .finally(() => setLoading(false));
-  };
+  }, [isAdmin, vistaAdmin]);
 
   useEffect(() => {
     load();
-  }, [isAdmin, vistaAdmin]);
+  }, [load]);
 
   const loadCierreMensual = (mes: string, ano: string) => {
     setLoadingCierre(true);
@@ -132,10 +160,12 @@ export default function CajaChicaPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error");
+      const caja = data as CajaChica;
+      mergeCajaEnEstado(caja);
       setAbrirModal(false);
       setMontoInicial(0);
       setMontoInicialUsd(0);
-      load();
+      if (!vistaAdmin) setCajaSeleccionada(caja);
       toast.success("Caja abierta correctamente");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error";
@@ -188,165 +218,149 @@ export default function CajaChicaPage() {
   const saldos = calcularSaldos();
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-12">
-      {/* Page Header */}
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between border-b pb-8">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-black tracking-tighter sm:text-4xl text-foreground">
-              Caja Chica
-            </h1>
+    <div className="mx-auto max-w-6xl space-y-8 pb-12 animate-in fade-in duration-300">
+      <div className="rounded-xl border bg-card/70 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight md:text-2xl">Caja chica</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Movimientos de efectivo y control del turno
+            </p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">
-            Gestión de flujo de efectivo, gastos operativos e ingresos diarios.
-          </p>
-        </div>
 
-        {isAdmin && (
-          <div className="flex p-1 bg-muted rounded-xl shadow-inner divide-x divide-white/10">
-            <Button
-              variant={!vistaAdmin ? "ghost" : "ghost"}
-              size="sm"
-              onClick={() => {
-                setVistaAdmin(false);
-                setCajaSeleccionada(null);
-              }}
-              className={`rounded-lg px-6 h-10 transition-all font-bold text-xs uppercase tracking-wider ${
-                !vistaAdmin ? "bg-white shadow-sm text-primary dark:bg-zinc-800" : "text-muted-foreground hover:bg-white/50"
-              }`}
-            >
-              <User className="h-4 w-4 mr-2" />
-              Mi caja
-            </Button>
-            <Button
-              variant={vistaAdmin ? "ghost" : "ghost"}
-              size="sm"
-              onClick={() => {
-                setVistaAdmin(true);
-                setCajaSeleccionada(null);
-              }}
-              className={`rounded-lg px-6 h-10 transition-all font-bold text-xs uppercase tracking-wider ${
-                vistaAdmin ? "bg-white shadow-sm text-primary dark:bg-zinc-800" : "text-muted-foreground hover:bg-white/50"
-              }`}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Empleados
-            </Button>
-          </div>
-        )}
+          {isAdmin && (
+            <div className="flex rounded-lg border border-border bg-muted/40 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setVistaAdmin(false);
+                  setCajaSeleccionada(null);
+                }}
+                className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                  !vistaAdmin
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <User className="h-4 w-4" />
+                Mi caja
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setVistaAdmin(true);
+                  setCajaSeleccionada(null);
+                }}
+                className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                  vistaAdmin
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                Empleados
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {loading && !cajaActual ? (
-        <div className="flex flex-col items-center justify-center py-24 space-y-4 opacity-50">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
-          <p className="text-sm font-bold tracking-widest uppercase">Cargando datos...</p>
-        </div>
+        <CajaChicaSkeleton />
       ) : (
-        <div className="space-y-8 animate-in fade-in duration-500">
-          {/* Admin Switcher View */}
+        <div className="space-y-8">
           {vistaAdmin && !cajaSeleccionada && (
-            <CajaSelector 
-                cajas={cajasTodas} 
-                cajaSeleccionada={cajaSeleccionada} 
-                onSelect={(c) => setCajaSeleccionada(c)} 
+            <CajaSelector
+              cajas={cajasTodas}
+              cajaSeleccionada={cajaSeleccionada}
+              onSelect={(c) => setCajaSeleccionada(c)}
             />
           )}
 
-          {/* Individual Caja View (Mine or Selected) */}
           {(!vistaAdmin || cajaSeleccionada) && (
             <>
-              {/* Back button for admin when viewing someone else's box */}
               {vistaAdmin && cajaSeleccionada && (
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setCajaSeleccionada(null)}
-                    className="mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCajaSeleccionada(null)}
+                  className="-ml-2 text-muted-foreground hover:text-foreground"
                 >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Volver al listado de cajas
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver al listado
                 </Button>
               )}
 
-              {/* Caja Status Header */}
               {!cajaActual && !vistaAdmin ? (
-                <Card className="border-none shadow-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground overflow-hidden relative">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
-                      <Wallet className="h-32 w-32" />
-                  </div>
-                  <CardContent className="p-8 relative z-10">
-                    <div className="max-w-md space-y-6">
-                      <div className="space-y-2">
-                        <h2 className="text-3xl font-black tracking-tight">Caja Cerrada</h2>
-                        <p className="text-primary-foreground/80 font-medium">
-                          No tenés una caja abierta para este turno. Empezá abriendo una para registrar tus movimientos de hoy.
+                <Card className="border border-dashed border-border bg-muted/20">
+                  <CardContent className="flex flex-col gap-6 p-8 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-background">
+                        <Wallet className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="space-y-1">
+                        <h2 className="text-lg font-semibold tracking-tight">Sin caja abierta</h2>
+                        <p className="max-w-md text-sm text-muted-foreground">
+                          Abrí una caja para registrar ingresos y egresos de este turno.
                         </p>
                       </div>
-                      <Button 
-                        onClick={() => setAbrirModal(true)} 
-                        size="lg"
-                        className="bg-white text-primary hover:bg-white/90 font-bold px-8 shadow-lg shadow-black/20"
-                      >
-                        <Plus className="h-5 w-5 mr-2" />
-                        Abrir Nueva Caja
-                      </Button>
                     </div>
+                    <Button onClick={() => setAbrirModal(true)} className="shrink-0 gap-2">
+                      <Plus className="h-4 w-4" />
+                      Abrir caja
+                    </Button>
                   </CardContent>
                 </Card>
               ) : cajaActual ? (
                 <div className="space-y-8">
-                  {/* Status Banner */}
-                  <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-muted/30 p-4 rounded-2xl border border-dashed border-border shadow-sm">
-                    <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm border">
-                            <ShieldCheck className="h-6 w-6 text-emerald-500" />
+                  <div className="flex flex-col gap-4 rounded-xl border border-border/80 bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3 sm:items-center">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background">
+                        <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Turno
+                        </p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">
+                            {cajaActual.user?.name ?? "Usuario"}
+                          </span>
+                          {cajaActual.estado === "ABIERTA" ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <span className="h-1.5 w-1.5 rounded-full bg-foreground/60" />
+                              Abierta
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Cerrada</span>
+                          )}
                         </div>
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Turno Actual</p>
-                            <h3 className="font-bold flex items-center gap-2">
-                                {cajaActual.user?.name ?? "Usuario"} 
-                                {cajaActual.estado === "ABIERTA" ? (
-                                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                ) : (
-                                    <Badge variant="secondary" className="h-4 text-[9px]">CERRADA</Badge>
-                                )}
-                            </h3>
-                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                        <div className="text-right hidden sm:block">
-                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Apertura</p>
-                            <p className="text-sm font-semibold">{new Date(cajaActual.fechaApertura).toLocaleString()}</p>
-                        </div>
-                        {esMiCaja && cajaActual.estado === "ABIERTA" && (
-                            <Button 
-                                variant="destructive" 
-                                size="sm" 
-                                onClick={() => setCierreModal(true)}
-                                className="font-bold uppercase tracking-wider text-[10px] px-4 shadow-md bg-red-600 hover:bg-red-700"
-                            >
-                                Cerrar Caja
-                            </Button>
-                        )}
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+                      <div className="text-sm sm:text-right">
+                        <p className="text-xs font-medium text-muted-foreground">Apertura</p>
+                        <p className="font-medium tabular-nums">
+                          {new Date(cajaActual.fechaApertura).toLocaleString("es-AR")}
+                        </p>
+                      </div>
+                      {esMiCaja && cajaActual.estado === "ABIERTA" && (
+                        <Button variant="outline" size="sm" onClick={() => setCierreModal(true)}>
+                          Cerrar caja
+                        </Button>
+                      )}
                     </div>
                   </div>
 
-                  {/* Main Stats */}
                   <BalanceCards ars={saldos.ars} usd={saldos.usd} />
 
-                  {/* Transaction Entry Form */}
                   {esMiCaja && cajaActual.estado === "ABIERTA" && (
-                    <TransactionForm 
-                        cajaId={cajaActual.id} 
-                        onSuccess={load} 
-                        saving={saving} 
-                    />
+                    <TransactionForm cajaId={cajaActual.id} onSuccess={mergeCajaEnEstado} saving={saving} />
                   )}
 
-                  {/* Transaction List */}
-                  <TransactionList 
-                    movimientos={cajaActual.movimientos ?? []} 
+                  <TransactionList
+                    movimientos={cajaActual.movimientos ?? []}
                     fechaApertura={cajaActual.fechaApertura}
                     montoInicial={cajaActual.montoInicial}
                     montoInicialUsd={cajaActual.montoInicialUsd}
@@ -356,55 +370,52 @@ export default function CajaChicaPage() {
             </>
           )}
 
-          {/* Monthly Closure Section */}
-          <MonthlyClosure 
-            cierreMensual={cierreMensual} 
-            onLoad={loadCierreMensual} 
-            loading={loadingCierre} 
+          <MonthlyClosure
+            cierreMensual={cierreMensual as never}
+            onLoad={loadCierreMensual}
+            loading={loadingCierre}
           />
         </div>
       )}
 
-      {/* Dialogs */}
       <Dialog open={abrirModal} onOpenChange={setAbrirModal}>
-        <DialogContent className="sm:max-w-md border-none shadow-2xl">
-          <DialogHeader className="space-y-3 pb-4">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Plus className="h-6 w-6 text-primary" />
-            </div>
-            <DialogTitle className="text-2xl font-black tracking-tight">Abrir Nueva Caja</DialogTitle>
-            <DialogDescription className="font-medium">
-              Ingresá el monto inicial con el que comenzás tu turno.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Abrir caja</DialogTitle>
+            <DialogDescription>Monto inicial del turno en pesos y/o dólares.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAbrir} className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Monto ARS</Label>
+                <Label>Monto ARS</Label>
                 <CurrencyInput
                   value={montoInicial}
                   onChange={(v) => setMontoInicial(v ?? 0)}
                   placeholder="0.00"
-                  className="bg-muted/50 border-none focus:ring-1 h-12"
+                  className="border-border bg-background"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Monto USD</Label>
+                <Label>Monto USD</Label>
                 <CurrencyInput
                   value={montoInicialUsd}
                   onChange={(v) => setMontoInicialUsd(v ?? 0)}
                   placeholder="0.00"
-                  className="bg-muted/50 border-none focus:ring-1 h-12"
+                  className="border-border bg-background"
                 />
               </div>
             </div>
-            {error && <p className="text-sm font-bold text-red-500 bg-red-500/10 p-3 rounded-lg">{error}</p>}
-            <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="ghost" onClick={() => setAbrirModal(false)} className="font-bold">
+            {error && (
+              <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setAbrirModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={saving} className="font-black px-8 shadow-lg shadow-primary/20">
-                {saving ? "Abriendo..." : "Abrir Caja"}
+              <Button type="submit" disabled={saving}>
+                {saving ? "Abriendo…" : "Abrir caja"}
               </Button>
             </div>
           </form>
@@ -412,40 +423,39 @@ export default function CajaChicaPage() {
       </Dialog>
 
       <Dialog open={cierreModal} onOpenChange={setCierreModal}>
-        <DialogContent className="sm:max-w-md border-none shadow-2xl">
-          <DialogHeader className="space-y-3 pb-4">
-            <div className="h-12 w-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                <Wallet className="h-6 w-6 text-red-600" />
-            </div>
-            <DialogTitle className="text-2xl font-black tracking-tight">Cerrar Caja</DialogTitle>
-            <DialogDescription className="font-medium">
-              Al cerrar la caja ya no podrás registrar nuevos movimientos.
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cerrar caja</DialogTitle>
+            <DialogDescription>
+              No podrás registrar más movimientos en esta caja hasta abrir un nuevo turno.
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="bg-muted/50 p-6 rounded-2xl space-y-4">
-             <div className="flex justify-between items-center group">
-                 <span className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Saldo Final ARS</span>
-                 <span className="text-2xl font-black text-emerald-600 tabular-nums">{formatARS(saldos.ars)}</span>
-             </div>
-             {saldos.usd !== 0 && (
-                 <div className="flex justify-between items-center group pt-4 border-t border-white/10">
-                     <span className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Saldo Final USD</span>
-                     <span className="text-xl font-black text-blue-600 tabular-nums">{formatUSD(saldos.usd)}</span>
-                 </div>
-             )}
+
+          <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+            <div className="flex justify-between gap-4 text-sm">
+              <span className="text-muted-foreground">Saldo final ARS</span>
+              <span className="font-semibold tabular-nums">{formatARS(saldos.ars)}</span>
+            </div>
+            {saldos.usd !== 0 && (
+              <div className="flex justify-between gap-4 border-t border-border pt-3 text-sm">
+                <span className="text-muted-foreground">Saldo final USD</span>
+                <span className="font-semibold tabular-nums">{formatUSD(saldos.usd)}</span>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-4 pt-4">
-            {error && <p className="text-sm font-bold text-red-500 bg-red-500/10 p-3 rounded-lg">{error}</p>}
-            <div className="flex flex-col gap-3">
-              <Button variant="destructive" onClick={handleCerrar} disabled={saving} className="h-12 font-black shadow-lg shadow-red-500/20">
-                {saving ? "Cerrando Turno..." : "Confirmar Cierre de Caja"}
-              </Button>
-              <Button variant="ghost" onClick={() => setCierreModal(false)} className="font-bold text-muted-foreground">
-                Cancelar y Volver
-              </Button>
-            </div>
+          <div className="space-y-3 pt-2">
+            {error && (
+              <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            <Button variant="destructive" className="w-full" onClick={handleCerrar} disabled={saving}>
+              {saving ? "Cerrando…" : "Confirmar cierre"}
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => setCierreModal(false)}>
+              Cancelar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

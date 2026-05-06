@@ -1,13 +1,21 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +27,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { CompraDetalleSkeleton } from "../ComprasSkeletons";
+
+const currencyFormatter = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+});
 
 interface ItemOrden {
   id: string;
@@ -40,6 +54,27 @@ interface OrdenDetalle {
   items: ItemOrden[];
 }
 
+function normalizeOrden(raw: OrdenDetalle): OrdenDetalle {
+  return {
+    ...raw,
+    total: Number(raw.total ?? 0),
+    items: (raw.items ?? []).map((item) => ({
+      ...item,
+      cantidad: Number(item.cantidad ?? 0),
+      cantidadRecibida: Number(item.cantidadRecibida ?? 0),
+      precioUnitario: Number(item.precioUnitario ?? 0),
+      subtotal: Number(item.subtotal ?? 0),
+    })),
+  };
+}
+
+function getCantidadesIniciales(items: ItemOrden[]) {
+  return items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.id] = Math.max(0, item.cantidad - item.cantidadRecibida);
+    return acc;
+  }, {});
+}
+
 export default function OrdenDetallePage() {
   const params = useParams();
   const id = params.id as string;
@@ -48,23 +83,25 @@ export default function OrdenDetallePage() {
   const [cantidadesRecibir, setCantidadesRecibir] = useState<Record<string, number>>({});
   const [recibiendo, setRecibiendo] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     fetch(`/api/compras/${id}`)
       .then((res) => {
         if (!res.ok) throw new Error("No encontrada");
         return res.json();
       })
       .then((o) => {
-        setOrden({ ...o, total: Number(o.total ?? 0) });
-        const inicial: Record<string, number> = {};
-        (o.items || []).forEach((i: ItemOrden) => {
-          inicial[i.id] = Math.max(0, i.cantidad - i.cantidadRecibida);
-        });
-        setCantidadesRecibir(inicial);
+        const normalized = normalizeOrden(o);
+        setOrden(normalized);
+        setCantidadesRecibir(getCantidadesIniciales(normalized.items));
       })
       .catch(() => setOrden(null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const recibir = async () => {
     if (!orden) return;
@@ -85,13 +122,10 @@ export default function OrdenDetallePage() {
         throw new Error(d.error ?? "Error");
       }
       const updated = await res.json();
-      setOrden({ ...updated, total: Number(updated.total ?? 0) });
-      const nuevoInicial: Record<string, number> = {};
-      (updated.items || []).forEach((i: ItemOrden) => {
-        const pendiente = i.cantidad - i.cantidadRecibida;
-        nuevoInicial[i.id] = Math.max(0, pendiente);
-      });
-      setCantidadesRecibir(nuevoInicial);
+      const normalized = normalizeOrden(updated);
+      setOrden(normalized);
+      setCantidadesRecibir(getCantidadesIniciales(normalized.items));
+      toast.success("Recepción registrada");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error");
     } finally {
@@ -109,14 +143,31 @@ export default function OrdenDetallePage() {
       });
       if (!res.ok) throw new Error("Error");
       const updated = await res.json();
-      setOrden({ ...updated, total: Number(updated.total ?? 0) });
+      const normalized = normalizeOrden(updated);
+      setOrden(normalized);
+      setCantidadesRecibir(getCantidadesIniciales(normalized.items));
       toast.success("Orden cancelada");
     } catch {
       toast.error("Error al cancelar la orden");
     }
   };
 
-  if (loading) return <p className="text-muted-foreground">Cargando…</p>;
+  const puedeRecibir = orden?.estado !== "RECIBIDO" && orden?.estado !== "CANCELADO";
+  const hayAlgoQueRecibir = Object.values(cantidadesRecibir).some((c) => c > 0);
+
+  const resumen = useMemo(() => {
+    const items = orden?.items ?? [];
+    const totalPedido = items.reduce((acc, item) => acc + item.cantidad, 0);
+    const totalRecibido = items.reduce((acc, item) => acc + item.cantidadRecibida, 0);
+    const pendientes = Math.max(0, totalPedido - totalRecibido);
+    const avance = totalPedido > 0 ? Math.round((totalRecibido / totalPedido) * 100) : 0;
+    return { totalPedido, totalRecibido, pendientes, avance };
+  }, [orden]);
+
+  const estadoVariant = (estado: string) =>
+    estado === "CANCELADO" ? "destructive" : estado === "PENDIENTE" ? "secondary" : "outline";
+
+  if (loading) return <CompraDetalleSkeleton />;
   if (!orden) {
     return (
       <div className="space-y-4">
@@ -128,12 +179,9 @@ export default function OrdenDetallePage() {
     );
   }
 
-  const puedeRecibir = orden.estado !== "RECIBIDO" && orden.estado !== "CANCELADO";
-  const hayAlgoQueRecibir = Object.values(cantidadesRecibir).some((c) => c > 0);
-
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/compras">
           <Button variant="ghost">← Órdenes</Button>
         </Link>
@@ -173,88 +221,160 @@ export default function OrdenDetallePage() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">{orden.numeroOrden}</h1>
-        <p className="text-muted-foreground">
-          {orden.proveedor?.nombre} •{" "}
-          {new Date(orden.fecha).toLocaleDateString()}
-        </p>
-        <Badge className="mt-2">{orden.estado}</Badge>
+      <div className="rounded-xl border bg-card/70 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight md:text-2xl">{orden.numeroOrden}</h1>
+              <Badge variant={estadoVariant(orden.estado)}>{orden.estado}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {orden.proveedor?.nombre} · {new Date(orden.fecha).toLocaleDateString("es-AR")}
+            </p>
+          </div>
+          <div className="rounded-lg border bg-background px-4 py-3 text-left lg:text-right">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Total orden
+            </p>
+            <p className="mt-1 text-2xl font-bold tabular-nums">
+              {currencyFormatter.format(orden.total)}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <Card>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Items
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold tabular-nums">{orden.items.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Unidades pedidas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold tabular-nums">{resumen.totalPedido}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Recibidas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold tabular-nums">{resumen.totalRecibido}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Avance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold tabular-nums">{resumen.avance}%</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {resumen.pendientes} unidades pendientes
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Items</CardTitle>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Recepción de mercadería</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Cargá solo las unidades que ingresan en esta operación.
+            </p>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-4 text-left font-medium">Producto</th>
-                  <th className="px-4 py-4 text-right font-medium">Pedido</th>
-                  <th className="px-4 py-4 text-right font-medium">Recibido</th>
-                  <th className="px-4 py-4 text-right font-medium">P. unit.</th>
-                  <th className="px-4 py-4 text-right font-medium">Subtotal</th>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Producto</TableHead>
+                  <TableHead className="text-right">Pedido</TableHead>
+                  <TableHead className="text-right">Recibido</TableHead>
+                  <TableHead className="text-right">Pendiente</TableHead>
+                  <TableHead className="text-right">P. unit.</TableHead>
+                  <TableHead className="text-right">Subtotal</TableHead>
                   {puedeRecibir && (
-                    <th className="px-4 py-4 text-right font-medium">Recibir ahora</th>
+                    <TableHead className="text-right">Recibir ahora</TableHead>
                   )}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {orden.items.map((item) => {
                   const pendiente = item.cantidad - item.cantidadRecibida;
                   return (
-                    <tr key={item.id} className="border-b last:border-0">
-                      <td className="px-4 py-4">
-                        {item.producto?.nombre} ({item.producto?.sku})
-                      </td>
-                      <td className="px-4 py-4 text-right tabular-nums">{item.cantidad}</td>
-                      <td className="px-4 py-4 text-right tabular-nums">
+                    <TableRow key={item.id} className="hover:bg-muted/50">
+                      <TableCell>
+                        <div className="font-medium">{item.producto?.nombre}</div>
+                        <div className="text-xs text-muted-foreground">{item.producto?.sku}</div>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{item.cantidad}</TableCell>
+                      <TableCell className="text-right tabular-nums">
                         {item.cantidadRecibida}
-                        {pendiente > 0 && (
-                          <span className="ml-1 text-amber-600">
-                            (pend: {pendiente})
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-right tabular-nums">
-                        ${Number(item.precioUnitario).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-4 text-right tabular-nums">
-                        ${Number(item.subtotal).toFixed(2)}
-                      </td>
-                    {puedeRecibir && (
-                      <td className="px-4 py-4">
-                        {pendiente > 0 ? (
-                          <Input
-                            type="number"
-                            min={0}
-                            max={pendiente}
-                            className="w-24 min-h-10 text-right tabular-nums"
-                            value={cantidadesRecibir[item.id] ?? 0}
-                            onChange={(e) =>
-                              setCantidadesRecibir((prev) => ({
-                                ...prev,
-                                [item.id]: parseInt(e.target.value, 10) || 0,
-                              }))
-                            }
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        <span className={pendiente > 0 ? "text-amber-700" : "text-muted-foreground"}>
+                          {Math.max(0, pendiente)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {currencyFormatter.format(item.precioUnitario)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {currencyFormatter.format(item.subtotal)}
+                      </TableCell>
+                      {puedeRecibir && (
+                        <TableCell className="text-right">
+                          {pendiente > 0 ? (
+                            <Input
+                              type="number"
+                              min={0}
+                              max={pendiente}
+                              className="ml-auto min-h-10 w-24 text-right tabular-nums"
+                              value={cantidadesRecibir[item.id] ?? 0}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value, 10) || 0;
+                                setCantidadesRecibir((prev) => ({
+                                  ...prev,
+                                  [item.id]: Math.min(Math.max(0, value), pendiente),
+                                }));
+                              }}
                             />
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
-                      </td>
-                    )}
-                    </tr>
+                        </TableCell>
+                      )}
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-          <div className="mt-6 space-y-1 border-t pt-6">
-            <p className="text-lg font-bold">Total: ${orden.total.toFixed(2)}</p>
+          <div className="mt-6 flex flex-col gap-1 border-t pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              Total:{" "}
+              <span className="font-semibold text-foreground">
+                {currencyFormatter.format(orden.total)}
+              </span>
+            </p>
             {orden.estado === "RECIBIDO" && orden.fechaRecepcion && (
-              <p className="text-sm text-muted-foreground">
+              <p>
                 Recibida el {new Date(orden.fechaRecepcion).toLocaleString()}
               </p>
             )}

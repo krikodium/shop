@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -89,6 +91,14 @@ export default function ProductosPage() {
     } finally {
       setCargando(false);
     }
+  };
+
+  const limpiarFiltros = () => {
+    setFiltroBusqueda("");
+    setFiltroCategoria("__all__");
+    setFiltroProveedor(proveedorIdFromUrl ?? "__all__");
+    setFiltroConsignacion("__all__");
+    setFiltroStock("__all__");
   };
 
   const queryParams = new URLSearchParams();
@@ -203,61 +213,96 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
-        <Input
-          placeholder="Buscar por nombre o SKU..."
-          value={filtroBusqueda}
-          onChange={(e) => setFiltroBusqueda(e.target.value)}
-          className="max-w-xs"
-        />
-        <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Categoría" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todas</SelectItem>
-            {categorias.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Proveedor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos</SelectItem>
-            {proveedores.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filtroConsignacion} onValueChange={setFiltroConsignacion}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos</SelectItem>
-            <SelectItem value="true">Consignación</SelectItem>
-            <SelectItem value="false">Regular</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filtroStock} onValueChange={setFiltroStock}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Stock" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos</SelectItem>
-            <SelectItem value="bajo">Stock bajo</SelectItem>
-            <SelectItem value="sin">Sin stock</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Card className="border-border/70">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Filtros de inventario</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Encontrá productos por texto, proveedor, categoría, tipo y estado de stock.
+              </p>
+            </div>
+            <Button variant="ghost" onClick={limpiarFiltros} className="self-start sm:self-auto">
+              Limpiar filtros
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="space-y-2 xl:col-span-2">
+              <Label htmlFor="filtro-busqueda">Buscar producto</Label>
+              <Input
+                id="filtro-busqueda"
+                placeholder="Nombre o SKU"
+                value={filtroBusqueda}
+                onChange={(e) => setFiltroBusqueda(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="filtro-categoria">Categoría</Label>
+              <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                <SelectTrigger id="filtro-categoria">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  {categorias.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="filtro-proveedor">Proveedor</Label>
+              <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
+                <SelectTrigger id="filtro-proveedor">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  {proveedores.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="filtro-tipo">Tipo de producto</Label>
+              <Select value={filtroConsignacion} onValueChange={setFiltroConsignacion}>
+                <SelectTrigger id="filtro-tipo">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="true">Consignación</SelectItem>
+                  <SelectItem value="false">Regular</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="filtro-stock">Estado de stock</Label>
+              <Select value={filtroStock} onValueChange={setFiltroStock}>
+                <SelectTrigger id="filtro-stock">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="bajo">Stock bajo</SelectItem>
+                  <SelectItem value="sin">Sin stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <ProductosTable
         queryParams={queryParams.toString()}

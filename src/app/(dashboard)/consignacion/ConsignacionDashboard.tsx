@@ -12,11 +12,9 @@ import {
   ArrowRight, 
   Calendar, 
   Clock,
-  ExternalLink,
-  ChevronRight,
   PlusCircle
 } from "lucide-react";
-import type { DeudaProveedor, RestriccionRendicion } from "@/app/api/consignacion/deudas/route";
+import type { DeudaProveedor } from "@/app/api/consignacion/deudas/route";
 import { formatARS } from "@/lib/formatCurrency";
 
 export function ConsignacionDashboard() {
@@ -35,7 +33,7 @@ export function ConsignacionDashboard() {
     return (
       <div className="grid gap-4 md:grid-cols-3">
         {[1, 2, 3].map((i) => (
-          <Card key={i} className="animate-pulse border-none shadow-sm bg-muted/20 h-[180px]" />
+          <Card key={i} className="animate-pulse border bg-muted/20 shadow-sm h-[176px]" />
         ))}
       </div>
     );
@@ -46,7 +44,7 @@ export function ConsignacionDashboard() {
 
   if (deudas.length === 0) {
     return (
-      <Card className="border-dashed bg-muted/10">
+      <Card className="border-dashed bg-muted/10 shadow-sm">
         <CardContent className="py-12 text-center space-y-4">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <Users className="h-6 w-6 text-muted-foreground" />
@@ -69,26 +67,30 @@ export function ConsignacionDashboard() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Summary Section */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-none shadow-md bg-gradient-to-br from-zinc-800 to-zinc-950 text-white">
+        <Card className="border shadow-sm bg-gradient-to-br from-zinc-800 to-zinc-900 text-white">
           <CardHeader className="pb-2">
-            <CardDescription className="text-zinc-400 font-medium font-sans uppercase tracking-widest text-[10px]">Deuda Total Acumulada</CardDescription>
-            <CardTitle className="text-2xl font-black">{formatARS(totalDeuda)}</CardTitle>
+            <CardDescription className="text-zinc-300/90 text-[11px] font-medium uppercase tracking-wide">
+              Deuda total acumulada
+            </CardDescription>
+            <CardTitle className="text-2xl font-extrabold tracking-tight">{formatARS(totalDeuda)}</CardTitle>
           </CardHeader>
           <CardContent>
-             <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+             <div className="flex items-center gap-1.5 text-xs text-zinc-300/70">
                 <AlertCircle className="h-3 w-3" />
                 <span>Pendiente de rendición · montos en ARS</span>
              </div>
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-white dark:bg-zinc-900">
+        <Card className="border shadow-sm bg-card">
           <CardHeader className="pb-2">
-            <CardDescription className="text-muted-foreground font-medium">Proveedores con deuda</CardDescription>
-            <CardTitle className="text-2xl font-black">{proveedoresConDeuda}</CardTitle>
+            <CardDescription className="text-muted-foreground font-medium text-[11px] uppercase tracking-wide">
+              Proveedores con deuda
+            </CardDescription>
+            <CardTitle className="text-2xl font-extrabold tracking-tight">{proveedoresConDeuda}</CardTitle>
           </CardHeader>
           <CardContent>
              <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
@@ -98,10 +100,12 @@ export function ConsignacionDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-white dark:bg-zinc-900">
+        <Card className="border shadow-sm bg-card">
           <CardHeader className="pb-2">
-            <CardDescription className="text-muted-foreground font-medium">Vendido en el período</CardDescription>
-            <CardTitle className="text-2xl font-black">
+            <CardDescription className="text-muted-foreground font-medium text-[11px] uppercase tracking-wide">
+              Vendido en el período
+            </CardDescription>
+            <CardTitle className="text-2xl font-extrabold tracking-tight">
                 {formatARS(deudas.reduce((acc, d) => acc + d.totalVendidoPeriodo, 0))}
             </CardTitle>
           </CardHeader>
@@ -119,33 +123,37 @@ export function ConsignacionDashboard() {
         {deudas.map((d) => (
           <Card
             key={d.proveedorId}
-            className={`group relative overflow-hidden transition-all hover:shadow-lg border-none ${
+            className={`group relative overflow-hidden border shadow-sm transition-all duration-200 hover:shadow-md ${
               d.deudaPendiente > 0
-                ? "bg-white dark:bg-zinc-900 border-l-4 border-l-primary"
-                : "bg-muted/30"
+                ? "bg-card"
+                : "bg-muted/20"
             }`}
           >
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
-                    <CardTitle className="text-lg font-black tracking-tight group-hover:text-primary transition-colors">
+                    <CardTitle className="text-lg font-bold tracking-tight group-hover:text-primary transition-colors">
                         {d.proveedorNombre}
                     </CardTitle>
                     {d.deudaPendiente > 0 ? (
-                        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10px] font-bold py-0 h-5">PENDIENTE</Badge>
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/25 text-[10px] font-semibold py-0 h-5">
+                          Pendiente
+                        </Badge>
                     ) : (
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 text-[10px] font-bold py-0 h-5"> AL DÍA</Badge>
+                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 text-[10px] font-semibold py-0 h-5">
+                          Al día
+                        </Badge>
                     )}
                 </div>
-                <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-muted/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                <div className="h-9 w-9 flex items-center justify-center rounded-lg bg-muted/60 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                     <Users className="h-5 w-5" />
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 pt-2">
+            <CardContent className="space-y-3 pt-2">
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Deuda por rendir</span>
-                <span className={`text-2xl font-black tabular-nums ${
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Deuda por rendir</span>
+                <span className={`text-2xl font-extrabold tabular-nums ${
                     d.deudaPendiente > 0 ? "text-primary" : "text-muted-foreground/40"
                   }`}>
                   {formatARS(d.deudaPendiente)}
@@ -153,20 +161,20 @@ export function ConsignacionDashboard() {
               </div>
 
               {d.ultimaRendicion ? (
-                <div className="flex items-center gap-2 rounded-lg bg-muted/30 p-2 text-[10px] font-medium text-muted-foreground">
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/20 p-2 text-[10px] font-medium text-muted-foreground">
                     <Calendar className="h-3 w-3" />
                     <span>Última rendición: {new Date(d.ultimaRendicion.fechaHasta).toLocaleDateString("es-AR", { day: '2-digit', month: 'short' })}</span>
                     <span className="ml-auto text-primary/70">{formatARS(d.ultimaRendicion.totalARendir)}</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 rounded-lg bg-muted/30 p-2 text-[10px] font-bold text-muted-foreground/50 border border-border/50">
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/20 p-2 text-[10px] font-medium text-muted-foreground/60">
                     <Clock className="h-3 w-3" />
                     <span>Sin rendiciones registradas</span>
                 </div>
               )}
 
               {!d.restriccionRendicion.permitido && (
-                <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 p-2 text-[10px] font-medium text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2 text-[10px] font-medium text-amber-700 dark:text-amber-400">
                     <AlertCircle className="h-3 w-3 shrink-0" />
                     <span>Ya rendido este mes · habilitado en {d.restriccionRendicion.diasParaUltimaSemana} días</span>
                 </div>
@@ -177,7 +185,7 @@ export function ConsignacionDashboard() {
                   <Button
                     variant={d.deudaPendiente > 0 ? "default" : "outline"}
                     size="sm"
-                    className={`w-full font-bold shadow-sm ${d.deudaPendiente > 0 ? "bg-primary hover:bg-primary/90" : "opacity-60 hover:opacity-100"}`}
+                    className={`w-full font-semibold shadow-sm ${d.deudaPendiente > 0 ? "bg-primary hover:bg-primary/90" : "opacity-70 hover:opacity-100"}`}
                   >
                     Generar Rendición
                     <ArrowRight className="ml-2 h-3 w-3" />
@@ -188,7 +196,7 @@ export function ConsignacionDashboard() {
                   variant="outline"
                   size="sm"
                   disabled
-                  className="w-full font-bold opacity-50 cursor-not-allowed"
+                  className="w-full font-medium opacity-55 cursor-not-allowed"
                 >
                   Rendición no disponible
                   <Clock className="ml-2 h-3 w-3" />
@@ -196,8 +204,7 @@ export function ConsignacionDashboard() {
               )}
             </CardContent>
             
-            {/* Subtle background icon for premium feel */}
-            <Users className="absolute -bottom-4 -right-4 h-24 w-24 text-muted-foreground/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Users className="absolute -bottom-5 -right-5 h-24 w-24 text-muted-foreground/5 opacity-0 group-hover:opacity-100 transition-opacity" />
           </Card>
         ))}
       </div>

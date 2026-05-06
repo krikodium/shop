@@ -1,315 +1,133 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Plus, Pencil } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus } from "lucide-react";
+import type { Usuario } from "./types";
+import { UsuariosSkeleton } from "./UsuariosSkeleton";
+import { UsuariosList } from "./UsuariosList";
+import { UsuarioFormDialog } from "./UsuarioFormDialog";
 
-interface Usuario {
-  id: string;
-  name: string | null;
-  email: string;
-  role: string;
-  horarioEntrada: string | null;
-  horarioSalida: string | null;
-  createdAt: string;
+function sortUsuarios(list: Usuario[]): Usuario[] {
+  return [...list].sort((a, b) => {
+    const an = (a.name?.trim() || a.email).toLowerCase();
+    const bn = (b.name?.trim() || b.email).toLowerCase();
+    return an.localeCompare(bn, "es");
+  });
 }
-
-const ROLES = [
-  { value: "ADMIN", label: "Admin" },
-  { value: "VENDEDOR", label: "Vendedor" },
-  { value: "VIEWER", label: "Solo lectura" },
-];
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    email: "",
-    name: "",
-    password: "",
-    role: "VENDEDOR",
-    horarioEntrada: "",
-    horarioSalida: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<Usuario | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
+    setLoading(true);
     fetch("/api/usuarios")
       .then((res) => {
         if (!res.ok) throw new Error("No autorizado");
         return res.json();
       })
-      .then(setUsuarios)
+      .then((data: Usuario[]) => setUsuarios(Array.isArray(data) ? data : []))
       .catch(() => setUsuarios([]))
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    load();
   }, []);
 
-  const openNew = () => {
-    setEditingId(null);
-    setForm({
-      email: "",
-      name: "",
-      password: "",
-      role: "VENDEDOR",
-      horarioEntrada: "",
-      horarioSalida: "",
-    });
-    setError(null);
-    setModalOpen(true);
-  };
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial
+    load();
+  }, [load]);
 
-  const openEdit = (u: Usuario) => {
-    setEditingId(u.id);
-    setForm({
-      email: u.email,
-      name: u.name ?? "",
-      password: "",
-      role: u.role,
-      horarioEntrada: u.horarioEntrada ?? "",
-      horarioSalida: u.horarioSalida ?? "",
+  const filteredUsuarios = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return usuarios.filter((u) => {
+      const roleOk = roleFilter === "all" || u.role === roleFilter;
+      const nameOk = !q || (u.name?.toLowerCase().includes(q) ?? false);
+      const emailOk = !q || u.email.toLowerCase().includes(q);
+      const searchOk = !q || nameOk || emailOk;
+      return roleOk && searchOk;
     });
-    setError(null);
-    setModalOpen(true);
-  };
+  }, [usuarios, searchQuery, roleFilter]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      if (editingId) {
-        const body: Record<string, unknown> = {
-          name: form.name || undefined,
-          role: form.role,
-          horarioEntrada: form.horarioEntrada || null,
-          horarioSalida: form.horarioSalida || null,
-        };
-        if (form.password) body.password = form.password;
-        const res = await fetch(`/api/usuarios/${editingId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d.error ?? "Error");
-        }
+  const openNew = useCallback(() => {
+    setUserToEdit(null);
+    setDialogOpen(true);
+  }, []);
+
+  const openEdit = useCallback((u: Usuario) => {
+    setUserToEdit(u);
+    setDialogOpen(true);
+  }, []);
+
+  const handleSaved = useCallback(
+    (user: Usuario, mode: "create" | "update") => {
+      if (mode === "create") {
+        setUsuarios((prev) => sortUsuarios([...prev, user]));
       } else {
-        if (!form.password || form.password.length < 6) {
-          throw new Error("La contraseña debe tener al menos 6 caracteres");
-        }
-        const res = await fetch("/api/usuarios", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: form.email,
-            name: form.name || undefined,
-            password: form.password,
-            role: form.role,
-            horarioEntrada: form.horarioEntrada || null,
-            horarioSalida: form.horarioSalida || null,
-          }),
-        });
-        if (!res.ok) {
-          const d = await res.json();
-          throw new Error(d.error ?? "Error");
-        }
+        setUsuarios((prev) =>
+          prev.map((x) => (x.id === user.id ? { ...x, ...user } : x))
+        );
       }
-      setModalOpen(false);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar");
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+    []
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Usuarios</h1>
-          <p className="text-muted-foreground">
-            Administración de usuarios del sistema
-          </p>
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="rounded-xl border bg-card/70 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight md:text-2xl">Usuarios</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Equipo del sistema: roles, horarios y acceso
+            </p>
+          </div>
+          <Button
+            onClick={openNew}
+            size="lg"
+            className="w-full gap-2 shadow-sm transition-shadow hover:shadow-md sm:w-auto"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo usuario
+          </Button>
         </div>
-        <Button onClick={openNew} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo usuario
-        </Button>
       </div>
 
       {loading ? (
-        <p className="text-muted-foreground">Cargando…</p>
+        <UsuariosSkeleton />
       ) : usuarios.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No hay usuarios o no tenés permiso para verlos
+        <Card className="border-dashed">
+          <CardContent className="py-14 text-center">
+            <p className="text-muted-foreground">
+              No hay usuarios o no tenés permiso para verlos
+            </p>
+            <Button variant="link" className="mt-2" onClick={() => load()}>
+              Reintentar carga
+            </Button>
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Horario</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {usuarios.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>{u.name ?? "—"}</TableCell>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={u.role === "ADMIN" ? "default" : "secondary"}>
-                      {ROLES.find((r) => r.value === u.role)?.label ?? u.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {u.horarioEntrada && u.horarioSalida
-                      ? `${u.horarioEntrada} - ${u.horarioSalida}`
-                      : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <UsuariosList
+          usuarios={filteredUsuarios}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          roleFilter={roleFilter}
+          onRoleFilterChange={setRoleFilter}
+          totalBeforeFilter={usuarios.length}
+          onEdit={openEdit}
+        />
       )}
 
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingId ? "Editar usuario" : "Nuevo usuario"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-5 pt-4">
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                type="email"
-                required
-                disabled={!!editingId}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Nombre</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Contraseña {editingId && "(dejar vacío para no cambiar)"}</Label>
-              <Input
-                value={form.password}
-                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                type="password"
-                required={!editingId}
-                minLength={6}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Rol</Label>
-              <Select
-                value={form.role}
-                onValueChange={(v) => setForm((f) => ({ ...f, role: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      {r.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Horario entrada</Label>
-                <Input
-                  type="time"
-                  value={form.horarioEntrada}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, horarioEntrada: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Horario salida</Label>
-                <Input
-                  type="time"
-                  value={form.horarioSalida}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, horarioSalida: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setModalOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Guardando…" : "Guardar"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <UsuarioFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        userToEdit={userToEdit}
+        onSaved={handleSaved}
+      />
     </div>
   );
 }

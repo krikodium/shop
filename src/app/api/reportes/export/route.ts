@@ -22,6 +22,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const desde = searchParams.get("desde");
   const hasta = searchParams.get("hasta");
+  const metodoPago = searchParams.get("metodoPago");
+  const proveedorId = searchParams.get("proveedorId");
+  const categoriaId = searchParams.get("categoriaId");
   const fechaDesde = desde ? new Date(desde + "T00:00:00.000") : null;
   const fechaHasta = hasta ? new Date(hasta + "T23:59:59.999") : null;
 
@@ -31,6 +34,27 @@ export async function GET(request: Request) {
       ...(fechaDesde ? { gte: fechaDesde } : {}),
       ...(fechaHasta ? { lte: fechaHasta } : {}),
     };
+  }
+  if (metodoPago && metodoPago !== "__all__") {
+    where.OR = [
+      { metodoPago: metodoPago as Prisma.MetodoPago },
+      { metodoPagoSecundario: metodoPago as Prisma.MetodoPago },
+    ];
+  }
+  if ((proveedorId && proveedorId !== "__all__") || (categoriaId && categoriaId !== "__all__")) {
+    const andItems: Prisma.ItemVentaWhereInput[] = [];
+    if (proveedorId && proveedorId !== "__all__") {
+      andItems.push({
+        OR: [
+          { proveedorId },
+          { producto: { proveedorId } },
+        ],
+      });
+    }
+    if (categoriaId && categoriaId !== "__all__") {
+      andItems.push({ producto: { categoriaId } });
+    }
+    where.items = { some: { AND: andItems } };
   }
 
   type Fila = {

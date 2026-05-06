@@ -174,7 +174,7 @@ export default function NuevaVentaPage() {
         setIsLoading(false);
       }
     },
-    [items, descuentoMonto, enviarVenta, router]
+    [items, enviarVenta, router]
   );
 
   const confirmarIgnorarStock = useCallback(async () => {

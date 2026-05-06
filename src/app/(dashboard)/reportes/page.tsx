@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { METODO_PAGO_LABEL } from "@/lib/constants";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -29,6 +37,7 @@ import {
   BarChart3,
   CreditCard,
   ArrowRight,
+  GitCompareArrows,
 } from "lucide-react";
 
 function getDefaultDates() {
@@ -44,6 +53,12 @@ export default function ReportesPage() {
   const { desde, hasta } = getDefaultDates();
   const [fechaDesde, setFechaDesde] = useState(desde);
   const [fechaHasta, setFechaHasta] = useState(hasta);
+  const [metodoPago, setMetodoPago] = useState("__all__");
+  const [proveedorId, setProveedorId] = useState("__all__");
+  const [categoriaId, setCategoriaId] = useState("__all__");
+  const [comparar, setComparar] = useState(true);
+  const [proveedores, setProveedores] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string }>>([]);
   const [ventas, setVentas] = useState<Record<string, unknown> | null>(null);
   const [inventario, setInventario] = useState<Record<string, unknown> | null>(null);
   const [rentabilidad, setRentabilidad] = useState<Record<string, unknown> | null>(null);
@@ -52,9 +67,16 @@ export default function ReportesPage() {
   const fetchReporte = useCallback(async (tipo: string) => {
     setLoading(tipo);
     try {
-      const res = await fetch(
-        `/api/reportes?tipo=${tipo}&desde=${fechaDesde}&hasta=${fechaHasta}`
-      );
+      const params = new URLSearchParams({
+        tipo,
+        desde: fechaDesde,
+        hasta: fechaHasta,
+        comparar: comparar ? "true" : "false",
+      });
+      if (metodoPago !== "__all__") params.set("metodoPago", metodoPago);
+      if (proveedorId !== "__all__") params.set("proveedorId", proveedorId);
+      if (categoriaId !== "__all__") params.set("categoriaId", categoriaId);
+      const res = await fetch(`/api/reportes?${params.toString()}`);
       if (!res.ok) throw new Error("Error");
       const data = await res.json();
       if (tipo === "ventas") setVentas(data);
@@ -67,13 +89,55 @@ export default function ReportesPage() {
     } finally {
       setLoading(null);
     }
-  }, [fechaDesde, fechaHasta]);
+  }, [fechaDesde, fechaHasta, metodoPago, proveedorId, categoriaId, comparar]);
 
   useEffect(() => {
     fetchReporte("ventas");
     fetchReporte("inventario");
     fetchReporte("rentabilidad");
   }, [fetchReporte]);
+
+  useEffect(() => {
+    fetch("/api/proveedores")
+      .then((r) => r.json())
+      .then((data) =>
+        setProveedores(Array.isArray(data) ? data.map((p) => ({ id: p.id, nombre: p.nombre })) : [])
+      )
+      .catch(() => setProveedores([]));
+    fetch("/api/categorias")
+      .then((r) => r.json())
+      .then((data) =>
+        setCategorias(Array.isArray(data) ? data.map((c) => ({ id: c.id, nombre: c.nombre })) : [])
+      )
+      .catch(() => setCategorias([]));
+  }, []);
+
+  const aplicarPreset = (preset: "hoy" | "ultimos7" | "mesActual" | "mesAnterior") => {
+    const hoy = new Date();
+    if (preset === "hoy") {
+      const d = hoy.toISOString().slice(0, 10);
+      setFechaDesde(d);
+      setFechaHasta(d);
+      return;
+    }
+    if (preset === "ultimos7") {
+      const desde7 = new Date(hoy);
+      desde7.setDate(hoy.getDate() - 6);
+      setFechaDesde(desde7.toISOString().slice(0, 10));
+      setFechaHasta(hoy.toISOString().slice(0, 10));
+      return;
+    }
+    if (preset === "mesActual") {
+      const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      setFechaDesde(inicio.toISOString().slice(0, 10));
+      setFechaHasta(hoy.toISOString().slice(0, 10));
+      return;
+    }
+    const inicioMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    const finMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+    setFechaDesde(inicioMesAnterior.toISOString().slice(0, 10));
+    setFechaHasta(finMesAnterior.toISOString().slice(0, 10));
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -85,43 +149,123 @@ export default function ReportesPage() {
             Ventas, inventario y rentabilidad por período
           </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-1.5 shadow-sm" asChild>
-          <a
-            href={`/api/reportes/export?desde=${encodeURIComponent(fechaDesde)}&hasta=${encodeURIComponent(fechaHasta)}`}
-            download
-          >
-            <Download className="h-3.5 w-3.5" />
-            Exportar CSV
-          </a>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5 shadow-sm" asChild>
+            <a
+              href={`/api/reportes/export?desde=${encodeURIComponent(fechaDesde)}&hasta=${encodeURIComponent(fechaHasta)}&metodoPago=${encodeURIComponent(metodoPago)}&proveedorId=${encodeURIComponent(proveedorId)}&categoriaId=${encodeURIComponent(categoriaId)}`}
+              download
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exportar CSV
+            </a>
+          </Button>
+          <Button size="sm" className="gap-1.5 shadow-sm" asChild>
+            <a
+              href={`/api/reportes/export/pdf?desde=${encodeURIComponent(fechaDesde)}&hasta=${encodeURIComponent(fechaHasta)}&metodoPago=${encodeURIComponent(metodoPago)}&proveedorId=${encodeURIComponent(proveedorId)}&categoriaId=${encodeURIComponent(categoriaId)}`}
+              download
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exportar PDF
+            </a>
+          </Button>
+        </div>
       </div>
 
       {/* ── Filtro de fechas ─────────────────────────────────────── */}
       <Card className="shadow-sm">
-        <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center">
+        <CardContent className="flex flex-col gap-4 py-4">
           <div className="flex items-center gap-2 text-muted-foreground shrink-0">
             <Calendar className="h-4 w-4" />
             <span className="text-sm font-medium">Período</span>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset("hoy")}>Hoy</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset("ultimos7")}>Últimos 7 días</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset("mesActual")}>Mes actual</Button>
+            <Button variant="outline" size="sm" onClick={() => aplicarPreset("mesAnterior")}>Mes anterior</Button>
+          </div>
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex-1">
               <label className="mb-1 block text-xs text-muted-foreground">Desde</label>
-              <input
+              <Input
                 type="date"
                 value={fechaDesde}
                 onChange={(e) => setFechaDesde(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:ring-primary/30 focus:outline-none"
+                className="h-10 border-border/70 bg-muted/20 shadow-sm transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
             <ArrowRight className="hidden sm:block h-4 w-4 text-muted-foreground/30 shrink-0 mt-5" />
             <div className="flex-1">
               <label className="mb-1 block text-xs text-muted-foreground">Hasta</label>
-              <input
+              <Input
                 type="date"
                 value={fechaHasta}
                 onChange={(e) => setFechaHasta(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:ring-primary/30 focus:outline-none"
+                className="h-10 border-border/70 bg-muted/20 shadow-sm transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-primary/30"
               />
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Método de pago</label>
+              <Select value={metodoPago} onValueChange={setMetodoPago}>
+                <SelectTrigger className="h-10 border-border/70 bg-muted/20 shadow-sm hover:bg-muted/30">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  {Object.entries(METODO_PAGO_LABEL).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Proveedor</label>
+              <Select value={proveedorId} onValueChange={setProveedorId}>
+                <SelectTrigger className="h-10 border-border/70 bg-muted/20 shadow-sm hover:bg-muted/30">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  {proveedores.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Categoría</label>
+              <Select value={categoriaId} onValueChange={setCategoriaId}>
+                <SelectTrigger className="h-10 border-border/70 bg-muted/20 shadow-sm hover:bg-muted/30">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  {categorias.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end pb-2">
+              <Button
+                type="button"
+                variant={comparar ? "default" : "outline"}
+                className={`w-full justify-start gap-2 h-10 shadow-sm ${
+                  comparar ? "bg-primary/90 hover:bg-primary" : "border-border/70 bg-muted/20 hover:bg-muted/30"
+                }`}
+                onClick={() => setComparar((v) => !v)}
+              >
+                <GitCompareArrows className="h-4 w-4" />
+                {comparar ? "Comparando con período anterior" : "Activar comparación con período anterior"}
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -149,6 +293,7 @@ export default function ReportesPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-2xl font-bold tabular-nums">{formatARS((ventas.totalVentas as number) ?? 0)}</p>
+                    <ComparativaHint comparativa={ventas.comparativa} clave="totalVentas" />
                   </CardContent>
                 </Card>
                 <Card className="overflow-hidden border-l-4 border-l-blue-500 shadow-sm transition-shadow hover:shadow-md">
@@ -170,6 +315,7 @@ export default function ReportesPage() {
                     <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
                       {formatARS((ventas.totalGanancia as number) ?? 0)}
                     </p>
+                    <ComparativaHint comparativa={ventas.comparativa} clave="totalGanancia" />
                   </CardContent>
                 </Card>
                 <Card className="overflow-hidden border-l-4 border-l-indigo-500 shadow-sm transition-shadow hover:shadow-md">
@@ -181,6 +327,7 @@ export default function ReportesPage() {
                     <p className="text-2xl font-bold tabular-nums">
                       {(ventas.margenPromedio as number)?.toFixed(1) ?? 0}%
                     </p>
+                    <ComparativaHint comparativa={ventas.comparativa} clave="margenPromedio" sufijo="%" />
                   </CardContent>
                 </Card>
               </div>
@@ -255,6 +402,46 @@ export default function ReportesPage() {
                   </CardContent>
                 </Card>
               )}
+
+              {(() => {
+                const rankings = ventas.rankings as
+                  | {
+                      topProductosPorVenta?: Array<{ nombre: string; sku: string; venta: number }>;
+                      topProductosPorGanancia?: Array<{ nombre: string; sku: string; ganancia: number }>;
+                    }
+                  | undefined;
+                if (!rankings) return null;
+                return (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <Card className="shadow-sm">
+                      <CardHeader>
+                        <CardTitle className="text-base">Top productos por venta</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {(rankings.topProductosPorVenta ?? []).slice(0, 5).map((p) => (
+                          <div key={p.sku} className="flex items-center justify-between text-sm">
+                            <span className="truncate pr-3">{p.nombre}</span>
+                            <span className="font-semibold tabular-nums">{formatARS(p.venta)}</span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                    <Card className="shadow-sm">
+                      <CardHeader>
+                        <CardTitle className="text-base">Top productos por ganancia</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {(rankings.topProductosPorGanancia ?? []).slice(0, 5).map((p) => (
+                          <div key={p.sku} className="flex items-center justify-between text-sm">
+                            <span className="truncate pr-3">{p.nombre}</span>
+                            <span className="font-semibold tabular-nums">{formatARS(p.ganancia ?? 0)}</span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <EmptyState text="Sin datos de ventas para este período" />
@@ -373,6 +560,7 @@ export default function ReportesPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-2xl font-bold tabular-nums">{formatARS((rentabilidad.totalVentas as number) ?? 0)}</p>
+                    <ComparativaHint comparativa={rentabilidad.comparativa} clave="totalVentas" />
                   </CardContent>
                 </Card>
                 <Card className="overflow-hidden border-l-4 border-l-slate-500 shadow-sm transition-shadow hover:shadow-md">
@@ -382,6 +570,7 @@ export default function ReportesPage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-2xl font-bold tabular-nums">{formatARS((rentabilidad.totalCosto as number) ?? 0)}</p>
+                    <ComparativaHint comparativa={rentabilidad.comparativa} clave="totalCosto" />
                   </CardContent>
                 </Card>
                 <Card className="overflow-hidden border-l-4 border-l-green-500 shadow-sm transition-shadow hover:shadow-md">
@@ -393,6 +582,7 @@ export default function ReportesPage() {
                     <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
                       {formatARS((rentabilidad.totalGanancia as number) ?? 0)}
                     </p>
+                    <ComparativaHint comparativa={rentabilidad.comparativa} clave="totalGanancia" />
                   </CardContent>
                 </Card>
                 <Card className="overflow-hidden border-l-4 border-l-indigo-500 shadow-sm transition-shadow hover:shadow-md">
@@ -404,6 +594,7 @@ export default function ReportesPage() {
                     <p className="text-2xl font-bold tabular-nums">
                       {(rentabilidad.margenPorcentaje as number)?.toFixed(1) ?? 0}%
                     </p>
+                    <ComparativaHint comparativa={rentabilidad.comparativa} clave="margenPorcentaje" sufijo="%" />
                   </CardContent>
                 </Card>
               </div>
@@ -489,5 +680,27 @@ function EmptyState({ text }: { text: string }) {
         <p className="text-sm text-muted-foreground">{text}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function ComparativaHint({
+  comparativa,
+  clave,
+  sufijo = "",
+}: {
+  comparativa: unknown;
+  clave: string;
+  sufijo?: string;
+}) {
+  const entry = (comparativa as Record<string, { deltaPct?: number | null }> | null)?.[clave];
+  const deltaPct = entry?.deltaPct;
+  if (deltaPct == null) return null;
+  const positivo = deltaPct >= 0;
+  return (
+    <p className={`mt-1 text-xs ${positivo ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+      {positivo ? "+" : ""}
+      {deltaPct.toFixed(1)}
+      {sufijo || "%"} vs período anterior
+    </p>
   );
 }
