@@ -18,21 +18,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { Stat, StatGrid } from "@/components/ui/stat";
 import {
   ShoppingCart,
   TrendingUp,
-  CreditCard,
   Package,
   AlertTriangle,
   ArrowRight,
-  DollarSign,
   Receipt,
   Users,
   Truck,
   HelpCircle,
   ShoppingBag,
   FileStack,
-  Banknote,
 } from "lucide-react";
 import { formatARS, formatUSD } from "@/lib/formatCurrency";
 
@@ -97,23 +96,22 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-8 animate-in fade-in duration-300">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="h-8 w-48 animate-skeleton-shimmer rounded-md" />
-            <div className="mt-2 h-4 w-64 animate-skeleton-shimmer rounded" />
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="h-3 w-40 animate-skeleton-shimmer rounded" />
+            <div className="h-8 w-56 animate-skeleton-shimmer rounded-md" />
+            <div className="h-4 w-72 animate-skeleton-shimmer rounded" />
           </div>
-          <div className="h-11 w-36 animate-skeleton-shimmer rounded-lg" />
+          <div className="h-10 w-36 animate-skeleton-shimmer rounded-lg" />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="h-[148px] rounded-2xl bg-zinc-950/90" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="rounded-lg border bg-card p-5">
-              <div className="flex justify-between">
-                <div className="h-4 w-24 animate-skeleton-shimmer rounded" />
-                <div className="h-4 w-4 animate-skeleton-shimmer rounded" />
-              </div>
-              <div className="mt-3 h-8 w-32 animate-skeleton-shimmer rounded" />
-              <div className="mt-1 h-3 w-20 animate-skeleton-shimmer rounded" />
+            <div key={i} className="rounded-xl border bg-card p-5">
+              <div className="h-3 w-24 animate-skeleton-shimmer rounded" />
+              <div className="mt-3 h-7 w-32 animate-skeleton-shimmer rounded" />
+              <div className="mt-2 h-3 w-20 animate-skeleton-shimmer rounded" />
             </div>
           ))}
         </div>
@@ -136,10 +134,11 @@ export default function DashboardPage() {
   if (loadError) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight md:text-2xl">Hermanas Caradonti</h1>
-          <p className="mt-1 text-muted-foreground">Resumen del mes y actividad reciente</p>
-        </div>
+        <PageHeader
+          overline="Panel · Resumen comercial"
+          title="Hermanas Caradonti"
+          description="Resumen del mes y actividad reciente"
+        />
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive md:p-5">
           <p className="font-medium">Error al cargar datos</p>
           <p className="mt-2 text-foreground/90">{loadError}</p>
@@ -166,118 +165,95 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="rounded-xl border bg-card/70 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5 sm:py-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight md:text-2xl">Hermanas Caradonti</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Resumen comercial, actividad reciente y alertas operativas del negocio
+      <PageHeader
+        overline="Panel · Resumen comercial"
+        title="Hermanas Caradonti"
+        description="Resumen comercial, actividad reciente y alertas operativas del negocio"
+      >
+        <Link href="/ventas/nueva" className="w-full sm:w-auto">
+          <Button className="w-full gap-2 sm:w-auto">
+            <ShoppingCart className="h-4 w-4" />
+            Nueva venta
+          </Button>
+        </Link>
+      </PageHeader>
+
+      {/* Banda de estado: facturación del mes */}
+      <section className="ledger-in relative overflow-hidden rounded-2xl bg-zinc-950 text-zinc-100">
+        <div
+          aria-hidden
+          className="ledger-grid-texture pointer-events-none absolute inset-0 opacity-[0.05]"
+        />
+        <div className="absolute inset-y-0 left-0 w-[3px] bg-primary" />
+        <div className="relative flex flex-col gap-7 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+              Ventas del mes
+            </p>
+            <p className="mt-3 font-mono text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+              {formatARS(resumen.totalVentasMes)}
+            </p>
+            <p className="mt-2 font-mono text-[11px] text-zinc-600">
+              {resumen.cantidadVentasMes} ventas registradas este mes
             </p>
           </div>
-          <Link href="/ventas/nueva" className="w-full sm:w-auto">
-            <Button size="lg" className="w-full gap-2 shadow-sm sm:w-auto">
-              <ShoppingCart className="h-4 w-4" />
-              Nueva venta
-            </Button>
-          </Link>
+          <div className="flex divide-x divide-white/10">
+            <div className="pr-6 sm:pr-8">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                Ganancia
+              </p>
+              <p className="mt-1 font-mono text-2xl tabular-nums text-emerald-400">
+                {formatARS(resumen.totalGananciaMes)}
+              </p>
+            </div>
+            <div className="pl-6 sm:pl-8">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                Hoy
+              </p>
+              <p className="mt-1 font-mono text-2xl tabular-nums">
+                {formatARS(resumen.totalVentasHoy)}
+              </p>
+              <p className="mt-0.5 font-mono text-[10px] text-zinc-600">
+                {resumen.cantidadVentasHoy} ventas
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ventas del mes
-            </CardTitle>
-            <DollarSign className="h-5 w-5 text-primary/70" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{formatARS(resumen.totalVentasMes)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {resumen.cantidadVentasMes} ventas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ganancia del mes
-            </CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-500/70" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
-              {formatARS(resumen.totalGananciaMes)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Hoy
-            </CardTitle>
-            <Receipt className="h-5 w-5 text-blue-500/70" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{formatARS(resumen.totalVentasHoy)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {resumen.cantidadVentasHoy} ventas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Deuda consignación
-            </CardTitle>
-            <CreditCard className="h-5 w-5 text-amber-500/70" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
-              {formatARS(resumen.totalDeudaConsignacion)}
-            </p>
-            <Link href="/consignacion" className="mt-1 inline-block text-xs font-medium text-primary hover:underline">
+      {/* Métricas secundarias */}
+      <StatGrid>
+        <Stat
+          label="Deuda consignación"
+          value={formatARS(resumen.totalDeudaConsignacion)}
+          tone={resumen.totalDeudaConsignacion > 0 ? "warning" : "default"}
+          hint={
+            <Link href="/consignacion" className="font-medium text-primary hover:underline">
               Ver rendiciones →
             </Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* USD en ventas (mes / hoy) */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              USD registrados (mes)
-            </CardTitle>
-            <Banknote className="h-5 w-5 text-slate-600/80" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{formatUSD(resumen.totalUsdRecibidoMes)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {resumen.ventasConUsdMes} venta{resumen.ventasConUsdMes !== 1 ? "s" : ""} con cobro en dólares
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              USD registrados (hoy)
-            </CardTitle>
-            <Banknote className="h-5 w-5 text-sky-600/80" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{formatUSD(resumen.totalUsdRecibidoHoy)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {resumen.ventasConUsdHoy} venta{resumen.ventasConUsdHoy !== 1 ? "s" : ""} con USD hoy
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          }
+        />
+        <Stat
+          label="USD registrados (mes)"
+          value={formatUSD(resumen.totalUsdRecibidoMes)}
+          hint={`${resumen.ventasConUsdMes} venta${resumen.ventasConUsdMes !== 1 ? "s" : ""} con dólares`}
+        />
+        <Stat
+          label="USD registrados (hoy)"
+          value={formatUSD(resumen.totalUsdRecibidoHoy)}
+          hint={`${resumen.ventasConUsdHoy} venta${resumen.ventasConUsdHoy !== 1 ? "s" : ""} con USD hoy`}
+        />
+        <Stat
+          label="Productos activos"
+          value={resumen.productosActivos}
+          tone={resumen.productosBajoStock > 0 ? "warning" : "default"}
+          hint={
+            resumen.productosBajoStock > 0
+              ? `${resumen.productosBajoStock} con stock bajo`
+              : "Stock en orden"
+          }
+        />
+      </StatGrid>
 
       {/* Gráficos */}
       <div className="grid gap-6 lg:grid-cols-2">

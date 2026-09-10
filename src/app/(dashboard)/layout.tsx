@@ -34,8 +34,11 @@ export default async function DashboardLayout({
       {/* Sidebar desktop */}
       <aside className="hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
         <div className="border-b border-border px-5 py-5">
-          <Link href="/" className="font-semibold text-lg tracking-tight">
-            Shop
+          <Link href="/" className="block">
+            <span className="block font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground/60">
+              Gestión
+            </span>
+            <span className="mt-0.5 block text-lg font-semibold tracking-tight">Shop</span>
           </Link>
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Dialog,
   DialogContent,
@@ -219,15 +220,11 @@ export default function CajaChicaPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-12 animate-in fade-in duration-300">
-      <div className="rounded-xl border bg-card/70 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5 sm:py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight md:text-2xl">Caja chica</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Movimientos de efectivo y control del turno
-            </p>
-          </div>
-
+      <PageHeader
+        overline="Gestión · Tesorería"
+        title="Caja chica"
+        description="Movimientos de efectivo y control del turno"
+      >
           {isAdmin && (
             <div className="flex rounded-lg border border-border bg-muted/40 p-1">
               <button
@@ -262,8 +259,7 @@ export default function CajaChicaPage() {
               </button>
             </div>
           )}
-        </div>
-      </div>
+      </PageHeader>
 
       {loading && !cajaActual ? (
         <CajaChicaSkeleton />

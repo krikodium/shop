@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Stat, StatGrid } from "@/components/ui/stat";
 import { METODO_PAGO_LABEL } from "@/lib/constants";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -27,12 +29,8 @@ import { Button } from "@/components/ui/button";
 import {
   Download,
   Calendar,
-  ShoppingBag,
-  TrendingUp,
-  Percent,
   DollarSign,
   Package,
-  Warehouse,
   AlertTriangle,
   BarChart3,
   CreditCard,
@@ -142,13 +140,11 @@ export default function ReportesPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* ── Header ────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight md:text-2xl">Reportes</h1>
-          <p className="mt-1 text-muted-foreground">
-            Ventas, inventario y rentabilidad por período
-          </p>
-        </div>
+      <PageHeader
+        overline="Análisis · Reportes"
+        title="Reportes"
+        description="Ventas, inventario y rentabilidad por período"
+      >
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-1.5 shadow-sm" asChild>
             <a
@@ -169,7 +165,7 @@ export default function ReportesPage() {
             </a>
           </Button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* ── Filtro de fechas ─────────────────────────────────────── */}
       <Card className="shadow-sm">
@@ -285,52 +281,30 @@ export default function ReportesPage() {
             <LoadingSkeleton />
           ) : ventas ? (
             <div className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Card className="overflow-hidden border-l-4 border-l-primary shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total ventas</CardTitle>
-                    <ShoppingBag className="h-5 w-5 text-primary/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums">{formatARS((ventas.totalVentas as number) ?? 0)}</p>
-                    <ComparativaHint comparativa={ventas.comparativa} clave="totalVentas" />
-                  </CardContent>
-                </Card>
-                <Card className="overflow-hidden border-l-4 border-l-blue-500 shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Cantidad</CardTitle>
-                    <BarChart3 className="h-5 w-5 text-blue-500/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums">{ventas.cantidadVentas as number ?? 0}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">operaciones en el período</p>
-                  </CardContent>
-                </Card>
-                <Card className="overflow-hidden border-l-4 border-l-green-500 shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Ganancia</CardTitle>
-                    <TrendingUp className="h-5 w-5 text-green-500/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
-                      {formatARS((ventas.totalGanancia as number) ?? 0)}
-                    </p>
-                    <ComparativaHint comparativa={ventas.comparativa} clave="totalGanancia" />
-                  </CardContent>
-                </Card>
-                <Card className="overflow-hidden border-l-4 border-l-indigo-500 shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Margen prom.</CardTitle>
-                    <Percent className="h-5 w-5 text-indigo-500/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums">
-                      {(ventas.margenPromedio as number)?.toFixed(1) ?? 0}%
-                    </p>
-                    <ComparativaHint comparativa={ventas.comparativa} clave="margenPromedio" sufijo="%" />
-                  </CardContent>
-                </Card>
-              </div>
+              <StatGrid>
+                <Stat
+                  label="Total ventas"
+                  value={formatARS((ventas.totalVentas as number) ?? 0)}
+                  accent
+                  hint={<ComparativaHint comparativa={ventas.comparativa} clave="totalVentas" />}
+                />
+                <Stat
+                  label="Cantidad"
+                  value={(ventas.cantidadVentas as number) ?? 0}
+                  hint="operaciones en el período"
+                />
+                <Stat
+                  label="Ganancia"
+                  value={formatARS((ventas.totalGanancia as number) ?? 0)}
+                  tone="positive"
+                  hint={<ComparativaHint comparativa={ventas.comparativa} clave="totalGanancia" />}
+                />
+                <Stat
+                  label="Margen prom."
+                  value={`${(ventas.margenPromedio as number)?.toFixed(1) ?? 0}%`}
+                  hint={<ComparativaHint comparativa={ventas.comparativa} clave="margenPromedio" sufijo="%" />}
+                />
+              </StatGrid>
 
               {/* USD section */}
               {(() => {
@@ -454,39 +428,24 @@ export default function ReportesPage() {
             <LoadingSkeleton />
           ) : inventario ? (
             <div className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Card className="overflow-hidden border-l-4 border-l-primary shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Productos activos</CardTitle>
-                    <Package className="h-5 w-5 text-primary/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums">{inventario.cantidadProductos as number ?? 0}</p>
-                  </CardContent>
-                </Card>
-                <Card className="overflow-hidden border-l-4 border-l-slate-500 shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Valor (costo)</CardTitle>
-                    <Warehouse className="h-5 w-5 text-slate-500/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums">{formatARS((inventario.valorInventarioCompra as number) ?? 0)}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Precio compra × stock</p>
-                  </CardContent>
-                </Card>
-                <Card className="overflow-hidden border-l-4 border-l-green-500 shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Valor (venta)</CardTitle>
-                    <TrendingUp className="h-5 w-5 text-green-500/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
-                      {formatARS((inventario.valorInventarioVenta as number) ?? 0)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">Precio venta × stock</p>
-                  </CardContent>
-                </Card>
-              </div>
+              <StatGrid className="lg:grid-cols-3">
+                <Stat
+                  label="Productos activos"
+                  value={(inventario.cantidadProductos as number) ?? 0}
+                  accent
+                />
+                <Stat
+                  label="Valor (costo)"
+                  value={formatARS((inventario.valorInventarioCompra as number) ?? 0)}
+                  hint="Precio compra × stock"
+                />
+                <Stat
+                  label="Valor (venta)"
+                  value={formatARS((inventario.valorInventarioVenta as number) ?? 0)}
+                  tone="positive"
+                  hint="Precio venta × stock"
+                />
+              </StatGrid>
 
               {(() => {
                 const productos = inventario.productosBajoStock as Array<{ sku: string; nombre: string; stockActual: number; stockMinimo: number }>;
@@ -552,52 +511,30 @@ export default function ReportesPage() {
             <LoadingSkeleton />
           ) : rentabilidad ? (
             <div className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Card className="overflow-hidden border-l-4 border-l-primary shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total ventas</CardTitle>
-                    <ShoppingBag className="h-5 w-5 text-primary/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums">{formatARS((rentabilidad.totalVentas as number) ?? 0)}</p>
-                    <ComparativaHint comparativa={rentabilidad.comparativa} clave="totalVentas" />
-                  </CardContent>
-                </Card>
-                <Card className="overflow-hidden border-l-4 border-l-slate-500 shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Costo total</CardTitle>
-                    <Warehouse className="h-5 w-5 text-slate-500/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums">{formatARS((rentabilidad.totalCosto as number) ?? 0)}</p>
-                    <ComparativaHint comparativa={rentabilidad.comparativa} clave="totalCosto" />
-                  </CardContent>
-                </Card>
-                <Card className="overflow-hidden border-l-4 border-l-green-500 shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Ganancia</CardTitle>
-                    <TrendingUp className="h-5 w-5 text-green-500/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
-                      {formatARS((rentabilidad.totalGanancia as number) ?? 0)}
-                    </p>
-                    <ComparativaHint comparativa={rentabilidad.comparativa} clave="totalGanancia" />
-                  </CardContent>
-                </Card>
-                <Card className="overflow-hidden border-l-4 border-l-indigo-500 shadow-sm transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Margen</CardTitle>
-                    <Percent className="h-5 w-5 text-indigo-500/70" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold tabular-nums">
-                      {(rentabilidad.margenPorcentaje as number)?.toFixed(1) ?? 0}%
-                    </p>
-                    <ComparativaHint comparativa={rentabilidad.comparativa} clave="margenPorcentaje" sufijo="%" />
-                  </CardContent>
-                </Card>
-              </div>
+              <StatGrid>
+                <Stat
+                  label="Total ventas"
+                  value={formatARS((rentabilidad.totalVentas as number) ?? 0)}
+                  accent
+                  hint={<ComparativaHint comparativa={rentabilidad.comparativa} clave="totalVentas" />}
+                />
+                <Stat
+                  label="Costo total"
+                  value={formatARS((rentabilidad.totalCosto as number) ?? 0)}
+                  hint={<ComparativaHint comparativa={rentabilidad.comparativa} clave="totalCosto" />}
+                />
+                <Stat
+                  label="Ganancia"
+                  value={formatARS((rentabilidad.totalGanancia as number) ?? 0)}
+                  tone="positive"
+                  hint={<ComparativaHint comparativa={rentabilidad.comparativa} clave="totalGanancia" />}
+                />
+                <Stat
+                  label="Margen"
+                  value={`${(rentabilidad.margenPorcentaje as number)?.toFixed(1) ?? 0}%`}
+                  hint={<ComparativaHint comparativa={rentabilidad.comparativa} clave="margenPorcentaje" sufijo="%" />}
+                />
+              </StatGrid>
 
               {(() => {
                 const productos = rentabilidad.porProducto as Array<{ nombre: string; sku: string; cantidad: number; venta: number; costo: number; ganancia: number }>;

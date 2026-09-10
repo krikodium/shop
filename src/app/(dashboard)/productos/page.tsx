@@ -21,6 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { PageHeader } from "@/components/ui/page-header";
 import { ProductosTable } from "./ProductosTable";
 import type { Categoria, Proveedor } from "@prisma/client";
 
@@ -110,11 +111,11 @@ export default function ProductosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight md:text-2xl">Productos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Catálogo e inventario</p>
-        </div>
+      <PageHeader
+        overline="Gestión · Inventario"
+        title="Productos"
+        description="Catálogo e inventario"
+      >
         <div className="flex gap-2">
           <Dialog open={modalCarga} onOpenChange={setModalCarga}>
             <DialogTrigger asChild>
@@ -211,7 +212,7 @@ export default function ProductosPage() {
             <Button>Nuevo producto</Button>
           </Link>
         </div>
-      </div>
+      </PageHeader>
 
       <Card className="border-border/70">
         <CardHeader className="pb-3">

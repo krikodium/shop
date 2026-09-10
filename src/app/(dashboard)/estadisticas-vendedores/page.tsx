@@ -239,10 +239,13 @@ export default function EstadisticasVendedoresPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Estadísticas del vendedor</h1>
-          <p className="mt-1 text-muted-foreground">
+      <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 space-y-1.5">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground/60">
+            Análisis · Equipo
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Estadísticas del vendedor</h1>
+          <p className="text-muted-foreground">
             Rendimiento operativo y ventas del período seleccionado
           </p>
           {!sinVendedor && (
@@ -553,7 +556,7 @@ export default function EstadisticasVendedoresPage() {
                           borderRadius: "8px",
                           border: "1px solid oklch(0.92 0 0)",
                         }}
-                        formatter={(value: unknown, name: string) => {
+                        formatter={(value: unknown, name?: string) => {
                           if (name === "total") return [formatARS(Number(value ?? 0)), "Total"];
                           return [Number(value ?? 0), "Ventas"];
                         }}

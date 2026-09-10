@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import {
-  HelpCircle,
   BookOpen,
   ShoppingCart,
   Receipt,
@@ -116,23 +116,14 @@ const accesosRapidos = [
 export default function AyudaPage() {
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-card/70 px-4 py-5 shadow-sm backdrop-blur-sm sm:px-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight md:text-2xl">
-              <HelpCircle className="h-6 w-6 text-primary" />
-              Centro de ayuda
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Guía práctica del sistema: configuración inicial, flujo de trabajo y accesos rápidos.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">Guía operativa</Badge>
-            <Badge variant="outline">Actualizado</Badge>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        overline="Soporte · Documentación"
+        title="Centro de ayuda"
+        description="Guía práctica del sistema: configuración inicial, flujo de trabajo y accesos rápidos."
+      >
+        <Badge variant="secondary">Guía operativa</Badge>
+        <Badge variant="outline">Actualizado</Badge>
+      </PageHeader>
 
       <Card className="shadow-sm">
         <CardHeader>
