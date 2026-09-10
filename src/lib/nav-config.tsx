@@ -14,6 +14,7 @@ import {
   HelpCircle,
   UserCog,
   TrendingUp,
+  ClipboardList,
 } from "lucide-react";
 
 export type NavItem = {
@@ -26,6 +27,7 @@ export const navBase: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/ventas/nueva", label: "Nueva venta", icon: ShoppingCart },
   { href: "/ventas", label: "Ventas", icon: Receipt },
+  { href: "/muestra-pedidos/nueva-venta", label: "Muestra pedidos", icon: ClipboardList },
   { href: "/productos", label: "Productos", icon: Package },
   { href: "/proveedores", label: "Proveedores", icon: Truck },
   { href: "/consignacion", label: "Consignación", icon: FileStack },
@@ -47,6 +49,7 @@ export const navMobile: NavItem[] = [
   { href: "/productos", label: "Inventario", icon: Package },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
   { href: "/ventas/nueva", label: "Venta rápida", icon: ShoppingCart },
+  { href: "/muestra-pedidos/nueva-venta", label: "Muestra pedidos", icon: ClipboardList },
 ];
 
 export function isActive(pathname: string, href: string, allNav: { href: string }[]) {
