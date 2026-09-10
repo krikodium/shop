@@ -210,7 +210,7 @@ del plan de pagos/señas.
 Este comando no debe imprimir nada. Si imprime una ruta, esa página falta en el mapa:
 
 ```bash
-for f in $(find src/app -name "page.tsx"); do grep -q "$f" docs/mapa-app.md || echo "FALTA EN EL MAPA: $f"; done
+for f in $(find src/app -name "page.tsx"); do grep -qF "$f" docs/mapa-app.md || echo "FALTA EN EL MAPA: $f"; done
 ```
 
 Esperado: sin salida.
