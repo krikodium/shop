@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { EMAIL_ENABLED, emailDeshabilitadoResponse } from "@/lib/email-config";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
@@ -27,6 +28,8 @@ const userSelect = {
 
 export async function POST(request: Request) {
   try {
+    if (!EMAIL_ENABLED) return emailDeshabilitadoResponse();
+
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });

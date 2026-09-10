@@ -75,6 +75,8 @@ export async function PATCH(
     if (data.diasTrabajo !== undefined) updateData.diasTrabajo = data.diasTrabajo;
     if (data.password) {
       updateData.password = await bcrypt.hash(data.password, 10);
+      // Resetear la contraseña cierra las sesiones abiertas de ese usuario.
+      updateData.passwordChangedAt = new Date();
     }
 
     const user = await prisma.user.update({

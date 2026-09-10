@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { EMAIL_ENABLED, emailDeshabilitadoResponse } from "@/lib/email-config";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { crearPasswordToken } from "@/lib/tokens";
@@ -15,6 +16,8 @@ const RESPUESTA_OK = {
 
 export async function POST(request: Request) {
   try {
+    if (!EMAIL_ENABLED) return emailDeshabilitadoResponse();
+
     const body = await request.json().catch(() => null);
     const parsed = schema.safeParse(body);
     // Aunque el email sea inválido, respondemos igual (genérico).

@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const hash = await bcrypt.hash(nueva, 10);
     await prisma.user.update({
       where: { id: user.id },
-      data: { password: hash },
+      data: { password: hash, passwordChangedAt: new Date() },
     });
 
     return NextResponse.json({ ok: true });

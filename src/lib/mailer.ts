@@ -48,24 +48,40 @@ async function enviar(to: string, subject: string, html: string, text: string) {
   await transporter.sendMail({ from, to, subject, html, text });
 }
 
+/** Escapa HTML para no interpolar datos de usuario (ej. el nombre) en crudo. */
+function esc(v: string): string {
+  return v.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!
+  );
+}
+
+/** Solo se aceptan links propios: evita que un link externo se cuele en el mail. */
+function assertLinkPropio(url: string): string {
+  const base = getBaseUrl();
+  if (!url.startsWith(base + "/")) {
+    throw new Error("Link de mail invalido: no pertenece a APP_URL");
+  }
+  return url;
+}
+
 function layout(titulo: string, cuerpo: string, cta: { label: string; url: string }) {
   return `
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
-    <h1 style="font-size:20px;margin:0 0 16px">${titulo}</h1>
+    <h1 style="font-size:20px;margin:0 0 16px">${esc(titulo)}</h1>
     <div style="font-size:14px;line-height:1.6;color:#444">${cuerpo}</div>
     <div style="margin:28px 0">
-      <a href="${cta.url}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-size:14px;font-weight:600">${cta.label}</a>
+      <a href="${esc(assertLinkPropio(cta.url))}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-size:14px;font-weight:600">${esc(cta.label)}</a>
     </div>
     <p style="font-size:12px;color:#888;line-height:1.5">
       Si el botón no funciona, copiá y pegá este enlace en tu navegador:<br>
-      <span style="word-break:break-all">${cta.url}</span>
+      <span style="word-break:break-all">${esc(cta.url)}</span>
     </p>
   </div>`;
 }
 
 /** Mail de invitación: el usuario define su contraseña por primera vez. */
 export async function enviarInvitacion(email: string, nombre: string | null, link: string) {
-  const saludo = nombre ? `Hola ${nombre},` : "Hola,";
+  const saludo = nombre ? `Hola ${esc(nombre)},` : "Hola,";
   const html = layout(
     "Te invitaron al sistema Shop",
     `<p>${saludo}</p><p>Se creó una cuenta para vos en el sistema de gestión del Shop. Para activarla, definí tu contraseña con el siguiente botón. El enlace vence en 72 horas.</p>`,
@@ -77,7 +93,7 @@ export async function enviarInvitacion(email: string, nombre: string | null, lin
 
 /** Mail de recuperación de contraseña. */
 export async function enviarReset(email: string, nombre: string | null, link: string) {
-  const saludo = nombre ? `Hola ${nombre},` : "Hola,";
+  const saludo = nombre ? `Hola ${esc(nombre)},` : "Hola,";
   const html = layout(
     "Restablecer tu contraseña",
     `<p>${saludo}</p><p>Recibimos un pedido para restablecer la contraseña de tu cuenta del Shop. Si fuiste vos, usá el botón de abajo. El enlace vence en 1 hora.</p><p>Si no lo pediste, podés ignorar este mail.</p>`,

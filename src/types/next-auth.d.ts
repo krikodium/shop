@@ -21,5 +21,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
     role?: string;
+    /** Epoch ms en que se emitió el token (para invalidar al cambiar contraseña) */
+    emitidoEn?: number;
   }
 }

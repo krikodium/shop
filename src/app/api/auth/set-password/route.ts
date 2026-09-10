@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { EMAIL_ENABLED, emailDeshabilitadoResponse } from "@/lib/email-config";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -11,6 +12,8 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
+    if (!EMAIL_ENABLED) return emailDeshabilitadoResponse();
+
     const body = await request.json();
     const { token, password } = schema.parse(body);
 
@@ -28,7 +31,7 @@ export async function POST(request: Request) {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: valido.userId },
-        data: { password: hash, emailVerified: new Date() },
+        data: { password: hash, emailVerified: new Date(), passwordChangedAt: new Date() },
       }),
       prisma.passwordToken.update({
         where: { id: valido.id },

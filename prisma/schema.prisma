@@ -389,6 +389,8 @@ model User {
   name          String?
   email         String    @unique
   password      String?   // Hash bcrypt para login con credenciales
+  /// Momento del último cambio de contraseña: invalida las sesiones JWT emitidas antes
+  passwordChangedAt DateTime?
   emailVerified DateTime?
   image         String?
   role          UserRole  @default(VENDEDOR)

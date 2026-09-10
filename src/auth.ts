@@ -37,6 +37,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        // Sello de emisión: cualquier cambio de contraseña posterior lo invalida.
+        token.emitidoEn = Date.now();
+        return token;
+      }
+      // En cada request: si la contraseña cambió después de emitido el token,
+      // la sesión deja de valer (cierra sesiones abiertas en otros dispositivos).
+      if (token.id) {
+        const actual = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { passwordChangedAt: true },
+        });
+        if (!actual) return null;
+        const cambiadaEn = actual.passwordChangedAt?.getTime() ?? 0;
+        const emitidoEn = Number(token.emitidoEn ?? 0);
+        if (cambiadaEn > emitidoEn) return null;
       }
       return token;
     },
