@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, type MetodoPago } from "@prisma/client";
 import { auth } from "@/auth";
 
 function escapeCsv(v: string | number | null | undefined): string {
@@ -37,8 +37,8 @@ export async function GET(request: Request) {
   }
   if (metodoPago && metodoPago !== "__all__") {
     where.OR = [
-      { metodoPago: metodoPago as Prisma.MetodoPago },
-      { metodoPagoSecundario: metodoPago as Prisma.MetodoPago },
+      { metodoPago: metodoPago as MetodoPago },
+      { metodoPagoSecundario: metodoPago as MetodoPago },
     ];
   }
   if ((proveedorId && proveedorId !== "__all__") || (categoriaId && categoriaId !== "__all__")) {

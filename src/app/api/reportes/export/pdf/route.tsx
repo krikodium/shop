@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, type MetodoPago } from "@prisma/client";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -25,8 +25,8 @@ function buildVentaWhere(
   }
   if (filtros.metodoPago) {
     where.OR = [
-      { metodoPago: filtros.metodoPago as Prisma.MetodoPago },
-      { metodoPagoSecundario: filtros.metodoPago as Prisma.MetodoPago },
+      { metodoPago: filtros.metodoPago as MetodoPago },
+      { metodoPagoSecundario: filtros.metodoPago as MetodoPago },
     ];
   }
   if (filtros.proveedorId || filtros.categoriaId) {
@@ -201,7 +201,7 @@ export async function GET(request: Request) {
   );
 
   const filename = `reporte_${desdeParam ?? "inicio"}_${hastaParam ?? "hoy"}.pdf`;
-  return new NextResponse(pdfBuffer, {
+  return new NextResponse(new Uint8Array(pdfBuffer), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

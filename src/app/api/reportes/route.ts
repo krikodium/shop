@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, type MetodoPago } from "@prisma/client";
 import { ventaFindManySafe } from "@/lib/ventaFindManySafe";
 
 type RangoFechas = {
@@ -39,8 +39,8 @@ function buildVentaWhere(
   }
   if (filtros.metodoPago) {
     where.OR = [
-      { metodoPago: filtros.metodoPago as Prisma.MetodoPago },
-      { metodoPagoSecundario: filtros.metodoPago as Prisma.MetodoPago },
+      { metodoPago: filtros.metodoPago as MetodoPago },
+      { metodoPagoSecundario: filtros.metodoPago as MetodoPago },
     ];
   }
   if (filtros.proveedorId || filtros.categoriaId) {
