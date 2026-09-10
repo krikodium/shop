@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
 import {
@@ -9,7 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, KeyRound } from "lucide-react";
+import { CambiarPasswordDialog } from "./CambiarPasswordDialog";
 
 function getInitials(name: string | null | undefined, email: string | null | undefined) {
   if (name) {
@@ -25,6 +27,7 @@ function getInitials(name: string | null | undefined, email: string | null | und
 
 export function UserMenu() {
   const { data: session } = useSession();
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   if (!session?.user) return null;
 
@@ -32,6 +35,7 @@ export function UserMenu() {
   const initials = getInitials(session.user.name, session.user.email);
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -55,6 +59,13 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuItem
+          onClick={() => setPasswordOpen(true)}
+          className="gap-2"
+        >
+          <KeyRound className="size-4" />
+          Cambiar contraseña
+        </DropdownMenuItem>
+        <DropdownMenuItem
           variant="destructive"
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="gap-2"
@@ -64,5 +75,7 @@ export function UserMenu() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <CambiarPasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
+    </>
   );
 }

@@ -400,9 +400,30 @@ model User {
   ventas        Venta[]
   jornadas      JornadaLaboral[]
   cajas         CajaChica[]
+  passwordTokens PasswordToken[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// Tokens de un solo uso para invitación (definir contraseña) y reset de contraseña.
+// Se guarda el HASH del token; el link enviado por mail lleva el token en crudo.
+model PasswordToken {
+  id        String     @id @default(cuid())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String     @unique
+  tipo      TokenTipo
+  expires   DateTime
+  usedAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  @@index([userId])
+}
+
+enum TokenTipo {
+  INVITACION
+  RESET
 }
 
 enum UserRole {

@@ -7,4 +7,7 @@ export interface Usuario {
   horarioSalida: string | null;
   diasTrabajo: string | null;
   createdAt: string;
+  /** false = invitado que todavía no definió su contraseña (acceso pendiente) */
+  tienePassword?: boolean;
+  emailVerified?: string | null;
 }

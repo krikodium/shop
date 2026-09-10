@@ -1,6 +1,7 @@
 "use client";
 
-import { Search, Pencil, Clock } from "lucide-react";
+import { useState } from "react";
+import { Search, Pencil, Clock, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -15,6 +16,9 @@ import {
 import type { Usuario } from "./types";
 import { ROLES, DIAS_SEMANA, parseDiasTrabajo, inicialesUsuario } from "./constants";
 
+// Reenvío por mail: apagado hasta configurar SMTP (NEXT_PUBLIC_EMAIL_ENABLED)
+const EMAIL_ENABLED = process.env.NEXT_PUBLIC_EMAIL_ENABLED === "true";
+
 interface UsuariosListProps {
   usuarios: Usuario[];
   searchQuery: string;
@@ -23,6 +27,7 @@ interface UsuariosListProps {
   onRoleFilterChange: (role: string) => void;
   totalBeforeFilter: number;
   onEdit: (u: Usuario) => void;
+  onResend: (u: Usuario) => Promise<void> | void;
 }
 
 export function UsuariosList({
@@ -33,8 +38,19 @@ export function UsuariosList({
   onRoleFilterChange,
   totalBeforeFilter,
   onEdit,
+  onResend,
 }: UsuariosListProps) {
   const showNoResults = totalBeforeFilter > 0 && usuarios.length === 0;
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const handleResend = async (u: Usuario) => {
+    setResendingId(u.id);
+    try {
+      await onResend(u);
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -93,6 +109,11 @@ export function UsuariosList({
                       <Badge variant={u.role === "ADMIN" ? "default" : "secondary"}>
                         {ROLES.find((r) => r.value === u.role)?.label ?? u.role}
                       </Badge>
+                      {u.tienePassword === false && (
+                        <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                          Acceso pendiente
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -128,15 +149,38 @@ export function UsuariosList({
                   </div>
                 )}
 
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="mt-4 w-full gap-2 transition-colors hover:bg-primary/10 hover:text-primary"
-                  onClick={() => onEdit(u)}
-                >
-                  <Pencil className="h-4 w-4" />
-                  Editar
-                </Button>
+                <div className="mt-4 flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="flex-1 gap-2 transition-colors hover:bg-primary/10 hover:text-primary"
+                    onClick={() => onEdit(u)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editar
+                  </Button>
+                  {EMAIL_ENABLED && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    disabled={resendingId === u.id}
+                    onClick={() => handleResend(u)}
+                    title={
+                      u.tienePassword === false
+                        ? "Reenviar invitación"
+                        : "Enviar enlace de restablecimiento"
+                    }
+                  >
+                    <Send className="h-4 w-4" />
+                    {resendingId === u.id
+                      ? "Enviando…"
+                      : u.tienePassword === false
+                        ? "Reenviar"
+                        : "Reset"}
+                  </Button>
+                  )}
+                </div>
               </Card>
             </li>
           ))}

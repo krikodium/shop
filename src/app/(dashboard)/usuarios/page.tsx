@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { Plus } from "lucide-react";
 import type { Usuario } from "./types";
 import { UsuariosSkeleton } from "./UsuariosSkeleton";
@@ -63,6 +65,21 @@ export default function UsuariosPage() {
     setDialogOpen(true);
   }, []);
 
+  const handleResend = useCallback(async (u: Usuario) => {
+    try {
+      const res = await fetch(`/api/usuarios/${u.id}/reenviar`, { method: "POST" });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? "No se pudo enviar");
+      toast.success(
+        d.tipo === "INVITACION"
+          ? `Invitación reenviada a ${u.email}`
+          : `Enlace de restablecimiento enviado a ${u.email}`
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al reenviar acceso");
+    }
+  }, []);
+
   const handleSaved = useCallback(
     (user: Usuario, mode: "create" | "update") => {
       if (mode === "create") {
@@ -78,24 +95,16 @@ export default function UsuariosPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="rounded-xl border bg-card/70 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5 sm:py-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight md:text-2xl">Usuarios</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Equipo del sistema: roles, horarios y acceso
-            </p>
-          </div>
-          <Button
-            onClick={openNew}
-            size="lg"
-            className="w-full gap-2 shadow-sm transition-shadow hover:shadow-md sm:w-auto"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo usuario
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        overline="Administración · Equipo"
+        title="Usuarios"
+        description="Equipo del sistema: roles, horarios y acceso"
+      >
+        <Button onClick={openNew} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Nuevo usuario
+        </Button>
+      </PageHeader>
 
       {loading ? (
         <UsuariosSkeleton />
@@ -119,6 +128,7 @@ export default function UsuariosPage() {
           onRoleFilterChange={setRoleFilter}
           totalBeforeFilter={usuarios.length}
           onEdit={openEdit}
+          onResend={handleResend}
         />
       )}
 

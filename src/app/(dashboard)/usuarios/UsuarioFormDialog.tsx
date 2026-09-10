@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +21,9 @@ import {
 } from "@/components/ui/select";
 import type { Usuario } from "./types";
 import { DIAS_SEMANA, ROLES, parseDiasTrabajo, serializeDiasTrabajo } from "./constants";
+
+// Invitación por mail: apagada hasta configurar SMTP (NEXT_PUBLIC_EMAIL_ENABLED)
+const EMAIL_ENABLED = process.env.NEXT_PUBLIC_EMAIL_ENABLED === "true";
 
 interface UsuarioFormDialogProps {
   open: boolean;
@@ -45,10 +49,13 @@ export function UsuarioFormDialog({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Para usuarios nuevos: enviar invitación por mail en vez de fijar contraseña.
+  const [invitar, setInvitar] = useState(EMAIL_ENABLED);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setInvitar(EMAIL_ENABLED);
     if (userToEdit) {
       setForm({
         email: userToEdit.email,
@@ -102,33 +109,61 @@ export function UsuarioFormDialog({
         const updated = (await res.json()) as Usuario;
         onSaved(updated, "update");
       } else {
-        if (!form.password || form.password.length < 6) {
-          throw new Error("La contraseña debe tener al menos 6 caracteres");
-        }
-        const res = await fetch("/api/usuarios", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: form.email,
-            name: form.name || undefined,
-            password: form.password,
-            role: form.role,
-            horarioEntrada: form.horarioEntrada || null,
-            horarioSalida: form.horarioSalida || null,
-            diasTrabajo:
-              form.role === "VENDEDOR"
-                ? form.diasTrabajo.trim()
-                  ? form.diasTrabajo
-                  : null
-                : null,
-          }),
-        });
-        if (!res.ok) {
+        const diasTrabajo =
+          form.role === "VENDEDOR"
+            ? form.diasTrabajo.trim()
+              ? form.diasTrabajo
+              : null
+            : null;
+
+        if (invitar) {
+          // Crear usuario sin contraseña y mandar mail de invitación.
+          const res = await fetch("/api/usuarios/invitar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: form.email,
+              name: form.name || undefined,
+              role: form.role,
+              horarioEntrada: form.horarioEntrada || null,
+              horarioSalida: form.horarioSalida || null,
+              diasTrabajo,
+            }),
+          });
           const d = await res.json();
-          throw new Error(d.error ?? "Error");
+          if (!res.ok) throw new Error(d.error ?? "Error");
+          onSaved({ ...(d.user as Usuario), tienePassword: false }, "create");
+          if (d.emailEnviado) {
+            toast.success(`Invitación enviada a ${form.email}`);
+          } else {
+            toast.warning(
+              d.error ?? "Usuario creado, pero no se pudo enviar el mail. Reenviá la invitación."
+            );
+          }
+        } else {
+          if (!form.password || form.password.length < 6) {
+            throw new Error("La contraseña debe tener al menos 6 caracteres");
+          }
+          const res = await fetch("/api/usuarios", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: form.email,
+              name: form.name || undefined,
+              password: form.password,
+              role: form.role,
+              horarioEntrada: form.horarioEntrada || null,
+              horarioSalida: form.horarioSalida || null,
+              diasTrabajo,
+            }),
+          });
+          if (!res.ok) {
+            const d = await res.json();
+            throw new Error(d.error ?? "Error");
+          }
+          const created = (await res.json()) as Usuario;
+          onSaved({ ...created, tienePassword: true }, "create");
         }
-        const created = (await res.json()) as Usuario;
-        onSaved(created, "create");
       }
       onOpenChange(false);
     } catch (err) {
@@ -167,16 +202,35 @@ export function UsuarioFormDialog({
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </div>
-          <div className="space-y-2">
-            <Label>Contraseña {userToEdit && "(dejar vacío para no cambiar)"}</Label>
-            <Input
-              value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-              type="password"
-              required={!userToEdit}
-              minLength={6}
-            />
-          </div>
+          {!userToEdit && EMAIL_ENABLED && (
+            <label className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
+              <input
+                type="checkbox"
+                checked={invitar}
+                onChange={(e) => setInvitar(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <span className="text-sm">
+                <span className="font-medium">Enviar invitación por email</span>
+                <span className="block text-xs text-muted-foreground">
+                  El usuario recibe un enlace para definir su propia contraseña.
+                  Desmarcá para asignarle una contraseña vos.
+                </span>
+              </span>
+            </label>
+          )}
+          {(userToEdit || !invitar) && (
+            <div className="space-y-2">
+              <Label>Contraseña {userToEdit && "(dejar vacío para no cambiar)"}</Label>
+              <Input
+                value={form.password}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                type="password"
+                required={!userToEdit && !invitar}
+                minLength={6}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Rol</Label>
             <Select

@@ -34,10 +34,25 @@ export async function GET() {
         horarioSalida: true,
         diasTrabajo: true,
         createdAt: true,
+        emailVerified: true,
+        password: true,
       },
       orderBy: { name: "asc" },
     });
-    return NextResponse.json(users);
+    // No exponer el hash: derivar solo si tiene contraseña definida.
+    const safe = users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      horarioEntrada: u.horarioEntrada,
+      horarioSalida: u.horarioSalida,
+      diasTrabajo: u.diasTrabajo,
+      createdAt: u.createdAt,
+      emailVerified: u.emailVerified,
+      tienePassword: u.password != null,
+    }));
+    return NextResponse.json(safe);
   } catch (error) {
     console.error("Error listando usuarios:", error);
     return NextResponse.json(
