@@ -46,7 +46,6 @@ export const PENDIENTES: string[] = [
   "src/components/pedidos-demo/demo-ui.tsx",
   "src/components/punto-venta/CarritoVenta.tsx",
   "src/components/punto-venta/ProductosGridPaginado.tsx",
-  "src/components/ui/sonner.tsx",
   "src/components/ui/stat.tsx",
   "src/components/ventas/GuardarDatosCliente.tsx",
   "src/components/ventas/TicketVenta.tsx",
