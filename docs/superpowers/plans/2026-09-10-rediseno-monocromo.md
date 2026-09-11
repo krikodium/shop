@@ -966,7 +966,8 @@ La solución tiene dos partes: un prop `loading` en `Button` y un hook `useAsync
 - Produces:
   - `<Spinner className?: string />` — círculo giratorio con `currentColor`, respeta `motion-reduce`.
   - `<Button loading?: boolean loadingText?: string … />` — cuando `loading` es `true`: muestra `Spinner`, queda `disabled`, expone `aria-busy="true"`, y **mantiene el ancho** (el texto no se reemplaza, salvo que se pase `loadingText`).
-  - `useAsyncAction<TArgs extends unknown[], TResult>(fn, opciones?) => { run, loading }` donde `opciones?: { timeoutMs?: number }` (por defecto `15000`). `run` ignora invocaciones mientras hay una en vuelo y devuelve `undefined` en ese caso.
+  - `useAsyncAction<TArgs extends unknown[], TResult>(fn, opciones?) => { run, loading, demorado }` donde `opciones?: { avisoMs?: number }` (por defecto `8000`). `run` ignora invocaciones mientras hay una en vuelo y devuelve `undefined` en ese caso. `loading` queda en `true` hasta que la promesa termine de verdad; pasados `avisoMs` sin terminar, `demorado` pasa a `true`.
+  - > ⚠️ **Corregido el 2026-09-11 durante la ejecución** (ver ledger, Tarea 4). La versión original tenía un perro guardián que a los 15 s apagaba `loading` y **rehabilitaba el botón con la request todavía viva**: en un POST de venta, cierre de caja o rendición eso permite un segundo envío y un registro duplicado. Ahora el hook **nunca rehabilita antes de tiempo**: avisa. El código de los pasos 1 y 5 de abajo es la versión original; la implementación real en `src/hooks/use-async-action.ts` es la que manda.
 
 - [ ] **Paso 1: Escribir los tests que fallan**
 
@@ -2307,7 +2308,7 @@ cat docs/mapa-app.md
    | `text-amber-600` (en una cifra) | `tono="alerta"` / `text-num-warning` |
    | `text-blue-*`, `text-indigo-*`, `text-purple-*` | sin color: `text-foreground` |
 
-5. **Carga.** Todo `fetch` de acción pasa por `useAsyncAction`; su botón recibe `loading` y `loadingText`. Se borran los `useState` de `saving`/`loading` que quedan sin uso.
+5. **Carga.** Todo `fetch` de acción pasa por `useAsyncAction`; su botón recibe `loading` y un `loadingText` que cambia cuando la acción se demora: `loadingText={demorado ? "Sigue procesando…" : "Guardando…"}`. Nunca se rehabilita un botón de alta mientras la request sigue viva: eso duplica registros. Se borran los `useState` de `saving`/`loading` que quedan sin uso.
 6. **Avisos.** `import { toast } from "sonner"` pasa a `import { notificar } from "@/lib/notificar"`. `toast.success(x)` → `notificar.ok(x)`; `toast.error(x)` → `notificar.error(x)`; `toast(x)` → `notificar.info(x)`.
 7. **Vacíos y movimiento.** Los "no hay nada" pasan a `<EmptyState>`. Las filas de tabla y los bloques que aparecen tras cargar se envuelven en `<Reveal indice={i} as="tr">`.
 
