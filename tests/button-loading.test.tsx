@@ -57,14 +57,15 @@ describe("Button con estado de carga", () => {
     expect(screen.getByRole("button")).toBeDisabled();
   });
 
-  it("con asChild sigue renderizando un único hijo, sin inyectar el spinner", () => {
+  it("con asChild y loading sigue renderizando un único hijo, sin spinner ni disabled", () => {
     render(
-      <Button asChild>
+      <Button asChild loading>
         <EnlaceDePrueba>Ir al destino</EnlaceDePrueba>
       </Button>
     );
     const enlace = screen.getByRole("link", { name: "Ir al destino" });
     expect(enlace).toHaveAttribute("href", "/destino");
     expect(enlace.querySelector("[data-slot='spinner']")).toBeNull();
+    expect(enlace).not.toHaveAttribute("disabled");
   });
 });

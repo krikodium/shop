@@ -102,24 +102,31 @@ estado de partida que dejó la Tarea 2.
 | `Spinner` (`src/components/ui/spinner.tsx`) | **Existe (Tarea 4).** `<Spinner className? />`, hereda `currentColor`, respeta `motion-reduce`. | Único indicador de carga de la app; lo usa `Button` internamente. |
 | `AlertDialog` (Radix, vía `radix-ui`) | **Disponible como dependencia** (`radix-ui` ya está en `package.json`); el wrapper de UI propio se confirma/crea en Tarea 5. | Toda confirmación destructiva (eliminar, anular, revertir). |
 | `notificar()` (`src/lib/notificar.ts`) | **No existe todavía.** Se crea en Tarea 5, sobre `sonner` (ya está en dependencias). | Todo aviso al usuario — éxito, error, advertencia. Reemplaza `alert()`/`confirm()`/`prompt()` nativos y cualquier `toast` invocado suelto sin pasar por acá. |
-| `useAsyncAction` (`src/hooks/use-async-action.ts`) | **Existe (Tarea 4).** `useAsyncAction(fn, { timeoutMs? = 15000 }) => { run, loading }`. `run` ignora invocaciones repetidas mientras hay una en vuelo (devuelve `undefined`); un perro guardián apaga `loading` si la promesa nunca resuelve. | Envolver toda acción async de UI (fetch/server action) para que `loading` y `notificar()` salgan consistentes en todas las pantallas. |
+| `useAsyncAction` (`src/hooks/use-async-action.ts`) | **Existe (Tarea 4, revisado en Ronda de arreglo 1).** `useAsyncAction(fn, { avisoMs? = 8000 }) => { run, loading, demorado }`. `run` ignora invocaciones repetidas mientras hay una en vuelo (devuelve `undefined`); `loading` solo se apaga cuando la promesa realmente termina (éxito o error) — nunca antes, para no habilitar un segundo clic con la request original todavía viva. `demorado` es aditivo: se enciende a los `avisoMs` como aviso, sin apagar `loading` ni liberar la acción en vuelo. | Envolver toda acción async de UI (fetch/server action) para que `loading` y `notificar()` salgan consistentes en todas las pantallas. |
 | `Reveal` / clases `ledger-*` (`globals.css`) | **`ledger-*` existe** en `globals.css` (ya usado, por ejemplo, en `ConsignacionDashboard.tsx`); componente `Reveal` a confirmar en Tarea 6/7. | Animaciones de entrada con `prefers-reduced-motion` ya resuelto — no reinventar transiciones sueltas. |
 
 ### Acción asíncrona
 
 ```tsx
-const { run: guardar, loading } = useAsyncAction(async () => {
+const { run: guardar, loading, demorado } = useAsyncAction(async () => {
   const res = await fetch("/api/clientes", { method: "POST", body });
   if (!res.ok) throw new Error("No se pudo guardar el cliente");
   notificar.ok("Cliente guardado");
 });
 
-<Button loading={loading} loadingText="Guardando…" onClick={() => void guardar()}>
+<Button
+  loading={loading}
+  loadingText={demorado ? "Sigue procesando…" : "Guardando…"}
+  onClick={() => void guardar()}
+>
   Guardar cliente
 </Button>
 ```
 
-Nunca `disabled={saving}` a secas: el usuario no ve que algo está pasando.
+Nunca `disabled={saving}` a secas: el usuario no ve que algo está pasando. Y `loading` nunca se
+apaga antes de que la promesa termine de verdad: rehabilitar el botón con la request original
+todavía en vuelo es lo que produce ventas, cierres de caja o rendiciones duplicadas si el usuario
+clickea de nuevo. `demorado` solo avisa que está tardando — no cancela ni libera nada.
 
 ---
 
