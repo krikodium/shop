@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { SidebarNav } from "@/components/layout/SidebarNav";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { MobileNav } from "@/components/layout/MobileNav";
 
@@ -45,8 +46,11 @@ export default async function DashboardLayout({
           <div className="min-h-0 flex-1 overflow-y-auto">
             <SidebarNav />
           </div>
-          <div className="mt-auto border-t border-border pt-4">
-            <UserMenu />
+          <div className="mt-auto flex items-center gap-2 border-t border-border pt-4">
+            <div className="min-w-0 flex-1">
+              <UserMenu />
+            </div>
+            <ThemeToggle />
           </div>
         </div>
       </aside>
