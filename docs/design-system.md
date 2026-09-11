@@ -94,10 +94,10 @@ estado de partida que dejó la Tarea 2.
 | Primitiva | Estado en Tarea 2 | Cuándo usarla |
 | --- | --- | --- |
 | `PageHeader` (`src/components/ui/page-header.tsx`) | **Existe.** Props: `overline?`, `title`, `description?`, `children?` (acciones a la derecha). | Encabezado de **toda** página. Ninguna pantalla arma su propio `<h1>` suelto — ver Receta 1. |
-| `StatGrid` / `Stat` (`src/components/ui/stat.tsx`) | **Existe, pero con deuda.** `Stat` hoy resuelve `tone` con clases hardcodeadas (`text-emerald-600 dark:text-emerald-400`, `text-amber-600 dark:text-amber-400`) — por eso `src/components/ui/stat.tsx` está en `PENDIENTES` de la guardia. Se migra a los tokens `--num-*` en Tarea 3/4. | Filas de KPIs/métricas. Reemplaza cualquier grilla de `Card` con ícono. |
-| `Figure` | **No existe todavía.** Se define en Tareas 4-7 como variante de cifra individual (fuera de grilla) que comparte tono con `Stat`. | Cifra destacada suelta (ej. un total grande en el header de un detalle) que no forma parte de una `StatGrid`. |
-| `Panel` / `PanelHeader` | **No existe todavía.** Se define en Tareas 4-7 para reemplazar el uso genérico de `Card`/`CardHeader`/`CardContent` en bloques de contenido (no-KPI). | Todo bloque de contenido que hoy usa `Card` para agrupar (listas, formularios, previews) y no es una métrica. |
-| `EmptyState` | **No existe todavía.** Se define en Tareas 4-7. | Estado vacío de tablas y listados (sin resultados, sin datos todavía). |
+| `Figure` / `FigureGrid` (`src/components/ui/figure.tsx`) | **Existe (Tarea 6).** `Figure({ label, valor, hint?, tono? = "neutro" \| "positivo" \| "negativo" \| "alerta", alineacion? = "izquierda" \| "derecha" })`. `FigureGrid({ columnas? = 2 \| 3 \| 4 })` es **un** bloque con divisores compartidos: `gap-px` + `bg-border` en el contenedor, `bg-card` en cada `Figure`, de modo que el hueco de 1px dibuja la línea — funciona con cualquier cantidad de filas y en cualquier breakpoint (a diferencia de `divide-y`/`divide-x`, que rompe en grillas de 2+ filas). El color del tono se aplica **solo** a la cifra. | Cifra individual suelta (`Figure`) o fila de KPIs/métricas (`FigureGrid`). Reemplaza cualquier grilla de `Card` con ícono. |
+| `StatGrid` / `Stat` (`src/components/ui/stat.tsx`) | **Existe, capa de compatibilidad (Tarea 6).** Ya no tiene clases hardcodeadas: `Stat` envuelve `Figure` traduciendo el `tone` viejo (`default`/`positive`/`warning`/`muted`) al `tono` nuevo, y `StatGrid` envuelve `FigureGrid` con `columnas={4}`. Por eso `src/components/ui/stat.tsx` **salió** de `PENDIENTES` en la guardia. Sigue existiendo solo para no romper `dashboard` y `reportes`; código nuevo usa `Figure`/`FigureGrid` directamente. | Pantallas ya migradas a `Stat`/`StatGrid` que todavía no pasaron por su tarea de hoja. |
+| `Panel` / `PanelHeader` / `PanelBody` (`src/components/ui/panel.tsx`) | **Existe (Tarea 6).** `Panel` es `rounded-lg border border-border bg-card`, sin sombra ni degradado ni borde de color. `PanelHeader({ title, descripcion?, acciones? })` arma la franja superior con regla inferior; `PanelBody` es el relleno estándar (`p-4 sm:p-5`). | Todo bloque de contenido que hoy usa `Card` para agrupar (listas, formularios, previews) y no es una métrica. |
+| `EmptyState` (`src/components/ui/empty-state.tsx`) | **Existe (Tarea 6).** `EmptyState({ titulo, descripcion?, accion?, icono? })` — borde punteado, sin ilustración ni color. | Estado vacío de tablas y listados (sin resultados, sin datos todavía). |
 | `Button` con prop `loading` | **Existe (Tarea 4).** `loading?: boolean`, `loadingText?: string`. Con `loading`: muestra `Spinner`, queda `disabled`, expone `aria-busy="true"` y mantiene el ancho (no reemplaza el texto salvo que se pase `loadingText`). Con `asChild` no inyecta el spinner (Slot exige un único hijo). | Todo botón que dispara una acción asíncrona — nunca `disabled={saving}` a secas. |
 | `Spinner` (`src/components/ui/spinner.tsx`) | **Existe (Tarea 4).** `<Spinner className? />`, hereda `currentColor`, respeta `motion-reduce`. | Único indicador de carga de la app; lo usa `Button` internamente. |
 | `AlertDialog` (Radix, vía `radix-ui`) | **Disponible como dependencia** (`radix-ui` ya está en `package.json`); el wrapper de UI propio se confirma/crea en Tarea 5. | Toda confirmación destructiva (eliminar, anular, revertir). |
@@ -345,3 +345,38 @@ Problemas, en los términos de la sección 1:
 Esta migración puntual de `ventas/[id]/page.tsx` es trabajo de una tarea de hoja
 posterior (Operación · Ventas), no de esta Tarea 2 — acá solo se deja documentado
 el criterio.
+
+### 5.1 Con las primitivas nuevas (`Figure`/`FigureGrid`, Tarea 6)
+
+Mismo caso real, con las primitivas que reemplazan a `Stat`/`StatGrid` para código
+nuevo — cuatro tarjetones con línea de color, ícono en cuadrito y `hover:shadow-md`:
+
+```tsx
+❌ Antes (`src/app/(dashboard)/ventas/[id]/page.tsx`)
+
+<Card className="overflow-hidden border-l-4 border-l-green-500 shadow-sm transition-shadow hover:shadow-md">
+  <CardHeader className="flex flex-row items-center justify-between pb-2">
+    <CardTitle className="text-sm text-muted-foreground">Ganancia</CardTitle>
+    <TrendingUp className="h-5 w-5 text-green-500/70" />
+  </CardHeader>
+  <CardContent>
+    <p className="text-2xl font-bold tabular-nums text-green-600">{formatARS(x)}</p>
+  </CardContent>
+</Card>
+```
+
+```tsx
+✅ Después — un bloque, divisores compartidos, color solo en la cifra:
+
+<FigureGrid columnas={3}>
+  <Figure label="Total" valor={formatARS(venta.total)} />
+  <Figure label="Ganancia" valor={formatARS(venta.gananciaBruta)} tono="positivo"
+          hint={`Margen ${venta.margenPorcentaje.toFixed(1)}%`} />
+  <Figure label="Pago" valor={METODO_PAGO_LABEL[venta.metodoPago]} />
+</FigureGrid>
+```
+
+Igual que en 5.0, pero con la API definitiva: `tono="positivo"` en vez de
+`tone="positive"`, y `FigureGrid` en vez de `StatGrid`. `Stat`/`StatGrid` siguen
+andando como alias de compatibilidad para no romper pantallas que ya migraron,
+pero código nuevo usa `Figure`/`FigureGrid` directamente.
