@@ -98,11 +98,28 @@ estado de partida que dejó la Tarea 2.
 | `Figure` | **No existe todavía.** Se define en Tareas 4-7 como variante de cifra individual (fuera de grilla) que comparte tono con `Stat`. | Cifra destacada suelta (ej. un total grande en el header de un detalle) que no forma parte de una `StatGrid`. |
 | `Panel` / `PanelHeader` | **No existe todavía.** Se define en Tareas 4-7 para reemplazar el uso genérico de `Card`/`CardHeader`/`CardContent` en bloques de contenido (no-KPI). | Todo bloque de contenido que hoy usa `Card` para agrupar (listas, formularios, previews) y no es una métrica. |
 | `EmptyState` | **No existe todavía.** Se define en Tareas 4-7. | Estado vacío de tablas y listados (sin resultados, sin datos todavía). |
-| `Button` con prop `loading` | **A confirmar/completar en Tarea 4.** Hoy revisar si `src/components/ui/button.tsx` ya soporta `loading` antes de asumir que no. | Todo botón que dispara una acción asíncrona — nunca `disabled={saving}` a secas. |
+| `Button` con prop `loading` | **Existe (Tarea 4).** `loading?: boolean`, `loadingText?: string`. Con `loading`: muestra `Spinner`, queda `disabled`, expone `aria-busy="true"` y mantiene el ancho (no reemplaza el texto salvo que se pase `loadingText`). Con `asChild` no inyecta el spinner (Slot exige un único hijo). | Todo botón que dispara una acción asíncrona — nunca `disabled={saving}` a secas. |
+| `Spinner` (`src/components/ui/spinner.tsx`) | **Existe (Tarea 4).** `<Spinner className? />`, hereda `currentColor`, respeta `motion-reduce`. | Único indicador de carga de la app; lo usa `Button` internamente. |
 | `AlertDialog` (Radix, vía `radix-ui`) | **Disponible como dependencia** (`radix-ui` ya está en `package.json`); el wrapper de UI propio se confirma/crea en Tarea 5. | Toda confirmación destructiva (eliminar, anular, revertir). |
 | `notificar()` (`src/lib/notificar.ts`) | **No existe todavía.** Se crea en Tarea 5, sobre `sonner` (ya está en dependencias). | Todo aviso al usuario — éxito, error, advertencia. Reemplaza `alert()`/`confirm()`/`prompt()` nativos y cualquier `toast` invocado suelto sin pasar por acá. |
-| `useAsyncAction` | **No existe todavía.** Se crea en Tarea 4. | Envolver toda acción async de UI (fetch/server action) para que `loading` y `notificar()` salgan consistentes en todas las pantallas. |
+| `useAsyncAction` (`src/hooks/use-async-action.ts`) | **Existe (Tarea 4).** `useAsyncAction(fn, { timeoutMs? = 15000 }) => { run, loading }`. `run` ignora invocaciones repetidas mientras hay una en vuelo (devuelve `undefined`); un perro guardián apaga `loading` si la promesa nunca resuelve. | Envolver toda acción async de UI (fetch/server action) para que `loading` y `notificar()` salgan consistentes en todas las pantallas. |
 | `Reveal` / clases `ledger-*` (`globals.css`) | **`ledger-*` existe** en `globals.css` (ya usado, por ejemplo, en `ConsignacionDashboard.tsx`); componente `Reveal` a confirmar en Tarea 6/7. | Animaciones de entrada con `prefers-reduced-motion` ya resuelto — no reinventar transiciones sueltas. |
+
+### Acción asíncrona
+
+```tsx
+const { run: guardar, loading } = useAsyncAction(async () => {
+  const res = await fetch("/api/clientes", { method: "POST", body });
+  if (!res.ok) throw new Error("No se pudo guardar el cliente");
+  notificar.ok("Cliente guardado");
+});
+
+<Button loading={loading} loadingText="Guardando…" onClick={() => void guardar()}>
+  Guardar cliente
+</Button>
+```
+
+Nunca `disabled={saving}` a secas: el usuario no ve que algo está pasando.
 
 ---
 
