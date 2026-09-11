@@ -12,9 +12,22 @@ const CON_COLOR_PERMITIDO = [
   "--destructive",
 ];
 
+function escaparRegExp(texto: string): string {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Busca `selector` como inicio de regla real (al comienzo de una línea,
+ * espacios iniciales permitidos, seguido de espacios opcionales y `{`), no
+ * como substring en cualquier posición. Evita falsos positivos como
+ * `.dark` matcheando dentro de `.dark .animate-skeleton-shimmer {` o de
+ * `@custom-variant dark (&:is(.dark *));`.
+ */
 function bloque(selector: string): string {
-  const i = css.indexOf(selector);
-  expect(i, `No encontré el bloque ${selector} en globals.css`).toBeGreaterThan(-1);
+  const patron = new RegExp(`^[ \\t]*${escaparRegExp(selector)}[ \\t]*\\{`, "m");
+  const m = css.match(patron);
+  expect(m, `No encontré el bloque ${selector} en globals.css`).not.toBeNull();
+  const i = m!.index!;
   const desde = css.indexOf("{", i);
   const hasta = css.indexOf("}", desde);
   return css.slice(desde + 1, hasta);

@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -152,8 +154,6 @@
   --sidebar-border: oklch(0.3 0 0);
   --sidebar-ring: oklch(0.8 0 0);
 }
-
-@custom-variant dark (&:is(.dark *));
 
 @layer base {
   * {

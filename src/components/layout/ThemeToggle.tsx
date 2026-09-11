@@ -1,17 +1,27 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const suscribirNada = () => () => {};
+
+/**
+ * true solo después de hidratar; false en el servidor y en el render de
+ * hidratación. `next-themes` lee el tema guardado de forma síncrona en el
+ * inicializador de su propio estado, así que `resolvedTheme` ya puede valer
+ * "dark" en el PRIMER render del cliente — usarlo solo no evita el mismatch.
+ * `useSyncExternalStore` sí: devuelve el snapshot del servidor durante la
+ * hidratación y recién después el del cliente, sin setState en un efecto.
+ */
+function useMontado() {
+  return useSyncExternalStore(suscribirNada, () => true, () => false);
+}
+
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-
-  // `resolvedTheme` es `undefined` en el servidor y en el primer render del
-  // cliente (hasta que next-themes lee el tema real). Usarlo directamente,
-  // en vez de un estado "montado" seteado en un efecto, evita el desajuste
-  // de hidratación sin disparar cascading renders.
-  const montado = resolvedTheme !== undefined;
+  const montado = useMontado();
   const oscuro = resolvedTheme === "dark";
 
   return (
