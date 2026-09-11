@@ -69,6 +69,22 @@ npx tsc --noEmit && npm run lint && npx vitest run && npm run build
 
 (En la Tarea 1 todavía no hay `vitest`; su verificación es distinta y está escrita en la tarea.)
 
+**Línea de base de `npm run lint` (medida el 2026-09-11): 4 errores preexistentes, ninguno
+introducido por este plan.** `tsc`, `vitest` y `build` sí están en verde desde el arranque.
+El criterio real, entonces, no es "lint en verde" sino **"lint no introduce errores nuevos"**.
+Los cuatro viven en archivos que tres tareas de hoja ya modifican, así que cada una arregla
+el suyo y la línea de base baja sola:
+
+| Error | Archivo | Lo arregla |
+| --- | --- | --- |
+| `setState` síncrono dentro de un efecto (cascading renders) | `src/app/(dashboard)/page.tsx:81` | **Tarea 9** |
+| `setState` síncrono dentro de un efecto (cascading renders) | `src/app/(dashboard)/ventas/VentasTable.tsx:86` | **Tarea 10** |
+| Comillas sin escapar (`react/no-unescaped-entities`), ×2 | `src/components/caja-chica/monthly-closure.tsx:178` | **Tarea 19** |
+
+Cada una de esas tres tareas suma un paso: correr `npm run lint`, arreglar **solo** el error
+de su propio archivo, y confirmar que el conteo global bajó. La Tarea 24 exige `npm run lint`
+con **cero errores**; si al llegar ahí quedan, es que una de las tres no hizo su parte.
+
 ---
 
 ## File Structure

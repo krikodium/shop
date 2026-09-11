@@ -302,7 +302,7 @@ grep -rno "\b\(bg\|text\|border\|from\|to\|via\|fill\|stroke\)-\(red\|orange\|am
 | 1 | `src/app/(dashboard)/productos/page.tsx` |
 | 1 | `src/app/(dashboard)/compras/[id]/page.tsx` |
 
-Total: 31 archivos con al menos una clase de color hardcodeada. Nota:
+Total: 32 archivos con deuda visual (la tabla de arriba tiene 32 filas y coincide exactamente con el array PENDIENTES de tests/design-guard.test.ts). Nota:
 `src/components/ui/sonner.tsx` y `src/components/ui/stat.tsx` son parte del
 sistema de diseño — sus 9 y 4 ocurrencias respectivamente valen la pena
 revisarlas temprano porque afectan a todas las pantallas que ya los usan.
