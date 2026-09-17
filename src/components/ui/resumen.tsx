@@ -5,19 +5,16 @@ export interface ItemResumen {
   label: string;
   valor: ReactNode;
   hint?: ReactNode;
-  /**
-   * Invierte la celda (fondo negro, texto blanco). Es el gesto que cierra un
-   * resumen: la cifra que el usuario vino a mirar. Una sola por bloque.
-   */
-  destacado?: boolean;
 }
 
 /**
- * Bloque de cifras que encabeza una pantalla: dos a cuatro celdas con
- * divisores de 1px y una sola celda invertida.
+ * Banda de cifras que encabeza una pantalla: dos a cuatro celdas separadas por
+ * divisores de 1px.
  *
- * Es el gesto más reconocible del sistema. Se usa arriba de todo, para las
- * cifras que resumen la pantalla; para métricas secundarias va `FigureGrid`.
+ * Deliberadamente compacta: una banda de información, no una fila de tarjetones.
+ * Tampoco hay celda "destacada" con fondo lleno — en tema oscuro un fondo
+ * invertido se convierte en una plancha blanca gigante. La jerarquía la dan el
+ * orden y el peso tipográfico, no un bloque de color.
  */
 export function Resumen({
   items,
@@ -42,33 +39,15 @@ export function Resumen({
       )}
     >
       {items.map((item) => (
-        <div
-          key={item.label}
-          className={cn(
-            "px-5 py-5",
-            item.destacado ? "bg-primary text-primary-foreground" : "bg-card"
-          )}
-        >
-          <dt
-            className={cn(
-              "font-mono text-[10px] uppercase tracking-[0.18em]",
-              item.destacado ? "text-primary-foreground/60" : "text-muted-foreground"
-            )}
-          >
+        <div key={item.label} className="bg-card px-4 py-3.5">
+          <dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
             {item.label}
           </dt>
-          <dd className="mt-2 font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
+          <dd className="mt-1.5 font-mono text-xl font-semibold tabular-nums">
             {item.valor}
           </dd>
           {item.hint && (
-            <dd
-              className={cn(
-                "mt-1.5 text-xs",
-                item.destacado ? "text-primary-foreground/60" : "text-muted-foreground"
-              )}
-            >
-              {item.hint}
-            </dd>
+            <dd className="mt-1 text-xs text-muted-foreground">{item.hint}</dd>
           )}
         </div>
       ))}

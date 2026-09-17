@@ -32,15 +32,15 @@ export function Figure({
   return (
     <div
       className={cn(
-        "bg-card px-4 py-4 sm:px-5",
+        "bg-card px-4 py-3.5",
         alineacion === "derecha" && "text-right",
         className
       )}
     >
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>
-      <p className={cn("mt-2 font-mono text-2xl font-semibold tabular-nums", claseTono[tono])}>
+      <p className={cn("mt-1.5 font-mono text-lg font-semibold tabular-nums", claseTono[tono])}>
         {valor}
       </p>
       {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}

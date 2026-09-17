@@ -124,10 +124,10 @@ export default function DashboardPage() {
         </div>
         <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-card px-5 py-5">
+            <div key={i} className="bg-card px-4 py-3.5">
               <div className="h-3 w-24 animate-skeleton-shimmer rounded" />
-              <div className="mt-3 h-8 w-36 animate-skeleton-shimmer rounded" />
-              <div className="mt-2 h-3 w-20 animate-skeleton-shimmer rounded" />
+              <div className="mt-2 h-6 w-32 animate-skeleton-shimmer rounded" />
+              <div className="mt-1.5 h-3 w-20 animate-skeleton-shimmer rounded" />
             </div>
           ))}
         </div>
@@ -221,7 +221,6 @@ export default function DashboardPage() {
             label: "Vendido hoy",
             valor: formatARS(resumen.totalVentasHoy),
             hint: plural(resumen.cantidadVentasHoy, "venta", "ventas"),
-            destacado: true,
           },
         ]}
       />
