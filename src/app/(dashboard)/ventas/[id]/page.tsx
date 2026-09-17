@@ -4,10 +4,14 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { Resumen, type ItemResumen } from "@/components/ui/resumen";
+import { Figure, FigureGrid } from "@/components/ui/figure";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,14 +25,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GuardarDatosCliente } from "@/components/ventas/GuardarDatosCliente";
 import { TicketVenta } from "@/components/ventas/TicketVenta";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { notificar } from "@/lib/notificar";
 import { METODO_PAGO_LABEL } from "@/lib/constants";
 import { formatARS } from "@/lib/formatCurrency";
-import {
-  TrendingUp,
-  CreditCard,
-  Package,
-  DollarSign,
-} from "lucide-react";
 
 interface VentaDetalle {
   id: string;
@@ -68,7 +68,6 @@ export default function VentaDetallePage() {
   const isAdmin = session?.user?.role === "ADMIN";
   const [venta, setVenta] = useState<VentaDetalle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [anulando, setAnulando] = useState(false);
   const [dialogAnularOpen, setDialogAnularOpen] = useState(false);
 
   useEffect(() => {
@@ -105,8 +104,7 @@ export default function VentaDetallePage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const anularVenta = async () => {
-    setAnulando(true);
+  const { run: anular, loading: anulando } = useAsyncAction(async () => {
     try {
       const res = await fetch(`/api/ventas/${id}`, {
         method: "PATCH",
@@ -115,46 +113,52 @@ export default function VentaDetallePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error al anular");
-      toast.success("Venta anulada correctamente");
+      notificar.ok("Venta anulada correctamente");
       setVenta((prev) => (prev ? { ...prev, anulada: true } : prev));
       setDialogAnularOpen(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al anular la venta");
-    } finally {
-      setAnulando(false);
+      notificar.error(e instanceof Error ? e.message : "Error al anular la venta");
     }
-  };
+  });
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-2">
-            <div className="h-9 w-24 animate-skeleton-shimmer rounded" />
-            <div className="h-8 w-40 animate-skeleton-shimmer rounded" />
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="h-3 w-28 animate-skeleton-shimmer rounded" />
+            <div className="h-8 w-52 animate-skeleton-shimmer rounded-md" />
           </div>
           <div className="flex gap-2">
-            <div className="h-10 w-28 animate-skeleton-shimmer rounded-lg" />
-            <div className="h-10 w-32 animate-skeleton-shimmer rounded-lg" />
+            <div className="h-10 w-28 animate-skeleton-shimmer rounded-md" />
+            <div className="h-10 w-32 animate-skeleton-shimmer rounded-md" />
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="h-40 animate-skeleton-shimmer rounded-lg" />
-          <div className="h-40 animate-skeleton-shimmer rounded-lg" />
+        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-card px-5 py-5">
+              <div className="h-3 w-24 animate-skeleton-shimmer rounded" />
+              <div className="mt-3 h-8 w-36 animate-skeleton-shimmer rounded" />
+            </div>
+          ))}
         </div>
         <div className="h-64 animate-skeleton-shimmer rounded-lg" />
       </div>
     );
   }
+
   if (!venta) {
     return (
       <div className="space-y-4">
-        <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center">
-          <p className="text-muted-foreground">Venta no encontrada.</p>
-          <Link href="/ventas" className="mt-4 inline-block">
-            <Button variant="outline">Volver a ventas</Button>
-          </Link>
-        </div>
+        <EmptyState
+          titulo="Venta no encontrada"
+          descripcion="Puede haber sido eliminada o el enlace ya no es válido."
+          accion={
+            <Button asChild variant="outline">
+              <Link href="/ventas">Volver a ventas</Link>
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -166,268 +170,219 @@ export default function VentaDetallePage() {
     venta.montoPago1Ars != null &&
     venta.montoPago2Ars != null;
 
+  const resumenItems: ItemResumen[] = [
+    {
+      label: "Pago",
+      valor: METODO_PAGO_LABEL[venta.metodoPago] ?? venta.metodoPago,
+      hint: pagoDividido
+        ? `+ ${METODO_PAGO_LABEL[venta.metodoPagoSecundario ?? ""] ?? venta.metodoPagoSecundario} (dividido)`
+        : undefined,
+    },
+    {
+      label: "Ganancia",
+      valor: formatARS(venta.gananciaBruta),
+      hint: `Costo ${formatARS(venta.costoTotal)} · Margen ${venta.margenPorcentaje.toFixed(1)}%`,
+    },
+  ];
+  if (venta.deudaConsignacion > 0) {
+    resumenItems.push({
+      label: "Consignación",
+      valor: formatARS(venta.deudaConsignacion),
+      hint: "Deuda a proveedores",
+    });
+  }
+  // El total cierra el bloque: la jerarquía la da el orden, no un fondo lleno.
+  resumenItems.push({
+    label: "Total",
+    valor: formatARS(venta.total),
+    hint:
+      venta.descuento > 0
+        ? `Sub. ${formatARS(venta.subtotal)} · Desc. ${formatARS(venta.descuento)}`
+        : undefined,
+  });
+
   return (
-    <div className="min-w-0 max-w-full space-y-6 animate-in fade-in duration-300">
-      {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <Link href="/ventas">
-            <Button variant="ghost" size="sm" className="mb-1 -ml-2 gap-1.5 text-muted-foreground">
-              ← Ventas
-            </Button>
-          </Link>
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-            <h1 className="min-w-0 break-words text-xl font-bold tracking-tight md:text-2xl">
-              Venta {venta.numeroVenta}
-            </h1>
-            {venta.anulada && <Badge variant="destructive">Anulada</Badge>}
-          </div>
-          <p className="mt-1 break-words text-muted-foreground">
-            {new Date(venta.fecha).toLocaleString("es-AR")} · {clienteNombre}
-          </p>
-        </div>
-        <div className="flex min-w-0 flex-wrap gap-2">
-          <TicketVenta
-            numeroVenta={venta.numeroVenta}
-            fecha={venta.fecha}
-            clienteNombre={clienteNombre}
-            metodoPago={venta.metodoPago}
-            items={venta.items}
-            subtotal={venta.subtotal}
-            descuento={venta.descuento}
-            total={venta.total}
-            metodoPagoSecundario={venta.metodoPagoSecundario}
-            montoPago1Ars={venta.montoPago1Ars}
-            montoPago2Ars={venta.montoPago2Ars}
-            usdPago1={venta.usdPago1}
-            usdPago2={venta.usdPago2}
-            cotizacionUsd={venta.cotizacionUsd}
-          />
-          {isAdmin && !venta.anulada && (
-            <AlertDialog open={dialogAnularOpen} onOpenChange={setDialogAnularOpen}>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive">Anular venta</Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Anular esta venta?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Se devolverá el stock de los productos y se revertirán las estadísticas del cliente. Esta acción no se puede deshacer.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={(e) => { e.preventDefault(); anularVenta(); }}
-                    disabled={anulando}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    {anulando ? "Anulando…" : "Anular venta"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          <Link href="/ventas/nueva">
-            <Button>Nueva venta</Button>
-          </Link>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+        <Link href="/ventas">← Ventas</Link>
+      </Button>
 
-      {/* ── KPIs ─────────────────────────────────────────────────── */}
-      <div
-        className={`grid min-w-0 gap-4 ${venta.deudaConsignacion > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}
+      <PageHeader
+        overline={`Operación · Venta ${venta.numeroVenta}`}
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {clienteNombre}
+            {venta.anulada && <Badge variant="outline">Anulada</Badge>}
+          </span>
+        }
+        description={new Date(venta.fecha).toLocaleString("es-AR")}
       >
-        <Card className="overflow-hidden border-l-4 border-l-primary shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
-            <DollarSign className="h-5 w-5 text-primary/70" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{formatARS(venta.total)}</p>
-            {venta.descuento > 0 && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Sub. {formatARS(venta.subtotal)} · Desc. {formatARS(venta.descuento)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-l-4 border-l-green-500 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Ganancia</CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-500/70" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
-              {formatARS(venta.gananciaBruta)}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Costo {formatARS(venta.costoTotal)} · Margen {venta.margenPorcentaje.toFixed(1)}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-l-4 border-l-blue-500 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pago</CardTitle>
-            <CreditCard className="h-5 w-5 text-blue-500/70" />
-          </CardHeader>
-          <CardContent>
-            <p className="break-words text-xl font-bold leading-tight sm:text-2xl">
-              {METODO_PAGO_LABEL[venta.metodoPago] ?? venta.metodoPago}
-            </p>
-            {pagoDividido && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                + {METODO_PAGO_LABEL[venta.metodoPagoSecundario ?? ""] ?? venta.metodoPagoSecundario} (dividido)
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {venta.deudaConsignacion > 0 && (
-          <Card className="overflow-hidden border-l-4 border-l-amber-500 shadow-sm transition-shadow hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Consignación</CardTitle>
-              <Package className="h-5 w-5 text-amber-500/70" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
-                {formatARS(venta.deudaConsignacion)}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">Deuda a proveedores</p>
-            </CardContent>
-          </Card>
+        <TicketVenta
+          numeroVenta={venta.numeroVenta}
+          fecha={venta.fecha}
+          clienteNombre={clienteNombre}
+          metodoPago={venta.metodoPago}
+          items={venta.items}
+          subtotal={venta.subtotal}
+          descuento={venta.descuento}
+          total={venta.total}
+          metodoPagoSecundario={venta.metodoPagoSecundario}
+          montoPago1Ars={venta.montoPago1Ars}
+          montoPago2Ars={venta.montoPago2Ars}
+          usdPago1={venta.usdPago1}
+          usdPago2={venta.usdPago2}
+          cotizacionUsd={venta.cotizacionUsd}
+        />
+        {isAdmin && !venta.anulada && (
+          <AlertDialog open={dialogAnularOpen} onOpenChange={setDialogAnularOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">Anular venta</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Anular esta venta?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Se devolverá el stock de los productos y se revertirán las estadísticas del cliente. Esta acción no
+                  se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void anular();
+                  }}
+                  disabled={anulando}
+                  className="bg-destructive text-white hover:bg-destructive/90"
+                >
+                  {anulando && <Spinner className="text-white" />}
+                  {anulando ? "Anulando…" : "Anular venta"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
-      </div>
+        <Button asChild>
+          <Link href="/ventas/nueva">Nueva venta</Link>
+        </Button>
+      </PageHeader>
 
-      {/* ── Pago dividido (detalle, solo si aplica) ──────────────── */}
+      <Resumen items={resumenItems} />
+
       {pagoDividido && (
-        <Card className="min-w-0 overflow-hidden border-l-4 border-l-blue-500 shadow-sm">
-          <CardHeader className="flex min-w-0 flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="min-w-0 break-words text-base">Detalle pago dividido</CardTitle>
-            <Badge className="bg-primary/15 text-primary hover:bg-primary/20">2 medios</Badge>
-          </CardHeader>
-          <CardContent>
+        <Panel>
+          <PanelHeader title="Detalle pago dividido" acciones={<Badge variant="outline">2 medios</Badge>} />
+          <PanelBody className="space-y-4">
             {((venta.usdPago1 != null && venta.usdPago1 > 0) ||
               (venta.usdPago2 != null && venta.usdPago2 > 0)) && (
-              <p className="mb-3 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Cotización usada:</span>{" "}
                 {venta.cotizacionUsd != null
                   ? `1 USD = ${venta.cotizacionUsd.toLocaleString("es-AR", { maximumFractionDigits: 4 })} ARS`
                   : "—"}
               </p>
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border bg-card p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primer pago</p>
-                <p className="mt-2 text-base font-semibold">{METODO_PAGO_LABEL[venta.metodoPago] ?? venta.metodoPago}</p>
-                <p className="mt-2 text-lg font-bold tabular-nums text-primary">
-                  {formatARS(venta.montoPago1Ars ?? 0)}
-                </p>
-                {venta.usdPago1 != null && venta.usdPago1 > 0 && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Registrado como {venta.usdPago1.toLocaleString("es-AR")} USD
-                  </p>
-                )}
-              </div>
-              <div className="rounded-lg border bg-card p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Segundo pago</p>
-                <p className="mt-2 text-base font-semibold">
-                  {METODO_PAGO_LABEL[venta.metodoPagoSecundario ?? ""] ?? venta.metodoPagoSecundario}
-                </p>
-                <p className="mt-2 text-lg font-bold tabular-nums text-primary">
-                  {formatARS(venta.montoPago2Ars ?? 0)}
-                </p>
-                {venta.usdPago2 != null && venta.usdPago2 > 0 && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Registrado como {venta.usdPago2.toLocaleString("es-AR")} USD
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            <FigureGrid columnas={2}>
+              <Figure
+                label="Primer pago"
+                valor={formatARS(venta.montoPago1Ars ?? 0)}
+                hint={
+                  <>
+                    {METODO_PAGO_LABEL[venta.metodoPago] ?? venta.metodoPago}
+                    {venta.usdPago1 != null && venta.usdPago1 > 0 && (
+                      <span className="block">{venta.usdPago1.toLocaleString("es-AR")} USD</span>
+                    )}
+                  </>
+                }
+              />
+              <Figure
+                label="Segundo pago"
+                valor={formatARS(venta.montoPago2Ars ?? 0)}
+                hint={
+                  <>
+                    {METODO_PAGO_LABEL[venta.metodoPagoSecundario ?? ""] ?? venta.metodoPagoSecundario}
+                    {venta.usdPago2 != null && venta.usdPago2 > 0 && (
+                      <span className="block">{venta.usdPago2.toLocaleString("es-AR")} USD</span>
+                    )}
+                  </>
+                }
+              />
+            </FigureGrid>
+          </PanelBody>
+        </Panel>
       )}
 
-      {/* ── Items + Cliente (2 columnas) ─────────────────────────── */}
-      <div className="grid min-w-0 gap-6 lg:grid-cols-3">
-        <Card className="min-w-0 overflow-hidden lg:col-span-2 shadow-sm">
-          <CardHeader className="flex min-w-0 flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="flex min-w-0 items-center gap-2 text-base">
-              <Package className="h-4 w-4 shrink-0" />
-              Items
-            </CardTitle>
-            <Badge variant="secondary" className="shrink-0">
-              {venta.items.reduce((s, i) => s + i.cantidad, 0)} unid.
-            </Badge>
-          </CardHeader>
-          <CardContent className="min-w-0 p-0">
-            {/* Móvil: lista apilada (evita scroll horizontal) */}
-            <ul className="divide-y md:hidden">
-              {venta.items.map((item, i) => (
-                <li key={i} className="px-4 py-3">
-                  <div className="min-w-0 break-words font-medium leading-snug">{item.productoNombre}</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">{item.productoSku}</div>
-                  {item.esConsignacion && (
-                    <Badge variant="secondary" className="mt-1.5 text-xs">
-                      Consig.
-                    </Badge>
-                  )}
-                  <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
-                    <span className="text-muted-foreground">
-                      {item.cantidad} × {formatARS(item.precioUnitario)}
-                    </span>
-                    <span className="font-semibold tabular-nums">{formatARS(item.subtotal)}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            {/* md+: tabla */}
-            <div className="hidden min-w-0 overflow-x-auto md:block">
-              <table className="w-full min-w-0 table-fixed text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="w-[40%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground md:px-6">
-                      Producto
-                    </th>
-                    <th className="w-[10%] px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground md:px-4">
-                      Cant.
-                    </th>
-                    <th className="w-[22%] px-2 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground md:px-4">
-                      P. unit.
-                    </th>
-                    <th className="w-[28%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground md:px-6">
-                      Subtotal
-                    </th>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Panel className="lg:col-span-2">
+          <PanelHeader
+            title="Items"
+            acciones={<Badge variant="outline">{venta.items.reduce((s, i) => s + i.cantidad, 0)} unid.</Badge>}
+          />
+          {/* Móvil: lista apilada (evita scroll horizontal) */}
+          <ul className="divide-y divide-border md:hidden">
+            {venta.items.map((item, i) => (
+              <li key={i} className="px-4 py-3">
+                <div className="min-w-0 break-words font-medium leading-snug">{item.productoNombre}</div>
+                <div className="mt-0.5 font-mono text-xs text-muted-foreground">{item.productoSku}</div>
+                {item.esConsignacion && (
+                  <Badge variant="outline" className="mt-1.5">
+                    Consig.
+                  </Badge>
+                )}
+                <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
+                  <span className="text-muted-foreground">
+                    {item.cantidad} × {formatARS(item.precioUnitario)}
+                  </span>
+                  <span className="font-mono font-semibold tabular-nums">{formatARS(item.subtotal)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {/* md+: tabla */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full table-fixed text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="w-[40%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground md:px-6">
+                    Producto
+                  </th>
+                  <th className="w-[10%] px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground md:px-4">
+                    Cant.
+                  </th>
+                  <th className="w-[22%] px-2 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground md:px-4">
+                    P. unit.
+                  </th>
+                  <th className="w-[28%] px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground md:px-6">
+                    Subtotal
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {venta.items.map((item, i) => (
+                  <tr key={i} className="border-b border-border last:border-0 hover:bg-accent">
+                    <td className="px-4 py-3 align-top md:px-6">
+                      <span className="break-words font-medium">{item.productoNombre}</span>
+                      <span className="text-xs text-muted-foreground"> ({item.productoSku})</span>
+                      {item.esConsignacion && (
+                        <Badge variant="outline" className="ml-2 align-middle">
+                          Consig.
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-2 py-3 text-center font-mono tabular-nums md:px-4">{item.cantidad}</td>
+                    <td className="break-all px-2 py-3 text-right font-mono tabular-nums md:px-4">
+                      {formatARS(item.precioUnitario)}
+                    </td>
+                    <td className="break-all px-4 py-3 text-right font-mono font-semibold tabular-nums md:px-6">
+                      {formatARS(item.subtotal)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {venta.items.map((item, i) => (
-                    <tr key={i} className="border-b transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3 align-top md:px-6">
-                        <span className="break-words font-medium">{item.productoNombre}</span>
-                        <span className="text-muted-foreground text-xs"> ({item.productoSku})</span>
-                        {item.esConsignacion && (
-                          <Badge variant="secondary" className="ml-2 align-middle text-xs">
-                            Consig.
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-2 py-3 text-center tabular-nums md:px-4">{item.cantidad}</td>
-                      <td className="break-all px-2 py-3 text-right tabular-nums md:px-4">
-                        {formatARS(item.precioUnitario)}
-                      </td>
-                      <td className="break-all px-4 py-3 text-right tabular-nums font-semibold md:px-6">
-                        {formatARS(item.subtotal)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
 
         <div className="min-w-0">
           <GuardarDatosCliente
@@ -438,9 +393,7 @@ export default function VentaDetallePage() {
               fetch(`/api/ventas/${id}`)
                 .then((res) => res.json())
                 .then((v) =>
-                  setVenta((prev) =>
-                    prev ? { ...prev, cliente: v.cliente, clienteNombre: v.clienteNombre } : prev
-                  )
+                  setVenta((prev) => (prev ? { ...prev, cliente: v.cliente, clienteNombre: v.clienteNombre } : prev))
                 );
             }}
           />

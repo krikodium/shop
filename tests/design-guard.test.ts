@@ -30,8 +30,6 @@ export const PENDIENTES: string[] = [
   "src/app/(dashboard)/reportes/page.tsx",
   "src/app/(dashboard)/usuarios/UsuarioFormDialog.tsx",
   "src/app/(dashboard)/usuarios/UsuariosList.tsx",
-  "src/app/(dashboard)/ventas/VentasTable.tsx",
-  "src/app/(dashboard)/ventas/[id]/page.tsx",
   "src/app/muestra-pedidos/error.tsx",
   "src/app/muestra-pedidos/layout.tsx",
   "src/app/muestra-pedidos/loading.tsx",
@@ -45,8 +43,6 @@ export const PENDIENTES: string[] = [
   "src/components/pedidos-demo/demo-ui.tsx",
   "src/components/punto-venta/CarritoVenta.tsx",
   "src/components/punto-venta/ProductosGridPaginado.tsx",
-  "src/components/ventas/GuardarDatosCliente.tsx",
-  "src/components/ventas/TicketVenta.tsx",
 ];
 
 const PROHIBIDOS: Array<{ nombre: string; patron: RegExp; motivo: string }> = [

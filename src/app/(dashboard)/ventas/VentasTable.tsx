@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { Receipt, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -14,7 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { Resumen } from "@/components/ui/resumen";
+import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { formatARS } from "@/lib/formatCurrency";
+import { cn } from "@/lib/utils";
 
 interface VentaRow {
   id: string;
@@ -28,6 +34,7 @@ interface VentaRow {
   metodoPagoSecundario?: string | null;
   usdPago1?: number | null;
   usdPago2?: number | null;
+  anulada?: boolean;
   cliente?: { nombre: string } | null;
   clienteNombre?: string | null;
 }
@@ -45,14 +52,22 @@ export function VentasTable() {
   const { desde, hasta } = getDefaultDates();
   const [fechaDesde, setFechaDesde] = useState(desde);
   const [fechaHasta, setFechaHasta] = useState(hasta);
+  const [busqueda, setBusqueda] = useState("");
   const [ventas, setVentas] = useState<VentaRow[]>([]);
+  // Arranca en `true`: la primera carga ya se refleja en el estado inicial,
+  // así el efecto de montaje no necesita volver a pedirlo de forma síncrona.
   const [loading, setLoading] = useState(true);
 
   const cargar = useCallback(() => {
-    setLoading(true);
+    // Deferido a un microtask: evita marcar `setLoading(true)` de forma
+    // síncrona dentro del efecto que dispara esta función (el estado ya
+    // arranca en `true` para la primera carga; para los refetch de filtros
+    // alcanza con encenderlo un instante después, no antes del primer paint).
+    Promise.resolve().then(() => setLoading(true));
     const params = new URLSearchParams();
     params.set("fechaDesde", fechaDesde);
     params.set("fechaHasta", `${fechaHasta}T23:59:59.999Z`);
+    params.set("incluirAnuladas", "true");
     fetch(`/api/ventas?${params}`)
       .then((res) => res.json())
       .then((data) => {
@@ -72,6 +87,7 @@ export function VentasTable() {
             metodoPagoSecundario: (v.metodoPagoSecundario as string) ?? null,
             usdPago1: u1,
             usdPago2: u2,
+            anulada: Boolean(v.anulada),
             cliente: v.cliente as { nombre: string } | null,
             clienteNombre: (v.clienteNombre as string) ?? null,
           };
@@ -86,147 +102,193 @@ export function VentasTable() {
     cargar();
   }, [cargar]);
 
+  const termino = busqueda.trim().toLocaleLowerCase("es");
+  const ventasFiltradas = termino
+    ? ventas.filter((v) =>
+        `${v.numeroVenta} ${v.cliente?.nombre ?? v.clienteNombre ?? ""}`
+          .toLocaleLowerCase("es")
+          .includes(termino)
+      )
+    : ventas;
+
+  const vigentes = ventasFiltradas.filter((v) => !v.anulada);
+  const totalPeriodo = vigentes.reduce((s, v) => s + v.total, 0);
+  const gananciaPeriodo = vigentes.reduce((s, v) => s + v.gananciaBruta, 0);
+
+  const filtros = (
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Nº de venta o cliente"
+          className="h-10 w-44 pl-9 sm:w-52"
+          aria-label="Buscar ventas"
+        />
+      </div>
+      <div>
+        <Label htmlFor="ventas-desde" className="sr-only">
+          Desde
+        </Label>
+        <Input
+          id="ventas-desde"
+          type="date"
+          value={fechaDesde}
+          onChange={(e) => setFechaDesde(e.target.value)}
+          className="h-10 w-[9.5rem]"
+        />
+      </div>
+      <div>
+        <Label htmlFor="ventas-hasta" className="sr-only">
+          Hasta
+        </Label>
+        <Input
+          id="ventas-hasta"
+          type="date"
+          value={fechaHasta}
+          onChange={(e) => setFechaHasta(e.target.value)}
+          className="h-10 w-[9.5rem]"
+        />
+      </div>
+    </div>
+  );
+
   if (loading && ventas.length === 0) {
     return (
-      <div className="space-y-4">
-        <div className="flex gap-3">
-          <div className="space-y-1">
-            <div className="h-4 w-12 animate-skeleton-shimmer rounded" />
-            <div className="h-10 w-36 animate-skeleton-shimmer rounded-md" />
-          </div>
-          <div className="space-y-1">
-            <div className="h-4 w-12 animate-skeleton-shimmer rounded" />
-            <div className="h-10 w-36 animate-skeleton-shimmer rounded-md" />
-          </div>
-        </div>
+      <div className="space-y-6">
+        <div className="h-24 animate-skeleton-shimmer rounded-xl" />
         <TableSkeleton rows={6} cols={9} />
       </div>
     );
   }
 
-  if (ventas.length === 0 && !loading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-3">
-          <div>
-            <Label htmlFor="ventas-desde" className="mb-1 block text-sm font-medium">Desde</Label>
-            <Input
-              id="ventas-desde"
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              className="min-h-10"
-            />
-          </div>
-          <div>
-            <Label htmlFor="ventas-hasta" className="mb-1 block text-sm font-medium">Hasta</Label>
-            <Input
-              id="ventas-hasta"
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              className="min-h-10"
-            />
-          </div>
-        </div>
-        <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center text-muted-foreground">
-          No hay ventas en este período.{" "}
-          <Link href="/ventas/nueva" className="font-medium text-primary hover:underline">
-            Crear una venta
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-3">
-        <div>
-          <Label htmlFor="ventas-desde" className="mb-1 block text-sm font-medium">Desde</Label>
-          <Input
-            id="ventas-desde"
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="min-h-10"
-          />
-        </div>
-        <div>
-          <Label htmlFor="ventas-hasta" className="mb-1 block text-sm font-medium">Hasta</Label>
-          <Input
-            id="ventas-hasta"
-            type="date"
-            value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="min-h-10"
-          />
-        </div>
-      </div>
-      <div className="rounded-lg border bg-card overflow-hidden shadow-sm">
-      <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Nº</TableHead>
-          <TableHead>Fecha</TableHead>
-          <TableHead>Cliente</TableHead>
-          <TableHead>Total</TableHead>
-          <TableHead className="whitespace-nowrap">Pago</TableHead>
-          <TableHead>Ganancia</TableHead>
-          <TableHead>Margen</TableHead>
-          <TableHead>Consignación</TableHead>
-          <TableHead className="w-[100px]"></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {ventas.map((v) => (
-          <TableRow key={v.id}>
-            <TableCell className="font-medium">{v.numeroVenta}</TableCell>
-            <TableCell>
-              {new Date(v.fecha).toLocaleDateString()} {new Date(v.fecha).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </TableCell>
-            <TableCell>{v.cliente?.nombre ?? v.clienteNombre ?? "—"}</TableCell>
-            <TableCell className="tabular-nums">${v.total.toFixed(2)}</TableCell>
-            <TableCell>
-              <div className="flex flex-wrap gap-1">
-                {v.metodoPagoSecundario ? (
-                  <Badge variant="secondary" className="text-[10px] font-normal">
-                    2 medios
-                  </Badge>
-                ) : null}
-                {(v.usdPago1 != null && v.usdPago1 > 0) ||
-                (v.usdPago2 != null && v.usdPago2 > 0) ? (
-                  <Badge variant="outline" className="border-sky-500/50 text-[10px] text-sky-700 dark:text-sky-300">
-                    USD
-                  </Badge>
-                ) : null}
-                {!v.metodoPagoSecundario &&
-                  !((v.usdPago1 != null && v.usdPago1 > 0) || (v.usdPago2 != null && v.usdPago2 > 0)) && (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </div>
-            </TableCell>
-            <TableCell className="tabular-nums text-green-600 dark:text-green-400">${v.gananciaBruta.toFixed(2)}</TableCell>
-            <TableCell>{v.margenPorcentaje.toFixed(1)}%</TableCell>
-            <TableCell>
-              {v.deudaConsignacion > 0 ? (
-                <Badge variant="secondary">${v.deudaConsignacion.toFixed(2)}</Badge>
-              ) : (
-                "—"
-              )}
-            </TableCell>
-            <TableCell>
-              <Link href={`/ventas/${v.id}`}>
-                <Button variant="ghost" size="sm">
-                  Ver
+    <div className="space-y-6">
+      {vigentes.length > 0 && (
+        <Resumen
+          className="anim-entrada"
+          items={[
+            { label: "Ventas del período", valor: vigentes.length },
+            { label: "Ganancia", valor: formatARS(gananciaPeriodo) },
+            { label: "Total facturado", valor: formatARS(totalPeriodo) },
+          ]}
+        />
+      )}
+
+      <Panel>
+        <PanelHeader title="Historial de ventas" acciones={filtros} />
+        {ventasFiltradas.length === 0 ? (
+          <PanelBody>
+            <EmptyState
+              icono={Receipt}
+              titulo="No hay ventas en este período"
+              descripcion="Ajustá el rango de fechas o el buscador, o registrá una venta nueva."
+              accion={
+                <Button asChild size="sm">
+                  <Link href="/ventas/nueva">Registrar una venta</Link>
                 </Button>
-              </Link>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-      </div>
+              }
+            />
+          </PanelBody>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nº</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead>Pago</TableHead>
+                <TableHead className="text-right">Ganancia</TableHead>
+                <TableHead className="text-right">Margen</TableHead>
+                <TableHead className="text-right">Consignación</TableHead>
+                <TableHead className="w-[80px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ventasFiltradas.map((v) => {
+                const sinMedioDetectado =
+                  !v.metodoPagoSecundario &&
+                  !((v.usdPago1 ?? 0) > 0 || (v.usdPago2 ?? 0) > 0);
+                return (
+                  <TableRow key={v.id} className={v.anulada ? "text-muted-foreground" : undefined}>
+                    <TableCell className={cn("font-medium", v.anulada && "line-through")}>
+                      {v.numeroVenta}
+                    </TableCell>
+                    <TableCell className={v.anulada ? "line-through" : undefined}>
+                      {new Date(v.fecha).toLocaleDateString("es-AR")}{" "}
+                      {new Date(v.fecha).toLocaleTimeString("es-AR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </TableCell>
+                    <TableCell className={v.anulada ? "line-through" : undefined}>
+                      {v.cliente?.nombre ?? v.clienteNombre ?? "—"}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right font-mono tabular-nums",
+                        v.anulada && "line-through"
+                      )}
+                    >
+                      {formatARS(v.total)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {v.anulada && <Badge variant="outline">Anulada</Badge>}
+                        {v.metodoPagoSecundario && <Badge variant="outline">2 medios</Badge>}
+                        {((v.usdPago1 != null && v.usdPago1 > 0) ||
+                          (v.usdPago2 != null && v.usdPago2 > 0)) && (
+                          <Badge variant="outline">USD</Badge>
+                        )}
+                        {!v.anulada && sinMedioDetectado && (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right font-mono tabular-nums",
+                        !v.anulada &&
+                          (v.gananciaBruta >= 0 ? "text-num-positive" : "text-num-negative"),
+                        v.anulada && "line-through"
+                      )}
+                    >
+                      {formatARS(v.gananciaBruta)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right font-mono tabular-nums",
+                        v.anulada && "line-through"
+                      )}
+                    >
+                      {v.margenPorcentaje.toFixed(1)}%
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right font-mono tabular-nums",
+                        !v.anulada && v.deudaConsignacion > 0 && "text-num-warning",
+                        v.anulada && "line-through"
+                      )}
+                    >
+                      {v.deudaConsignacion > 0 ? formatARS(v.deudaConsignacion) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/ventas/${v.id}`}>Ver</Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </Panel>
     </div>
   );
 }

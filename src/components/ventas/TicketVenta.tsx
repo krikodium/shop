@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { METODO_PAGO_LABEL } from "@/lib/constants";
 import { formatCurrencyDisplay } from "@/lib/formatCurrency";
@@ -61,43 +62,47 @@ export function TicketVenta({
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={imprimir} className="print:hidden">
-        🖨️ Imprimir ticket
+      <Button variant="outline" onClick={imprimir} className="print:hidden">
+        <Printer className="size-4" aria-hidden="true" />
+        Imprimir ticket
       </Button>
 
+      {/* Documento de impresión: tokens fijados a la variante clara en
+          globals.css (bloque @media print), para que el papel salga siempre
+          en blanco y negro sin importar el tema de la app. */}
       <div
         id="ticket-venta"
         ref={ticketRef}
-        className="hidden print:block w-[80mm] max-w-[80mm] mx-auto p-4 text-[11px] font-mono bg-white text-black leading-tight"
+        className="hidden w-[80mm] max-w-[80mm] bg-background p-4 text-[11px] leading-tight font-mono text-foreground print:mx-auto print:block"
       >
         {/* Encabezado */}
-        <div className="text-center border-b-2 border-black pb-3 mb-4">
+        <div className="mb-4 border-b-2 border-foreground pb-3 text-center">
           <h1 className="text-base font-bold tracking-wide">SHOP</h1>
-          <p className="text-[10px] uppercase tracking-wider mt-0.5">Comprobante de venta</p>
+          <p className="mt-0.5 text-[10px] tracking-wider uppercase">Comprobante de venta</p>
         </div>
 
         {/* Datos de la venta */}
-        <div className="space-y-1.5 text-[11px] mb-4">
+        <div className="mb-4 space-y-1.5 text-[11px]">
           <div className="flex justify-between">
-            <span className="text-gray-600">Venta</span>
+            <span className="text-muted-foreground">Venta</span>
             <span className="font-semibold">{numeroVenta}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Fecha</span>
+            <span className="text-muted-foreground">Fecha</span>
             <span>{new Date(fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Cliente</span>
-            <span className="text-right max-w-[55%] break-words">{clienteNombre}</span>
+            <span className="text-muted-foreground">Cliente</span>
+            <span className="max-w-[55%] text-right break-words">{clienteNombre}</span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="text-gray-600 shrink-0">Pago</span>
+            <span className="shrink-0 text-muted-foreground">Pago</span>
             <span className="text-right">
               {metodoPagoSecundario && montoPago1Ars != null && montoPago2Ars != null ? (
                 <span className="block">
                   {METODO_PAGO_LABEL[metodoPago] ?? metodoPago}: {fmt(montoPago1Ars)}
                   {usdPago1 != null && usdPago1 > 0 && cotizacionUsd != null && (
-                    <span className="block text-[9px] text-gray-500">
+                    <span className="block text-[9px] text-muted-foreground">
                       ({usdPago1} USD @ {Number(cotizacionUsd).toLocaleString("es-AR")})
                     </span>
                   )}
@@ -105,7 +110,7 @@ export function TicketVenta({
                     {METODO_PAGO_LABEL[metodoPagoSecundario] ?? metodoPagoSecundario}: {fmt(montoPago2Ars)}
                   </span>
                   {usdPago2 != null && usdPago2 > 0 && cotizacionUsd != null && (
-                    <span className="block text-[9px] text-gray-500">
+                    <span className="block text-[9px] text-muted-foreground">
                       ({usdPago2} USD @ {Number(cotizacionUsd).toLocaleString("es-AR")})
                     </span>
                   )}
@@ -118,68 +123,62 @@ export function TicketVenta({
         </div>
 
         {/* Línea separadora */}
-        <div className="border-t border-dashed border-gray-400 my-3" />
+        <div className="my-3 border-t border-dashed border-border" />
 
         {/* Items */}
-        <table className="w-full text-[10px] border-collapse">
+        <table className="w-full border-collapse text-[10px]">
           <thead>
-            <tr className="border-b border-black">
-              <th className="text-left py-1.5 font-semibold">Producto</th>
-              <th className="text-center py-1.5 w-8 font-semibold">Cant</th>
-              <th className="text-right py-1.5 font-semibold">P.unit</th>
-              <th className="text-right py-1.5 font-semibold">Subtot</th>
+            <tr className="border-b border-foreground">
+              <th className="py-1.5 text-left font-semibold">Producto</th>
+              <th className="w-8 py-1.5 text-center font-semibold">Cant</th>
+              <th className="py-1.5 text-right font-semibold">P.unit</th>
+              <th className="py-1.5 text-right font-semibold">Subtot</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item, i) => (
-              <tr key={i} className="border-b border-dashed border-gray-300">
+              <tr key={i} className="border-b border-dashed border-border">
                 <td className="py-1.5 align-top">
                   <span className="block break-words">{item.productoNombre}</span>
-                  {item.esConsignacion && (
-                    <span className="text-[9px] text-gray-500">(consig.)</span>
-                  )}
+                  {item.esConsignacion && <span className="text-[9px] text-muted-foreground">(consig.)</span>}
                 </td>
-                <td className="text-center py-1.5 align-top">{item.cantidad}</td>
-                <td className="text-right py-1.5 align-top tabular-nums">{fmt(item.precioUnitario)}</td>
-                <td className="text-right py-1.5 align-top tabular-nums font-medium">{fmt(item.subtotal)}</td>
+                <td className="py-1.5 text-center align-top">{item.cantidad}</td>
+                <td className="py-1.5 text-right align-top tabular-nums">{fmt(item.precioUnitario)}</td>
+                <td className="py-1.5 text-right align-top font-medium tabular-nums">{fmt(item.subtotal)}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
         {/* Totales */}
-        <div className="border-t-2 border-black mt-4 pt-3 space-y-1 text-[11px]">
+        <div className="mt-4 space-y-1 border-t-2 border-foreground pt-3 text-[11px]">
           <div className="flex justify-between">
             <span>Subtotal</span>
             <span className="tabular-nums">{fmt(subtotal)}</span>
           </div>
           {descuento > 0 && (
-            <div className="flex justify-between text-gray-600">
+            <div className="flex justify-between text-muted-foreground">
               <span>Descuento</span>
               <span className="tabular-nums">- {fmt(descuento)}</span>
             </div>
           )}
-          <div className="flex justify-between font-bold text-sm pt-2 mt-2 border-t border-dashed">
+          <div className="mt-2 flex justify-between border-t border-dashed border-border pt-2 text-sm font-bold">
             <span>TOTAL</span>
             <span className="tabular-nums">{fmt(total)}</span>
           </div>
         </div>
 
         {/* Pie */}
-        <div className="mt-6 pt-4 border-t border-dashed text-center">
-          <p className="text-[9px] text-gray-500">
-            Gracias por su compra
-          </p>
+        <div className="mt-6 border-t border-dashed border-border pt-4 text-center">
+          <p className="text-[9px] text-muted-foreground">Gracias por su compra</p>
           {items.some((i) => i.esConsignacion) && (
-            <p className="text-[9px] text-gray-500 mt-0.5">
-              * Productos en consignación
-            </p>
+            <p className="mt-0.5 text-[9px] text-muted-foreground">* Productos en consignación</p>
           )}
         </div>
 
         {/* Línea de corte */}
-        <div className="mt-6 pt-2 border-t-2 border-dashed border-gray-400 text-center">
-          <span className="text-[8px] text-gray-400">— corte —</span>
+        <div className="mt-6 border-t-2 border-dashed border-border pt-2 text-center">
+          <span className="text-[8px] text-muted-foreground">— corte —</span>
         </div>
       </div>
     </>
