@@ -26,7 +26,7 @@ export default async function DashboardLayout({
         </Link>
         <Link
           href="/ventas/nueva"
-          className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+          className="rounded-md bg-action px-3 py-2 text-sm font-medium text-action-foreground transition-colors hover:bg-action/90"
         >
           + Venta
         </Link>

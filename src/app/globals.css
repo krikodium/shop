@@ -33,6 +33,8 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-action: var(--action);
+  --color-action-foreground: var(--action-foreground);
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
@@ -67,6 +69,10 @@
   /* Acción principal: negro sobre blanco */
   --primary: oklch(0.16 0 0);
   --primary-foreground: oklch(0.99 0 0);
+  /* Acción principal. Separada de --primary porque en tema oscuro un botón
+     blanco pleno es una plancha; los enlaces sí siguen usando --primary. */
+  --action: oklch(0.16 0 0);
+  --action-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.96 0 0);
   --secondary-foreground: oklch(0.22 0 0);
   --muted: oklch(0.965 0 0);
@@ -121,6 +127,8 @@
 
   --primary: oklch(0.97 0 0);
   --primary-foreground: oklch(0.16 0 0);
+  --action: oklch(0.32 0 0);
+  --action-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.26 0 0);
   --secondary-foreground: oklch(0.97 0 0);
   --muted: oklch(0.25 0 0);
@@ -227,6 +235,13 @@
     visibility: visible;
   }
   #ticket-venta {
+    /* El papel siempre sale en la variante clara, sin importar el tema de
+       la app: fijamos los tokens que usa TicketVenta a sus valores de :root. */
+    color-scheme: light;
+    --background: oklch(0.99 0 0);
+    --foreground: oklch(0.16 0 0);
+    --border: oklch(0.9 0 0);
+    --muted-foreground: oklch(0.52 0 0);
     position: absolute;
     left: 0;
     top: 0;

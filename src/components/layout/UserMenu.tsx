@@ -42,7 +42,7 @@ export function UserMenu() {
           variant="ghost"
           className="flex h-auto w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-accent"
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-medium text-primary">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-medium text-foreground">
             {initials}
           </div>
           <div className="min-w-0 flex-1">

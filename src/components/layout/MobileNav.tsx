@@ -24,7 +24,7 @@ export function MobileNav() {
     const active = isActive(pathname, href, nav);
     return `flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium transition-colors touch-manipulation ${
       active
-        ? "bg-primary text-primary-foreground"
+        ? "bg-accent font-medium text-foreground"
         : "text-foreground hover:bg-accent"
     }`;
   };
