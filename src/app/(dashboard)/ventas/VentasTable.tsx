@@ -67,7 +67,6 @@ export function VentasTable() {
     const params = new URLSearchParams();
     params.set("fechaDesde", fechaDesde);
     params.set("fechaHasta", `${fechaHasta}T23:59:59.999Z`);
-    params.set("incluirAnuladas", "true");
     fetch(`/api/ventas?${params}`)
       .then((res) => res.json())
       .then((data) => {
@@ -111,6 +110,10 @@ export function VentasTable() {
       )
     : ventas;
 
+  // La API devuelve como máximo 100 ventas (take: 100 en /api/ventas). Los
+  // agregados de abajo suman SOLO lo listado, así que cuando se alcanza el tope
+  // hay que decirlo: si no, un total incompleto se lee como el total del período.
+  const topeAlcanzado = ventas.length >= 100;
   const vigentes = ventasFiltradas.filter((v) => !v.anulada);
   const totalPeriodo = vigentes.reduce((s, v) => s + v.total, 0);
   const gananciaPeriodo = vigentes.reduce((s, v) => s + v.gananciaBruta, 0);
@@ -172,9 +175,21 @@ export function VentasTable() {
         <Resumen
           className="anim-entrada"
           items={[
-            { label: "Ventas del período", valor: vigentes.length },
-            { label: "Ganancia", valor: formatARS(gananciaPeriodo) },
-            { label: "Total facturado", valor: formatARS(totalPeriodo) },
+            {
+              label: "Ventas listadas",
+              valor: vigentes.length,
+              hint: topeAlcanzado ? "tope de 100 alcanzado" : "en el período elegido",
+            },
+            {
+              label: "Ganancia",
+              valor: formatARS(gananciaPeriodo),
+              hint: "suma de las ventas listadas",
+            },
+            {
+              label: "Total facturado",
+              valor: formatARS(totalPeriodo),
+              hint: "suma de las ventas listadas",
+            },
           ]}
         />
       )}
