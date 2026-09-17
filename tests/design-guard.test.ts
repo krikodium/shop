@@ -24,7 +24,6 @@ export const PENDIENTES: string[] = [
   "src/app/(dashboard)/consignacion/rendiciones/[id]/page.tsx",
   "src/app/(dashboard)/consignacion/rendiciones/nueva/page.tsx",
   "src/app/(dashboard)/estadisticas-vendedores/page.tsx",
-  "src/app/(dashboard)/page.tsx",
   "src/app/(dashboard)/productos/[id]/editar/page.tsx",
   "src/app/(dashboard)/productos/page.tsx",
   "src/app/(dashboard)/proveedores/[id]/page.tsx",

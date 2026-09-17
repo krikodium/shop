@@ -16,32 +16,31 @@ import {
   Legend,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
-import { Stat, StatGrid } from "@/components/ui/stat";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { Figure, FigureGrid } from "@/components/ui/figure";
+import { Resumen } from "@/components/ui/resumen";
+import { DataList, DataRow } from "@/components/ui/data-list";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   ShoppingCart,
-  TrendingUp,
   Package,
-  AlertTriangle,
   ArrowRight,
   Receipt,
   Users,
   Truck,
-  HelpCircle,
   ShoppingBag,
   FileStack,
+  BarChart3,
 } from "lucide-react";
 import { formatARS, formatUSD } from "@/lib/formatCurrency";
-
-const CHART_COLORS = [
-  "#6366f1", // indigo
-  "#22c55e", // green
-  "#f59e0b", // amber
-  "#ec4899", // pink
-  "#3b82f6", // blue
-];
+import {
+  COLORES_GRAFICO,
+  ejeGrafico,
+  grillaGrafico,
+  tooltipGrafico,
+} from "@/lib/chart-theme";
 
 interface DashboardData {
   resumen: {
@@ -61,7 +60,13 @@ interface DashboardData {
   };
   ventasUltimos14Dias: Array<{ fecha: string; label: string; total: number; cantidad: number }>;
   metodoPagoChart: Array<{ name: string; value: number; cantidad: number }>;
-  productosBajoStock: Array<{ id: string; sku: string; nombre: string; stockActual: number; stockMinimo: number }>;
+  productosBajoStock: Array<{
+    id: string;
+    sku: string;
+    nombre: string;
+    stockActual: number;
+    stockMinimo: number;
+  }>;
   ultimasVentas: Array<{
     id: string;
     numeroVenta: string;
@@ -72,13 +77,25 @@ interface DashboardData {
   }>;
 }
 
+const ACCESOS = [
+  { href: "/ventas", label: "Ventas", icon: Receipt },
+  { href: "/productos", label: "Productos", icon: Package },
+  { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/proveedores", label: "Proveedores", icon: Truck },
+  { href: "/consignacion", label: "Consignación", icon: FileStack },
+  { href: "/compras", label: "Compras", icon: ShoppingBag },
+  { href: "/reportes", label: "Reportes", icon: BarChart3 },
+];
+
+const plural = (n: number, singular: string, plural: string) =>
+  `${n} ${n === 1 ? singular : plural}`;
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoadError(null);
     fetch("/api/dashboard", { credentials: "same-origin" })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -88,7 +105,7 @@ export default function DashboardPage() {
       .catch(() => {
         setData(null);
         setLoadError(
-          "No se pudo cargar el dashboard. Revisá que la app esté conectada a la base de datos (DATABASE_URL) y que las migraciones estén aplicadas."
+          "No se pudo cargar el panel. Revisá que la app esté conectada a la base de datos (DATABASE_URL) y que las migraciones estén aplicadas."
         );
       })
       .finally(() => setLoading(false));
@@ -96,36 +113,35 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="space-y-6">
         <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 space-y-2">
-            <div className="h-3 w-40 animate-skeleton-shimmer rounded" />
-            <div className="h-8 w-56 animate-skeleton-shimmer rounded-md" />
-            <div className="h-4 w-72 animate-skeleton-shimmer rounded" />
+            <div className="h-3 w-28 animate-skeleton-shimmer rounded" />
+            <div className="h-8 w-52 animate-skeleton-shimmer rounded-md" />
+            <div className="h-4 w-80 animate-skeleton-shimmer rounded" />
           </div>
-          <div className="h-10 w-36 animate-skeleton-shimmer rounded-lg" />
+          <div className="h-10 w-36 animate-skeleton-shimmer rounded-md" />
         </div>
-        <div className="h-[148px] rounded-2xl bg-zinc-950/90" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="rounded-xl border bg-card p-5">
+        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-card px-5 py-5">
               <div className="h-3 w-24 animate-skeleton-shimmer rounded" />
-              <div className="mt-3 h-7 w-32 animate-skeleton-shimmer rounded" />
+              <div className="mt-3 h-8 w-36 animate-skeleton-shimmer rounded" />
               <div className="mt-2 h-3 w-20 animate-skeleton-shimmer rounded" />
             </div>
           ))}
         </div>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-lg border bg-card p-5">
-            <div className="h-6 w-40 animate-skeleton-shimmer rounded" />
-            <div className="mt-2 h-4 w-56 animate-skeleton-shimmer rounded" />
-            <div className="mt-6 h-[280px] animate-skeleton-shimmer rounded" />
-          </div>
-          <div className="rounded-lg border bg-card p-5">
-            <div className="h-6 w-48 animate-skeleton-shimmer rounded" />
-            <div className="mt-2 h-4 w-32 animate-skeleton-shimmer rounded" />
-            <div className="mt-6 h-[280px] animate-skeleton-shimmer rounded" />
-          </div>
+        <div className="grid gap-5 lg:grid-cols-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="rounded-lg border border-border">
+              <div className="border-b border-border px-5 py-3.5">
+                <div className="h-4 w-44 animate-skeleton-shimmer rounded" />
+              </div>
+              <div className="p-5">
+                <div className="h-[260px] animate-skeleton-shimmer rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -133,16 +149,21 @@ export default function DashboardPage() {
 
   if (loadError) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="space-y-6">
         <PageHeader
-          overline="Panel · Resumen comercial"
-          title="Hermanas Caradonti"
-          description="Resumen del mes y actividad reciente"
+          overline="Panel"
+          title="Inicio"
+          description="Resumen del mes, actividad reciente y alertas de stock."
         />
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive md:p-5">
-          <p className="font-medium">Error al cargar datos</p>
-          <p className="mt-2 text-foreground/90">{loadError}</p>
-        </div>
+        <EmptyState
+          titulo="No se pudieron cargar los datos"
+          descripcion={loadError}
+          accion={
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Reintentar
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -163,371 +184,295 @@ export default function DashboardPage() {
     ventasConUsdHoy: 0,
   };
 
+  const ventas14 = data?.ventasUltimos14Dias ?? [];
+  const metodoPago = data?.metodoPagoChart ?? [];
+  const ultimasVentas = data?.ultimasVentas ?? [];
+  const bajoStock = data?.productosBajoStock ?? [];
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <PageHeader
-        overline="Panel · Resumen comercial"
-        title="Hermanas Caradonti"
-        description="Resumen comercial, actividad reciente y alertas operativas del negocio"
+        overline="Panel"
+        title="Inicio"
+        description="Resumen del mes, actividad reciente y alertas de stock."
       >
-        <Link href="/ventas/nueva" className="w-full sm:w-auto">
-          <Button className="w-full gap-2 sm:w-auto">
-            <ShoppingCart className="h-4 w-4" />
+        <Button asChild className="h-11 w-full sm:w-auto">
+          <Link href="/ventas/nueva">
+            <ShoppingCart className="size-4" aria-hidden="true" />
             Nueva venta
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </PageHeader>
 
-      {/* Banda de estado: facturación del mes */}
-      <section className="ledger-in relative overflow-hidden rounded-2xl bg-zinc-950 text-zinc-100">
-        <div
-          aria-hidden
-          className="ledger-grid-texture pointer-events-none absolute inset-0 opacity-[0.05]"
-        />
-        <div className="absolute inset-y-0 left-0 w-[3px] bg-primary" />
-        <div className="relative flex flex-col gap-7 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-zinc-500">
-              Ventas del mes
-            </p>
-            <p className="mt-3 font-mono text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
-              {formatARS(resumen.totalVentasMes)}
-            </p>
-            <p className="mt-2 font-mono text-[11px] text-zinc-600">
-              {resumen.cantidadVentasMes} ventas registradas este mes
-            </p>
-          </div>
-          <div className="flex divide-x divide-white/10">
-            <div className="pr-6 sm:pr-8">
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-                Ganancia
-              </p>
-              <p className="mt-1 font-mono text-2xl tabular-nums text-emerald-400">
-                {formatARS(resumen.totalGananciaMes)}
-              </p>
-            </div>
-            <div className="pl-6 sm:pl-8">
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-                Hoy
-              </p>
-              <p className="mt-1 font-mono text-2xl tabular-nums">
-                {formatARS(resumen.totalVentasHoy)}
-              </p>
-              <p className="mt-0.5 font-mono text-[10px] text-zinc-600">
-                {resumen.cantidadVentasHoy} ventas
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <Resumen
+        className="anim-entrada"
+        items={[
+          {
+            label: "Ventas del mes",
+            valor: formatARS(resumen.totalVentasMes),
+            hint: plural(resumen.cantidadVentasMes, "venta registrada", "ventas registradas"),
+          },
+          {
+            label: "Ganancia del mes",
+            valor: formatARS(resumen.totalGananciaMes),
+            hint: "Neto después de costos",
+          },
+          {
+            label: "Vendido hoy",
+            valor: formatARS(resumen.totalVentasHoy),
+            hint: plural(resumen.cantidadVentasHoy, "venta", "ventas"),
+            destacado: true,
+          },
+        ]}
+      />
 
-      {/* Métricas secundarias */}
-      <StatGrid>
-        <Stat
+      <FigureGrid columnas={4}>
+        <Figure
           label="Deuda consignación"
-          value={formatARS(resumen.totalDeudaConsignacion)}
-          tone={resumen.totalDeudaConsignacion > 0 ? "warning" : "default"}
+          valor={formatARS(resumen.totalDeudaConsignacion)}
+          tono={resumen.totalDeudaConsignacion > 0 ? "alerta" : "neutro"}
           hint={
-            <Link href="/consignacion" className="font-medium text-primary hover:underline">
-              Ver rendiciones →
+            <Link href="/consignacion" className="underline underline-offset-4 hover:text-foreground">
+              Ver rendiciones
             </Link>
           }
         />
-        <Stat
-          label="USD registrados (mes)"
-          value={formatUSD(resumen.totalUsdRecibidoMes)}
-          hint={`${resumen.ventasConUsdMes} venta${resumen.ventasConUsdMes !== 1 ? "s" : ""} con dólares`}
+        <Figure
+          label="USD del mes"
+          valor={formatUSD(resumen.totalUsdRecibidoMes)}
+          hint={plural(resumen.ventasConUsdMes, "venta con dólares", "ventas con dólares")}
         />
-        <Stat
-          label="USD registrados (hoy)"
-          value={formatUSD(resumen.totalUsdRecibidoHoy)}
-          hint={`${resumen.ventasConUsdHoy} venta${resumen.ventasConUsdHoy !== 1 ? "s" : ""} con USD hoy`}
+        <Figure
+          label="USD de hoy"
+          valor={formatUSD(resumen.totalUsdRecibidoHoy)}
+          hint={plural(resumen.ventasConUsdHoy, "venta con dólares", "ventas con dólares")}
         />
-        <Stat
+        <Figure
           label="Productos activos"
-          value={resumen.productosActivos}
-          tone={resumen.productosBajoStock > 0 ? "warning" : "default"}
+          valor={resumen.productosActivos}
+          tono={resumen.productosBajoStock > 0 ? "alerta" : "neutro"}
           hint={
             resumen.productosBajoStock > 0
               ? `${resumen.productosBajoStock} con stock bajo`
               : "Stock en orden"
           }
         />
-      </StatGrid>
+      </FigureGrid>
 
-      {/* Gráficos */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Tendencia de ventas (14 días)</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Evolución diaria de facturación
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[280px]">
-              {data?.ventasUltimos14Dias && data.ventasUltimos14Dias.length > 0 ? (
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel>
+          <PanelHeader
+            title="Ventas de los últimos 14 días"
+            descripcion="Facturación diaria en pesos"
+          />
+          <PanelBody>
+            <div className="h-[260px]">
+              {ventas14.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.ventasUltimos14Dias} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0 0)" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
+                  <BarChart data={ventas14} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid {...grillaGrafico} />
+                    <XAxis dataKey="label" {...ejeGrafico} />
                     <YAxis
                       tickFormatter={(v) => `$${v}`}
-                      tick={{ fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={50}
+                      width={56}
+                      {...ejeGrafico}
                     />
                     <Tooltip
-                      contentStyle={{ borderRadius: "8px", border: "1px solid oklch(0.92 0 0)" }}
-                      formatter={(value: unknown) =>
-                        [formatARS(Number(value ?? 0)), "Total"]
-                      }
+                      {...tooltipGrafico}
+                      formatter={(value: unknown) => [formatARS(Number(value ?? 0)), "Total"]}
                       labelFormatter={(_, payload) =>
                         (Array.isArray(payload) && payload[0]?.payload?.label) ?? ""
                       }
                     />
-                    <Bar
-                      dataKey="total"
-                      fill="oklch(0.45 0.12 195)"
-                      radius={[6, 6, 0, 0]}
-                    />
+                    <Bar dataKey="total" fill="var(--chart-1)" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center rounded-lg bg-muted/30 text-muted-foreground text-sm">
-                  Sin datos de ventas
-                </div>
+                <EmptyState
+                  className="h-full justify-center"
+                  titulo="Sin ventas en el período"
+                  descripcion="Cuando registres ventas vas a ver acá la evolución diaria."
+                />
               )}
             </div>
-          </CardContent>
-        </Card>
+          </PanelBody>
+        </Panel>
 
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Composición por método de pago</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Participación de cada medio en el mes
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[280px]">
-              {data?.metodoPagoChart && data.metodoPagoChart.length > 0 ? (
+        <Panel>
+          <PanelHeader
+            title="Cómo te pagaron este mes"
+            descripcion="Participación de cada medio de pago"
+          />
+          <PanelBody>
+            <div className="h-[260px]">
+              {metodoPago.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={data.metodoPagoChart}
+                      data={metodoPago}
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      outerRadius={95}
-                      innerRadius={45}
+                      outerRadius={92}
+                      innerRadius={52}
                       paddingAngle={2}
-                      label={({ name, percent }) =>
-                        `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-                      }
+                      stroke="var(--card)"
+                      strokeWidth={2}
                     >
-                      {data.metodoPagoChart.map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                      {metodoPago.map((entrada, i) => (
+                        <Cell
+                          key={entrada.name}
+                          fill={COLORES_GRAFICO[i % COLORES_GRAFICO.length]}
+                        />
                       ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{ borderRadius: "8px", border: "1px solid oklch(0.92 0 0)" }}
-                      formatter={(value: unknown) => formatARS(Number(value ?? 0))}
+                    <Legend
+                      verticalAlign="bottom"
+                      height={32}
+                      formatter={(value: unknown) => (
+                        <span className="text-xs text-muted-foreground">{String(value)}</span>
+                      )}
                     />
-                    <Legend />
+                    <Tooltip
+                      {...tooltipGrafico}
+                      formatter={(value: unknown, name: unknown) => [
+                        formatARS(Number(value ?? 0)),
+                        String(name),
+                      ]}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center rounded-lg bg-muted/30 text-muted-foreground text-sm">
-                  Sin datos
-                </div>
+                <EmptyState
+                  className="h-full justify-center"
+                  titulo="Sin cobros registrados"
+                  descripcion="Acá vas a ver con qué medios te pagaron durante el mes."
+                />
               )}
             </div>
-          </CardContent>
-        </Card>
+          </PanelBody>
+        </Panel>
       </div>
 
-      {/* Últimas ventas y productos bajo stock */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base md:text-lg">Últimas ventas</CardTitle>
-            <Link href="/ventas">
-              <Button variant="ghost" size="sm" className="gap-1.5">
-                Ver todas
-                <ArrowRight className="h-3.5 w-3.5" />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel>
+          <PanelHeader
+            title="Últimas ventas"
+            acciones={
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/ventas">
+                  Ver todas
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Link>
               </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {data?.ultimasVentas && data.ultimasVentas.length > 0 ? (
-              <ul className="space-y-2">
-                {data.ultimasVentas.map((v) => (
-                  <li key={v.id}>
-                    <Link
-                      href={`/ventas/${v.id}`}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-card p-3 transition-colors hover:bg-accent/40"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-medium">{v.numeroVenta}</span>
-                          {v.pagoDividido && (
-                            <Badge variant="secondary" className="text-[10px] font-normal">
-                              2 medios
-                            </Badge>
-                          )}
-                          {v.tieneUsd && (
-                            <Badge variant="outline" className="border-sky-500/50 text-[10px] text-sky-700 dark:text-sky-300">
-                              USD
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(v.fecha).toLocaleString("es-AR")}
-                        </p>
-                      </div>
-                      <span className="shrink-0 font-semibold tabular-nums">
-                        {formatARS(Number(v.total))}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No hay ventas recientes
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            }
+          />
+          {ultimasVentas.length > 0 ? (
+            <DataList className="rounded-none border-0 border-t">
+              {ultimasVentas.map((v) => (
+                <DataRow
+                  key={v.id}
+                  href={`/ventas/${v.id}`}
+                  titulo={v.numeroVenta}
+                  meta={new Date(v.fecha).toLocaleString("es-AR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  etiquetas={
+                    <>
+                      {v.pagoDividido && (
+                        <Badge variant="outline" className="font-normal">
+                          2 medios
+                        </Badge>
+                      )}
+                      {v.tieneUsd && (
+                        <Badge variant="outline" className="font-normal">
+                          USD
+                        </Badge>
+                      )}
+                    </>
+                  }
+                  valor={formatARS(Number(v.total))}
+                />
+              ))}
+            </DataList>
+          ) : (
+            <PanelBody>
+              <EmptyState
+                titulo="Todavía no hay ventas"
+                descripcion="La primera venta que registres aparece acá."
+                accion={
+                  <Button asChild size="sm">
+                    <Link href="/ventas/nueva">Registrar una venta</Link>
+                  </Button>
+                }
+              />
+            </PanelBody>
+          )}
+        </Panel>
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-              <Package className="h-4 w-4" />
-              Productos
-            </CardTitle>
-            <Link href="/productos">
-              <Button variant="ghost" size="sm" className="gap-1.5">
-                Ver catálogo
-                <ArrowRight className="h-3.5 w-3.5" />
+        <Panel>
+          <PanelHeader
+            title="Stock bajo"
+            descripcion={
+              resumen.productosBajoStock > 0
+                ? `${resumen.productosBajoStock} de ${resumen.productosActivos} productos activos`
+                : "Todo el catálogo por encima del mínimo"
+            }
+            acciones={
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/productos">
+                  Ver catálogo
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Link>
               </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 flex flex-wrap gap-3 text-sm">
-              <span className="text-muted-foreground">
-                {resumen.productosActivos} activos
-              </span>
-              {resumen.productosBajoStock > 0 && (
-                <span className="flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
-                  <AlertTriangle className="h-4 w-4" />
-                  {resumen.productosBajoStock} con stock bajo
-                </span>
-              )}
-            </div>
-            {data?.productosBajoStock && data.productosBajoStock.length > 0 ? (
-              <ul className="space-y-2">
-                {data.productosBajoStock.map((p) => (
-                  <li key={p.sku}>
-                    <Link
-                      href={`/productos/${p.id}/editar`}
-                      className="flex items-center justify-between rounded-lg border border-amber-300/80 bg-amber-50/70 p-3 text-sm transition-colors hover:bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
-                    >
-                      <div className="min-w-0">
-                        <span className="font-medium">{p.nombre}</span>
-                        <span className="ml-1 text-muted-foreground">({p.sku})</span>
-                      </div>
-                      <span className="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
-                        {p.stockActual} / {p.stockMinimo}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No hay productos con stock bajo
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            }
+          />
+          {bajoStock.length > 0 ? (
+            <DataList className="rounded-none border-0 border-t">
+              {bajoStock.map((p) => (
+                <DataRow
+                  key={p.sku}
+                  href={`/productos/${p.id}/editar`}
+                  titulo={p.nombre}
+                  meta={p.sku}
+                  valor={`${p.stockActual} / ${p.stockMinimo}`}
+                  valorHint="actual / mínimo"
+                  tono={p.stockActual === 0 ? "negativo" : "alerta"}
+                />
+              ))}
+            </DataList>
+          ) : (
+            <PanelBody>
+              <EmptyState
+                titulo="Sin faltantes"
+                descripcion="Ningún producto está por debajo de su stock mínimo."
+              />
+            </PanelBody>
+          )}
+        </Panel>
       </div>
 
-      {/* Accesos rápidos */}
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>Accesos rápidos</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Gestión de inventario, ventas, consignación y reportes
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <Link href="/ventas/nueva">
-              <Button size="sm" className="w-full justify-start gap-1.5">
-                <ShoppingCart className="h-3.5 w-3.5" />
-                Nueva venta
-              </Button>
-            </Link>
-            <Link href="/ventas">
-              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
-                <Receipt className="h-3.5 w-3.5" />
-                Ventas
-              </Button>
-            </Link>
-            <Link href="/productos">
-              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
-                <Package className="h-3.5 w-3.5" />
-                Productos
-              </Button>
-            </Link>
-            <Link href="/compras">
-              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
-                <ShoppingBag className="h-3.5 w-3.5" />
-                Compras
-              </Button>
-            </Link>
-            <Link href="/proveedores">
-              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
-                <Truck className="h-3.5 w-3.5" />
-                Proveedores
-              </Button>
-            </Link>
-            <Link href="/consignacion">
-              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
-                <FileStack className="h-3.5 w-3.5" />
-                Consignación
-              </Button>
-            </Link>
-            <Link href="/reportes">
-              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5" />
-                Reportes
-              </Button>
-            </Link>
-            <Link href="/clientes">
-              <Button variant="secondary" size="sm" className="w-full justify-start gap-1.5">
-                <Users className="h-3.5 w-3.5" />
-                Clientes
-              </Button>
-            </Link>
-            <Link href="/ayuda">
-              <Button variant="outline" size="sm" className="w-full justify-start gap-1.5">
-                <HelpCircle className="h-3.5 w-3.5" />
-                Ayuda
-              </Button>
-            </Link>
+      <Panel>
+        <PanelHeader title="Ir a" />
+        <PanelBody>
+          <div className="flex flex-wrap gap-2">
+            {ACCESOS.map(({ href, label, icon: Icono }) => (
+              <Link
+                key={href}
+                href={href}
+                className="inline-flex min-h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium transition-colors duration-[--dur-fast] hover:border-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <Icono className="size-4 shrink-0" aria-hidden="true" />
+                {label}
+              </Link>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        </PanelBody>
+      </Panel>
     </div>
   );
 }
