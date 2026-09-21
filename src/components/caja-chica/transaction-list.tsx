@@ -9,8 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ListTodo, History, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { EmptyState } from "@/components/ui/empty-state";
 import { formatARS, formatUSD } from "@/lib/formatCurrency";
 
 const formatDate = (date: Date) =>
@@ -43,6 +43,23 @@ interface TransactionListProps {
   montoInicialUsd?: number | null;
 }
 
+/** Monto del movimiento en su propia moneda (sin convertir). */
+function montoEnMoneda(m: Movimiento) {
+  return (m.moneda ?? "ARS") === "ARS" ? formatARS(Number(m.monto)) : formatUSD(Number(m.monto));
+}
+
+function FechaHora({ fecha, apagada }: { fecha: string; apagada?: boolean }) {
+  const d = new Date(fecha);
+  return (
+    <span className={apagada ? "text-muted-foreground" : undefined}>
+      <span className="font-mono tabular-nums">{formatDate(d)}</span>{" "}
+      <span className="font-mono text-xs tabular-nums text-muted-foreground">{formatTime(d)}</span>
+    </span>
+  );
+}
+
+const Guion = () => <span className="text-muted-foreground">—</span>;
+
 export function TransactionList({
   movimientos,
   fechaApertura,
@@ -54,159 +71,103 @@ export function TransactionList({
   );
 
   return (
-    <Card className="border border-border/80 bg-card shadow-sm overflow-hidden">
-      <CardHeader className="border-b border-border/60 pb-3">
-        <div className="flex items-center gap-2">
-          <History className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-lg font-semibold">Libro de caja</CardTitle>
-        </div>
-        <CardDescription>Movimientos del turno</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border/60 hover:bg-transparent">
-                <TableHead className="w-[140px] pl-6 text-xs font-medium text-muted-foreground">
-                  Fecha y hora
-                </TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Concepto</TableHead>
-                <TableHead className="w-16 text-center text-xs font-medium text-muted-foreground">
-                  Mon.
-                </TableHead>
-                <TableHead className="text-right text-xs font-medium text-muted-foreground">
-                  Ingreso
-                </TableHead>
-                <TableHead className="pr-6 text-right text-xs font-medium text-muted-foreground">
-                  Egreso
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {allMovs.map((m) => (
-                <TableRow
-                  key={m.id}
-                  className="border-border/40 transition-colors hover:bg-muted/40"
-                >
-                  <TableCell className="pl-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">
-                        {formatDate(new Date(m.fecha))}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatTime(new Date(m.fecha))}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-md border ${
-                          m.tipo === "INGRESO"
-                            ? "border-border bg-muted/50 text-foreground"
-                            : "border-border bg-muted/50 text-muted-foreground"
-                        }`}
-                      >
-                        {m.tipo === "INGRESO" ? (
-                          <ArrowDownToLine className="h-3.5 w-3.5" />
-                        ) : (
-                          <ArrowUpFromLine className="h-3.5 w-3.5" />
-                        )}
-                      </span>
-                      <Badge variant="secondary" className="text-[10px] font-normal">
-                        {m.tipo}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{m.concepto ?? "Sin concepto"}</span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className="text-[10px] font-medium text-muted-foreground">
-                      {m.moneda ?? "ARS"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {m.tipo === "INGRESO" ? (
-                      <span className="text-sm font-semibold tabular-nums text-foreground">
-                        {(m.moneda ?? "ARS") === "ARS"
-                          ? formatARS(Number(m.monto))
-                          : formatUSD(Number(m.monto))}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="pr-6 text-right">
-                    {m.tipo === "EGRESO" ? (
-                      <span className="text-sm font-semibold tabular-nums text-foreground">
-                        {(m.moneda ?? "ARS") === "ARS"
-                          ? formatARS(Number(m.monto))
-                          : formatUSD(Number(m.monto))}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+    <Panel>
+      <PanelHeader
+        title="Libro de caja"
+        descripcion={
+          allMovs.length > 0
+            ? `${allMovs.length} ${allMovs.length === 1 ? "movimiento" : "movimientos"} en el turno`
+            : "Movimientos del turno"
+        }
+      />
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Fecha y hora</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Concepto</TableHead>
+            <TableHead className="w-16">Mon.</TableHead>
+            <TableHead className="text-right">Ingreso</TableHead>
+            <TableHead className="text-right">Egreso</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {allMovs.map((m) => (
+            <TableRow key={m.id}>
+              <TableCell>
+                <FechaHora fecha={m.fecha} />
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  {m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
+                </Badge>
+              </TableCell>
+              <TableCell className="max-w-[320px] truncate">
+                {m.concepto ?? <span className="text-muted-foreground">Sin concepto</span>}
+              </TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">
+                {m.moneda ?? "ARS"}
+              </TableCell>
+              <TableCell className="text-right font-mono font-semibold tabular-nums text-num-positive">
+                {m.tipo === "INGRESO" ? montoEnMoneda(m) : <Guion />}
+              </TableCell>
+              <TableCell className="text-right font-mono font-semibold tabular-nums text-num-negative">
+                {m.tipo === "EGRESO" ? montoEnMoneda(m) : <Guion />}
+              </TableCell>
+            </TableRow>
+          ))}
 
-              <TableRow className="border-border/60 bg-muted/25 hover:bg-muted/30">
-                <TableCell className="pl-6 py-4">
-                  <div className="flex flex-col text-muted-foreground">
-                    <span className="text-sm">{formatDate(new Date(fechaApertura))}</span>
-                    <span className="text-xs">{formatTime(new Date(fechaApertura))}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-[10px] font-normal">
-                    Apertura
-                  </Badge>
-                </TableCell>
-                <TableCell>Monto inicial</TableCell>
-                <TableCell className="text-center text-[10px] font-medium text-muted-foreground">
-                  ARS
-                </TableCell>
-                <TableCell className="text-right text-sm font-semibold tabular-nums">
-                  {formatARS(montoInicial)}
-                </TableCell>
-                <TableCell className="pr-6 text-right text-muted-foreground">—</TableCell>
-              </TableRow>
+          <TableRow>
+            <TableCell>
+              <FechaHora fecha={fechaApertura} apagada />
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline" className="text-[10px] font-normal">
+                Apertura
+              </Badge>
+            </TableCell>
+            <TableCell className="text-muted-foreground">Monto inicial</TableCell>
+            <TableCell className="font-mono text-xs text-muted-foreground">ARS</TableCell>
+            <TableCell className="text-right font-mono font-semibold tabular-nums">
+              {formatARS(montoInicial)}
+            </TableCell>
+            <TableCell className="text-right">
+              <Guion />
+            </TableCell>
+          </TableRow>
 
-              {Number(montoInicialUsd ?? 0) > 0 && (
-                <TableRow className="border-border/60 bg-muted/25 hover:bg-muted/30">
-                  <TableCell className="pl-6 py-3 text-muted-foreground">—</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-[10px] font-normal">
-                      Apertura
-                    </Badge>
-                  </TableCell>
-                  <TableCell>Monto inicial USD</TableCell>
-                  <TableCell className="text-center text-[10px] font-medium text-muted-foreground">
-                    USD
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-semibold tabular-nums">
-                    {formatUSD(Number(montoInicialUsd))}
-                  </TableCell>
-                  <TableCell className="pr-6 text-right text-muted-foreground">—</TableCell>
-                </TableRow>
-              )}
+          {Number(montoInicialUsd ?? 0) > 0 && (
+            <TableRow>
+              <TableCell>
+                <Guion />
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  Apertura
+                </Badge>
+              </TableCell>
+              <TableCell className="text-muted-foreground">Monto inicial USD</TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">USD</TableCell>
+              <TableCell className="text-right font-mono font-semibold tabular-nums">
+                {formatUSD(Number(montoInicialUsd))}
+              </TableCell>
+              <TableCell className="text-right">
+                <Guion />
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
 
-              {allMovs.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-14 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center gap-2">
-                      <ListTodo className="h-8 w-8 opacity-40" />
-                      <p className="text-sm">Todavía no hay movimientos registrados</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+      {allMovs.length === 0 && (
+        <PanelBody className="border-t border-border">
+          <EmptyState
+            className="py-6"
+            titulo="Todavía no hay movimientos registrados"
+            descripcion="Los ingresos y egresos del turno aparecen acá, arriba de la apertura."
+          />
+        </PanelBody>
+      )}
+    </Panel>
   );
 }

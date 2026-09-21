@@ -1,8 +1,15 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Wallet, Landmark } from "lucide-react";
+import { Figure, FigureGrid } from "@/components/ui/figure";
 import { formatARS, formatUSD } from "@/lib/formatCurrency";
+
+/*
+ * Nombre histórico: esto ya NO son tarjetas. Los saldos del turno se muestran
+ * como una fila de cifras (`FigureGrid` + `Figure`), un solo bloque con
+ * divisores. Se conserva el nombre `BalanceCards` para no romper imports.
+ *
+ * Solo presenta los saldos que recibe ya calculados: no suma ni recalcula nada.
+ */
 
 interface BalanceCardsProps {
   ars: number;
@@ -11,46 +18,19 @@ interface BalanceCardsProps {
 
 export function BalanceCards({ ars, usd }: BalanceCardsProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Card className="border border-border/80 bg-card shadow-sm transition-shadow hover:shadow-md">
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Saldo ARS
-              </p>
-              <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground sm:text-3xl">
-                {formatARS(ars)}
-              </p>
-              <p className="text-xs text-muted-foreground">Efectivo en pesos</p>
-            </div>
-            <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-muted-foreground">
-              <Wallet className="h-5 w-5" aria-hidden />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border border-border/80 bg-card shadow-sm transition-shadow hover:shadow-md">
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 space-y-1">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Saldo USD
-              </p>
-              <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground sm:text-3xl">
-                {formatUSD(usd)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {usd !== 0 ? "Saldo en dólares" : "Sin movimientos en USD"}
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-muted-foreground">
-              <Landmark className="h-5 w-5" aria-hidden />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <FigureGrid columnas={2}>
+      <Figure
+        label="Saldo ARS"
+        valor={formatARS(ars)}
+        tono={ars >= 0 ? "neutro" : "negativo"}
+        hint="Efectivo en pesos"
+      />
+      <Figure
+        label="Saldo USD"
+        valor={formatUSD(usd)}
+        tono={usd >= 0 ? "neutro" : "negativo"}
+        hint={usd !== 0 ? "Saldo en dólares" : "Sin movimientos en USD"}
+      />
+    </FigureGrid>
   );
 }

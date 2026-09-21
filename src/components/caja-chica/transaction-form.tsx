@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -13,8 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDownLeft, ArrowUpRight, PlusCircle, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { notificar } from "@/lib/notificar";
+import { cn } from "@/lib/utils";
 
 export interface CajaChicaPayload {
   id: string;
@@ -38,31 +40,30 @@ export interface CajaChicaPayload {
 interface TransactionFormProps {
   cajaId: string;
   onSuccess: (caja: CajaChicaPayload) => void;
+  /** Bloquea el alta mientras la página tiene otra acción de caja en vuelo. */
   saving?: boolean;
 }
+
+const claseSegmento = (activo: boolean) =>
+  cn(
+    "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+    activo
+      ? "bg-background text-foreground shadow-xs"
+      : "text-muted-foreground hover:text-foreground"
+  );
 
 export function TransactionForm({ cajaId, onSuccess, saving: externalSaving }: TransactionFormProps) {
   const [tipo, setTipo] = useState<"INGRESO" | "EGRESO">("EGRESO");
   const [monto, setMonto] = useState(0);
   const [moneda, setMoneda] = useState<"ARS" | "USD">("ARS");
   const [concepto, setConcepto] = useState("");
-  const [internalSaving, setInternalSaving] = useState(false);
-
-  const saving = externalSaving || internalSaving;
 
   const conceptosRapidos =
     tipo === "EGRESO"
       ? ["Gasto - Delivery", "Gasto - Compras", "Gasto - Flete", "Gasto - Viáticos", "Gasto - Otros"]
       : ["Aporte a caja", "Ingreso - Venta", "Ingreso - Sobrante", "Ingreso - Otros"];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (monto <= 0) {
-      toast.error("El monto debe ser mayor a 0");
-      return;
-    }
-
-    setInternalSaving(true);
+  const registrar = useAsyncAction(async () => {
     try {
       const res = await fetch("/api/caja-chica", {
         method: "POST",
@@ -84,114 +85,127 @@ export function TransactionForm({ cajaId, onSuccess, saving: externalSaving }: T
       setMonto(0);
       setConcepto("");
       onSuccess(caja);
-      toast.success(tipo === "INGRESO" ? "Ingreso registrado" : "Egreso registrado", {
-        icon: <CheckCircle2 className="h-4 w-4 text-foreground" />,
-      });
+      notificar.ok(tipo === "INGRESO" ? "Ingreso registrado" : "Egreso registrado");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al registrar movimiento");
-    } finally {
-      setInternalSaving(false);
+      notificar.error(err instanceof Error ? err.message : "Error al registrar movimiento");
     }
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (monto <= 0) {
+      notificar.error("El monto debe ser mayor a 0");
+      return;
+    }
+    void registrar.run();
   };
 
   return (
-    <Card className="border border-border/80 bg-card shadow-sm">
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <PlusCircle className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-lg font-semibold">Registrar movimiento</CardTitle>
-        </div>
-        <CardDescription>Ingreso o egreso de efectivo en esta caja</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex flex-col gap-6">
-            <div className="inline-flex rounded-lg border border-border bg-muted/40 p-1">
-              <button
-                type="button"
-                onClick={() => setTipo("INGRESO")}
-                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  tipo === "INGRESO"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <ArrowDownLeft className="h-4 w-4" />
-                Ingreso
-              </button>
-              <button
-                type="button"
-                onClick={() => setTipo("EGRESO")}
-                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  tipo === "EGRESO"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <ArrowUpRight className="h-4 w-4" />
-                Egreso
-              </button>
+    <Panel>
+      <PanelHeader
+        title="Registrar movimiento"
+        descripcion="Ingreso o egreso de efectivo en esta caja"
+        acciones={
+          <div
+            role="group"
+            aria-label="Tipo de movimiento"
+            className="inline-flex rounded-lg border border-border bg-muted p-0.5"
+          >
+            <button
+              type="button"
+              aria-pressed={tipo === "INGRESO"}
+              onClick={() => setTipo("INGRESO")}
+              className={claseSegmento(tipo === "INGRESO")}
+            >
+              <ArrowDownLeft className="size-4" aria-hidden="true" />
+              Ingreso
+            </button>
+            <button
+              type="button"
+              aria-pressed={tipo === "EGRESO"}
+              onClick={() => setTipo("EGRESO")}
+              className={claseSegmento(tipo === "EGRESO")}
+            >
+              <ArrowUpRight className="size-4" aria-hidden="true" />
+              Egreso
+            </button>
+          </div>
+        }
+      />
+      <PanelBody>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="mov-moneda" className="text-xs text-muted-foreground">
+                Moneda
+              </Label>
+              <Select value={moneda} onValueChange={(v) => setMoneda(v as "ARS" | "USD")}>
+                <SelectTrigger id="mov-moneda" className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ARS">Peso argentino (ARS)</SelectItem>
+                  <SelectItem value="USD">Dólar (USD)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-medium text-muted-foreground">Moneda</Label>
-                <Select value={moneda} onValueChange={(v) => setMoneda(v as "ARS" | "USD")}>
-                  <SelectTrigger className="border-border bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ARS">Peso argentino (ARS)</SelectItem>
-                    <SelectItem value="USD">Dólar (USD)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-medium text-muted-foreground">Monto</Label>
-                <CurrencyInput
-                  value={monto}
-                  onChange={(v) => setMonto(v ?? 0)}
-                  placeholder="0.00"
-                  className="border-border bg-background"
-                />
-              </div>
-
-              <div className="space-y-2 lg:col-span-2">
-                <Label className="text-xs font-medium text-muted-foreground">Concepto</Label>
-                <Input
-                  value={concepto}
-                  onChange={(e) => setConcepto(e.target.value)}
-                  placeholder="Ej.: compra, viáticos…"
-                  className="border-border bg-background"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Monto</Label>
+              <CurrencyInput
+                value={monto}
+                onChange={(v) => setMonto(v ?? 0)}
+                placeholder="0.00"
+                className="h-10 font-mono tabular-nums"
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-medium text-muted-foreground">Sugerencias</Label>
-              <div className="flex flex-wrap gap-2">
-                {conceptosRapidos.map((c) => (
-                  <Button
-                    key={c}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-full border-dashed text-xs font-normal"
-                    onClick={() => setConcepto(c)}
-                  >
-                    {c}
-                  </Button>
-                ))}
-              </div>
+            <div className="space-y-1.5 lg:col-span-2">
+              <Label htmlFor="mov-concepto" className="text-xs text-muted-foreground">
+                Concepto
+              </Label>
+              <Input
+                id="mov-concepto"
+                value={concepto}
+                onChange={(e) => setConcepto(e.target.value)}
+                placeholder="Ej.: compra, viáticos…"
+                className="h-10"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Sugerencias
+              </span>
+              {conceptosRapidos.map((c) => (
+                <Button
+                  key={c}
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  className="font-normal"
+                  aria-pressed={concepto === c}
+                  onClick={() => setConcepto(c)}
+                >
+                  {c}
+                </Button>
+              ))}
             </div>
 
-            <Button type="submit" disabled={saving} className="w-full sm:w-auto sm:self-end">
-              {saving ? "Registrando…" : "Registrar movimiento"}
+            <Button
+              type="submit"
+              loading={registrar.loading}
+              loadingText="Registrando…"
+              disabled={externalSaving}
+              className="w-full sm:w-auto"
+            >
+              Registrar movimiento
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </PanelBody>
+    </Panel>
   );
 }

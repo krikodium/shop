@@ -1,9 +1,11 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, User, Calendar, ChevronRight } from "lucide-react";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ChevronRight } from "lucide-react";
 import { formatARS, formatUSD } from "@/lib/formatCurrency";
+import { cn } from "@/lib/utils";
 
 interface Movimiento {
   id: string;
@@ -34,91 +36,73 @@ interface CajaSelectorProps {
 
 export function CajaSelector({ cajas, cajaSeleccionada, onSelect }: CajaSelectorProps) {
   return (
-    <Card className="border border-border/80 bg-card shadow-sm overflow-hidden">
-      <CardHeader className="border-b border-border/60 pb-3">
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-lg font-semibold">Cajas de empleados</CardTitle>
-        </div>
-        <CardDescription>Elegí una caja para ver detalle y movimientos</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
+    <Panel>
+      <PanelHeader
+        title="Cajas de empleados"
+        descripcion="Elegí una caja para ver el detalle y los movimientos"
+      />
+      {cajas.length === 0 ? (
+        <PanelBody>
+          <EmptyState className="py-6" titulo="No hay cajas en el listado actual" />
+        </PanelBody>
+      ) : (
         <div className="divide-y divide-border">
-          {cajas.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              No hay cajas en el listado actual
-            </div>
-          ) : (
-            cajas.map((c) => (
+          {cajas.map((c) => {
+            const seleccionada = cajaSeleccionada?.id === c.id;
+            return (
               <button
                 key={c.id}
                 type="button"
-                onClick={() => onSelect(cajaSeleccionada?.id === c.id ? null : c)}
-                className={`flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-muted/50 ${
-                  cajaSeleccionada?.id === c.id ? "bg-muted/40" : ""
-                }`}
+                onClick={() => onSelect(seleccionada ? null : c)}
+                aria-pressed={seleccionada}
+                className={cn(
+                  "flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none sm:px-5",
+                  seleccionada && "bg-accent"
+                )}
               >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
-                      c.estado === "ABIERTA"
-                        ? "border-border bg-muted/50 text-foreground"
-                        : "border-transparent bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    <User className="h-5 w-5" />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-medium">
+                      {c.user?.name ?? c.user?.email ?? "Sin nombre"}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      {c.estado === "ABIERTA" ? "Abierta" : "Cerrada"}
+                    </Badge>
                   </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-sm">
-                        {c.user?.name ?? c.user?.email ?? "Sin nombre"}
-                      </p>
-                      {c.estado === "ABIERTA" ? (
-                        <Badge variant="outline" className="text-[10px] font-normal">
-                          Abierta
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-[10px] font-normal">
-                          Cerrada
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3 shrink-0" />
-                      <span>
-                        {new Date(c.fechaApertura).toLocaleString("es-AR", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                  </div>
+                  <p className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+                    {new Date(c.fechaApertura).toLocaleString("es-AR", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="text-right">
-                    <p className="text-sm font-semibold tabular-nums text-foreground">
+                    <p className="font-mono text-sm font-semibold tabular-nums">
                       {formatARS(Number(c.montoInicial ?? 0))}
                     </p>
                     {Number(c.montoInicialUsd ?? 0) > 0 && (
-                      <p className="text-[11px] tabular-nums text-muted-foreground">
+                      <p className="font-mono text-xs tabular-nums text-muted-foreground">
                         {formatUSD(Number(c.montoInicialUsd ?? 0))}
                       </p>
                     )}
                   </div>
                   <ChevronRight
-                    className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
-                      cajaSeleccionada?.id === c.id ? "rotate-90" : ""
-                    }`}
+                    aria-hidden="true"
+                    className={cn(
+                      "size-4 shrink-0 text-muted-foreground transition-transform",
+                      seleccionada && "rotate-90"
+                    )}
                   />
                 </div>
               </button>
-            ))
-          )}
+            );
+          })}
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </Panel>
   );
 }

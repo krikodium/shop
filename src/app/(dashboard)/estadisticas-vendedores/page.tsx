@@ -16,7 +16,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { Resumen } from "@/components/ui/resumen";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Select,
   SelectContent,
@@ -24,28 +29,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  CalendarClock,
-  DollarSign,
-  Percent,
-  Receipt,
-  Ticket,
-  TrendingDown,
-  TrendingUp,
-  User,
-} from "lucide-react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { formatARS } from "@/lib/formatCurrency";
+import {
+  COLORES_GRAFICO,
+  ejeGrafico,
+  grillaGrafico,
+  tooltipGrafico,
+} from "@/lib/chart-theme";
+import { cn } from "@/lib/utils";
 import { EstadisticasVendedoresSkeleton } from "./EstadisticasVendedoresSkeleton";
 
-const CHART_COLORS = [
-  "#6366f1",
-  "#22c55e",
-  "#f59e0b",
-  "#ec4899",
-  "#3b82f6",
-  "#14b8a6",
-  "#a855f7",
-];
+/** Eje Y compacto: 1,2 M, 350 mil… */
+const formatoCompacto = (x: unknown) =>
+  new Intl.NumberFormat("es-AR", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(Number(x));
 
 const METODO_PAGO_LABEL: Record<string, string> = {
   EFECTIVO: "Efectivo",
@@ -195,15 +195,15 @@ export default function EstadisticasVendedoresPage() {
   if (forbidden) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <div>
-          <h1 className="text-2xl font-bold">Estadísticas del vendedor</h1>
-          <p className="text-muted-foreground">Solo administradores pueden ver esta página.</p>
-        </div>
-        <Card className="border-destructive/40 bg-destructive/5">
-          <CardContent className="py-8 text-center text-destructive">
-            No tenés permiso para ver esta página (solo administradores).
-          </CardContent>
-        </Card>
+        <PageHeader
+          overline="Administración"
+          title="Estadísticas del vendedor"
+          description="Solo administradores pueden ver esta página."
+        />
+        <EmptyState
+          titulo="No tenés permiso para ver esta página"
+          descripcion="Las estadísticas de vendedores están disponibles solo para administradores."
+        />
       </div>
     );
   }
@@ -211,13 +211,20 @@ export default function EstadisticasVendedoresPage() {
   if (loadError) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <div>
-          <h1 className="text-2xl font-bold">Estadísticas del vendedor</h1>
-          <p className="text-muted-foreground">Rendimiento y ventas por período</p>
-        </div>
-        <Card className="border-destructive/40 bg-destructive/5">
-          <CardContent className="py-6 text-sm text-destructive">{loadError}</CardContent>
-        </Card>
+        <PageHeader
+          overline="Administración"
+          title="Estadísticas del vendedor"
+          description="Rendimiento y ventas por período"
+        />
+        <EmptyState
+          titulo="No se pudieron cargar las estadísticas"
+          descripcion={loadError}
+          accion={
+            <Button variant="outline" size="sm" onClick={refresh}>
+              Reintentar
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -236,41 +243,42 @@ export default function EstadisticasVendedoresPage() {
   const selectValue = overrideVendorId ?? data?.vendedorId ?? "";
 
   const nombreMostrar = v?.name ?? v?.email ?? "Vendedor";
+  const variacion = comparacion?.variacionMontoPct ?? null;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 space-y-1.5">
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground/60">
-            Análisis · Equipo
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Estadísticas del vendedor</h1>
-          <p className="text-muted-foreground">
-            Rendimiento operativo y ventas del período seleccionado
-          </p>
-          {!sinVendedor && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                <User className="h-4 w-4 shrink-0" />
-                {nombreMostrar}
+      <PageHeader
+        overline="Administración"
+        title="Estadísticas del vendedor"
+        description={
+          sinVendedor ? (
+            "Rendimiento operativo y ventas del período seleccionado"
+          ) : (
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-medium text-foreground">{nombreMostrar}</span>
+              <span aria-hidden="true">·</span>
+              <span>
+                Horario{" "}
+                <span className="font-mono tabular-nums">
+                  {v.horarioEntrada ?? "—"} – {v.horarioSalida ?? "—"}
+                </span>
               </span>
-              <span className="text-border">·</span>
-              <span className="inline-flex items-center gap-1">
-                <CalendarClock className="h-3.5 w-3.5" />
-                Horario: {v.horarioEntrada ?? "—"} – {v.horarioSalida ?? "—"}
+              <span aria-hidden="true">·</span>
+              <span>
+                Jornadas en el mes{" "}
+                <span className="font-mono tabular-nums">{v.diasTrabajados}</span>
               </span>
-              <span className="text-border">·</span>
-              <span>Jornadas registradas en el mes: {v.diasTrabajados}</span>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {multiVendor && (
-            <Select
-              value={selectValue}
-              onValueChange={(id) => setOverrideVendorId(id)}
-            >
-              <SelectTrigger className="w-[min(100%,220px)]">
+            </span>
+          )
+        }
+      >
+        {multiVendor && (
+          <>
+            <Label htmlFor="est-vendedor" className="sr-only">
+              Vendedor
+            </Label>
+            <Select value={selectValue} onValueChange={(id) => setOverrideVendorId(id)}>
+              <SelectTrigger id="est-vendedor" className="h-9 w-[min(100%,220px)]">
                 <SelectValue placeholder="Vendedor" />
               </SelectTrigger>
               <SelectContent>
@@ -281,156 +289,123 @@ export default function EstadisticasVendedoresPage() {
                 ))}
               </SelectContent>
             </Select>
-          )}
-          <Select value={mes} onValueChange={setMes}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Mes" />
-            </SelectTrigger>
-            <SelectContent>
-              {meses.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={ano} onValueChange={setAno}>
-            <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Año" />
-            </SelectTrigger>
-            <SelectContent>
-              {anios.map((a) => (
-                <SelectItem key={a} value={String(a)}>
-                  {a}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+          </>
+        )}
+        <Label htmlFor="est-mes" className="sr-only">
+          Mes
+        </Label>
+        <Select value={mes} onValueChange={setMes}>
+          <SelectTrigger id="est-mes" className="h-9 w-[140px]">
+            <SelectValue placeholder="Mes" />
+          </SelectTrigger>
+          <SelectContent>
+            {meses.map((m) => (
+              <SelectItem key={m.value} value={m.value}>
+                {m.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Label htmlFor="est-ano" className="sr-only">
+          Año
+        </Label>
+        <Select value={ano} onValueChange={setAno}>
+          <SelectTrigger id="est-ano" className="h-9 w-[96px] font-mono tabular-nums">
+            <SelectValue placeholder="Año" />
+          </SelectTrigger>
+          <SelectContent>
+            {anios.map((a) => (
+              <SelectItem key={a} value={String(a)}>
+                {a}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </PageHeader>
 
       {sinVendedor ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No hay usuarios con rol vendedor. Creá uno en Usuarios.
-          </CardContent>
-        </Card>
+        <EmptyState
+          titulo="No hay usuarios con rol vendedor"
+          descripcion="Creá uno en Usuarios para ver sus estadísticas."
+        />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Facturación del período
-                </CardTitle>
-                <DollarSign className="h-5 w-5 text-primary/70" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums">{formatARS(resumen.totalMonto)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Ventas no anuladas</p>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Ventas
-                </CardTitle>
-                <Receipt className="h-5 w-5 text-blue-500/70" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums">{resumen.cantidadVentas}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Tickets en el período</p>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Ticket promedio
-                </CardTitle>
-                <Ticket className="h-5 w-5 text-amber-500/70" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums">
-                  {formatARS(resumen.ticketPromedio)}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">Por operación</p>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Ganancia bruta
-                </CardTitle>
-                <TrendingUp className="h-5 w-5 text-green-500/70" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
-                  {formatARS(v.gananciaBruta)}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Margen sobre ventas: {resumen.margenPorcentaje}%
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden border border-border/70 shadow-sm transition-shadow hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  vs mes anterior
-                </CardTitle>
-                <Percent className="h-5 w-5 text-muted-foreground/80" />
-              </CardHeader>
-              <CardContent>
-                {comparacion ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      {comparacion.variacionMontoPct != null ? (
-                        <>
-                          {comparacion.variacionMontoPct >= 0 ? (
-                            <TrendingUp className="h-5 w-5 text-green-600" />
-                          ) : (
-                            <TrendingDown className="h-5 w-5 text-red-500" />
+          <Resumen
+            className="anim-entrada"
+            items={[
+              {
+                label: "Facturación del período",
+                valor: formatARS(resumen.totalMonto),
+                hint: comparacion ? (
+                  <span className="flex flex-col gap-0.5">
+                    {variacion != null ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-0.5 font-mono tabular-nums",
+                            variacion >= 0 ? "text-num-positive" : "text-num-negative"
                           )}
-                          <p
-                            className={`text-2xl font-bold tabular-nums ${
-                              comparacion.variacionMontoPct >= 0
-                                ? "text-green-600 dark:text-green-400"
-                                : "text-red-600 dark:text-red-400"
-                            }`}
-                          >
-                            {comparacion.variacionMontoPct >= 0 ? "+" : ""}
-                            {comparacion.variacionMontoPct}%
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-lg font-semibold text-muted-foreground">—</p>
-                      )}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Mes previo: {formatARS(comparacion.totalMonto)} ({comparacion.cantidadVentas}{" "}
-                      ventas)
-                    </p>
-                  </>
+                        >
+                          {variacion >= 0 ? (
+                            <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                          ) : (
+                            <ArrowDownRight className="size-3.5" aria-hidden="true" />
+                          )}
+                          {variacion >= 0 ? "+" : ""}
+                          {variacion}%
+                        </span>
+                        vs mes anterior
+                      </span>
+                    ) : (
+                      <span>Sin variación calculable vs mes anterior</span>
+                    )}
+                    <span>
+                      Mes previo{" "}
+                      <span className="font-mono tabular-nums">
+                        {formatARS(comparacion.totalMonto)}
+                      </span>{" "}
+                      ({comparacion.cantidadVentas} ventas)
+                    </span>
+                  </span>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin datos de comparación</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  "Ventas no anuladas"
+                ),
+              },
+              {
+                label: "Ventas",
+                valor: resumen.cantidadVentas,
+                hint: "Tickets en el período",
+              },
+              {
+                label: "Ticket promedio",
+                valor: formatARS(resumen.ticketPromedio),
+                hint: "Por operación",
+              },
+              {
+                label: "Ganancia bruta",
+                valor: (
+                  <span className={v.gananciaBruta < 0 ? "text-num-negative" : "text-num-positive"}>
+                    {formatARS(v.gananciaBruta)}
+                  </span>
+                ),
+                hint: (
+                  <>
+                    Margen sobre ventas{" "}
+                    <span className="font-mono tabular-nums">{resumen.margenPorcentaje}%</span>
+                  </>
+                ),
+              },
+            ]}
+          />
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>Método de pago</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Distribución de facturación en el período
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Panel>
+              <PanelHeader
+                title="Método de pago"
+                descripcion="Distribución de la facturación en el período"
+              />
+              <PanelBody>
+                <div className="h-[280px]">
                   {pieMetodoData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -440,146 +415,154 @@ export default function EstadisticasVendedoresPage() {
                           nameKey="name"
                           cx="50%"
                           cy="50%"
-                          outerRadius={95}
+                          outerRadius={88}
                           innerRadius={48}
                           paddingAngle={2}
+                          stroke="var(--card)"
+                          strokeWidth={2}
                           label={({ name, percent }) =>
                             `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
                           }
+                          labelLine={false}
+                          fontSize={11}
                         >
-                          {pieMetodoData.map((_, i) => (
-                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                          {pieMetodoData.map((entrada, i) => (
+                            <Cell
+                              key={entrada.name}
+                              fill={COLORES_GRAFICO[i % COLORES_GRAFICO.length]}
+                            />
                           ))}
                         </Pie>
                         <Tooltip
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid oklch(0.92 0 0)",
-                          }}
-                          formatter={(value: unknown) => formatARS(Number(value ?? 0))}
+                          {...tooltipGrafico}
+                          formatter={(value: unknown, name: unknown) => [
+                            formatARS(Number(value ?? 0)),
+                            String(name),
+                          ]}
                         />
-                        <Legend />
+                        <Legend
+                          verticalAlign="bottom"
+                          height={32}
+                          formatter={(value: unknown) => (
+                            <span className="text-xs text-muted-foreground">{String(value)}</span>
+                          )}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex h-full items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">
-                      Sin ventas en el período
-                    </div>
+                    <EmptyState
+                      className="h-full justify-center py-6"
+                      titulo="Sin ventas en el período"
+                    />
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </PanelBody>
+            </Panel>
 
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>Ventas por día de la semana</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Total facturado según el día calendario de cada venta
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
+            <Panel>
+              <PanelHeader
+                title="Ventas por día de la semana"
+                descripcion="Total facturado según el día calendario de cada venta"
+              />
+              <PanelBody>
+                <div className="h-[280px]">
                   {barSemanaData.some((d) => d.total > 0) ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={barSemanaData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0 0)" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis
-                          tickFormatter={(x) =>
-                            new Intl.NumberFormat("es-AR", {
-                              notation: "compact",
-                              maximumFractionDigits: 1,
-                            }).format(Number(x))
-                          }
-                          width={44}
-                          tick={{ fontSize: 11 }}
-                        />
+                      <BarChart
+                        data={barSemanaData}
+                        margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid {...grillaGrafico} />
+                        <XAxis dataKey="label" {...ejeGrafico} />
+                        <YAxis tickFormatter={formatoCompacto} width={48} {...ejeGrafico} />
                         <Tooltip
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid oklch(0.92 0 0)",
-                          }}
-                          formatter={(value: unknown) => formatARS(Number(value ?? 0))}
+                          {...tooltipGrafico}
+                          formatter={(value: unknown) => [
+                            formatARS(Number(value ?? 0)),
+                            "Facturado",
+                          ]}
                         />
-                        <Bar dataKey="total" fill="oklch(0.45 0.12 195)" radius={[6, 6, 0, 0]} />
+                        <Legend
+                          verticalAlign="bottom"
+                          height={28}
+                          formatter={() => (
+                            <span className="text-xs text-muted-foreground">Facturado</span>
+                          )}
+                        />
+                        <Bar
+                          dataKey="total"
+                          name="Facturado"
+                          fill={COLORES_GRAFICO[0]}
+                          radius={[3, 3, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex h-full items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">
-                      Sin ventas en el período
-                    </div>
+                    <EmptyState
+                      className="h-full justify-center py-6"
+                      titulo="Sin ventas en el período"
+                    />
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </PanelBody>
+            </Panel>
           </div>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Ventas diarias de {nombreMostrar}</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Evolución día a día en el período seleccionado
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[280px]">
+          <Panel>
+            <PanelHeader
+              title={`Ventas diarias de ${nombreMostrar}`}
+              descripcion="Evolución día a día en el período seleccionado"
+            />
+            <PanelBody>
+              <div className="h-[260px]">
                 {areaData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={areaData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="fillVendedorUnico" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="oklch(0.55 0.15 195)" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="oklch(0.55 0.15 195)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0 0)" vertical={false} />
+                      <CartesianGrid {...grillaGrafico} />
                       <XAxis
                         dataKey="label"
-                        tick={{ fontSize: 11 }}
                         interval="preserveStartEnd"
                         minTickGap={24}
+                        {...ejeGrafico}
                       />
-                      <YAxis
-                        tickFormatter={(val) =>
-                          new Intl.NumberFormat("es-AR", {
-                            notation: "compact",
-                            maximumFractionDigits: 1,
-                          }).format(Number(val))
-                        }
-                        tick={{ fontSize: 11 }}
-                        width={52}
-                        axisLine={false}
-                        tickLine={false}
-                      />
+                      <YAxis tickFormatter={formatoCompacto} width={52} {...ejeGrafico} />
                       <Tooltip
-                        contentStyle={{
-                          borderRadius: "8px",
-                          border: "1px solid oklch(0.92 0 0)",
-                        }}
+                        {...tooltipGrafico}
+                        cursor={{ stroke: "var(--border)" }}
                         formatter={(value: unknown, name?: string) => {
                           if (name === "total") return [formatARS(Number(value ?? 0)), "Total"];
                           return [Number(value ?? 0), "Ventas"];
                         }}
                         labelFormatter={(label) => `Día ${label}`}
                       />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={28}
+                        formatter={() => (
+                          <span className="text-xs text-muted-foreground">Total facturado</span>
+                        )}
+                      />
                       <Area
                         type="monotone"
                         dataKey="total"
                         name="total"
-                        stroke="oklch(0.45 0.12 195)"
+                        stroke={COLORES_GRAFICO[0]}
                         strokeWidth={2}
-                        fill="url(#fillVendedorUnico)"
+                        strokeDasharray=""
+                        fill={COLORES_GRAFICO[0]}
+                        fillOpacity={0.06}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex h-full items-center justify-center rounded-lg bg-muted/30 text-sm text-muted-foreground">
-                    Sin ventas diarias en el período
-                  </div>
+                  <EmptyState
+                    className="h-full justify-center py-6"
+                    titulo="Sin ventas diarias en el período"
+                  />
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </PanelBody>
+          </Panel>
         </>
       )}
     </div>
