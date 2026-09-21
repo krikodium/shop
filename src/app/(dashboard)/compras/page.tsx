@@ -7,13 +7,13 @@ export default function ComprasPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        overline="Gestión · Compras"
+        overline="Mercadería · Compras"
         title="Órdenes de compra"
         description="Gestioná compras, seguí estados y filtrá por proveedor, monto y fecha."
       >
-        <Link href="/compras/nueva">
-          <Button>Nueva orden</Button>
-        </Link>
+        <Button asChild>
+          <Link href="/compras/nueva">Nueva orden</Link>
+        </Button>
       </PageHeader>
       <ComprasTable />
     </div>

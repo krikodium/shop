@@ -36,8 +36,8 @@ export function RendicionPDFDownload(props: RendicionPDFDownloadProps) {
       fileName={fileName}
     >
       {({ loading }) => (
-        <Button variant="outline" disabled={loading}>
-          {loading ? "Generando PDF…" : "Descargar PDF"}
+        <Button variant="outline" loading={loading} loadingText="Generando PDF…">
+          Descargar PDF
         </Button>
       )}
     </PDFDownloadLink>

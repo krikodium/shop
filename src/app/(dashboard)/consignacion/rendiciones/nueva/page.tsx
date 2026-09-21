@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { RendicionParams, RendicionPreview } from "@/components/consignacion";
-import { ArrowLeft, AlertTriangle, Lock, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { useAsyncAction } from "@/hooks/use-async-action";
 import type { Proveedor } from "@prisma/client";
 import { parseCurrencyInput } from "@/lib/formatCurrency";
 
@@ -54,7 +56,6 @@ function NuevaRendicionContent() {
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [preview, setPreview] = useState<PreviewData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [monedaLiquidacion, setMonedaLiquidacion] = useState<"ARS" | "USD">("ARS");
   const [cotizacionUsd, setCotizacionUsd] = useState("");
@@ -150,13 +151,12 @@ function NuevaRendicionContent() {
       .finally(() => setLoadingRestriccion(false));
   }, [proveedorId]);
 
-  const calcularPreview = async () => {
+  const calcularPreviewAccion = async () => {
     if (!proveedorId || !fechaDesde || !fechaHasta) {
       setError("Seleccioná proveedor y rango de fechas");
       return;
     }
     setError(null);
-    setIsLoading(true);
     try {
       const res = await fetch("/api/consignacion/rendiciones/preview", {
         method: "POST",
@@ -177,15 +177,12 @@ function NuevaRendicionContent() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error");
       setPreview(null);
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const confirmarRendicion = async () => {
+  const confirmarRendicionAccion = async () => {
     if (!proveedorId || !fechaDesde || !fechaHasta) return;
     setError(null);
-    setIsLoading(true);
     try {
       const res = await fetch("/api/consignacion/rendiciones", {
         method: "POST",
@@ -208,26 +205,28 @@ function NuevaRendicionContent() {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error");
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  return (
-    <div className="space-y-10 pb-20">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-            <Link href="/consignacion" className="group flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-2">
-                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-                <span className="text-xs font-bold uppercase tracking-wider">Volver al Dashboard</span>
-            </Link>
-            <h1 className="text-3xl font-black tracking-tighter sm:text-4xl text-foreground">
-                Nueva Rendición
-            </h1>
-        </div>
-      </div>
+  // Cada acción con su propio indicador; mientras una está en vuelo la otra
+  // queda deshabilitada (antes compartían un único `isLoading`).
+  const { run: calcularPreview, loading: calculando } = useAsyncAction(calcularPreviewAccion);
+  const { run: confirmarRendicion, loading: confirmando } =
+    useAsyncAction(confirmarRendicionAccion);
 
-      <RendicionParams 
+  return (
+    <div className="space-y-6">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+        <Link href="/consignacion/rendiciones">← Rendiciones</Link>
+      </Button>
+
+      <PageHeader
+        overline="Mercadería · Consignación"
+        title="Nueva rendición"
+        description="Calculá lo vendido en el período y confirmá la liquidación al proveedor."
+      />
+
+      <RendicionParams
         proveedores={proveedores}
         proveedorId={proveedorId}
         setProveedorId={setProveedorId}
@@ -235,53 +234,46 @@ function NuevaRendicionContent() {
         setFechaDesde={setFechaDesde}
         fechaHasta={fechaHasta}
         setFechaHasta={setFechaHasta}
-        onCalculate={calcularPreview}
-        isLoading={isLoading}
+        onCalculate={() => void calcularPreview()}
+        isLoading={calculando}
+        ocupado={confirmando}
         bloqueado={restriccion ? !restriccion.permitido : false}
       />
 
       {restriccion && !restriccion.permitido && (
-        <div className="rounded-lg bg-amber-500/10 p-5 border border-amber-500/20 space-y-2">
-            <p className="text-sm font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                <Lock className="h-4 w-4 shrink-0" />
-                Rendición no disponible
+        <div role="status" className="space-y-1 rounded-lg border border-border px-4 py-3">
+          <p className="text-sm font-medium">Rendición no disponible</p>
+          <p className="text-sm text-muted-foreground">{restriccion.motivo}</p>
+          {restriccion.diasParaUltimaSemana > 0 && (
+            <p className="text-xs text-muted-foreground">
+              La deuda de consignación se sigue acumulando y se incluirá en la próxima rendición.
             </p>
-            <p className="text-sm text-amber-700/80 dark:text-amber-400/80">
-                {restriccion.motivo}
-            </p>
-            {restriccion.diasParaUltimaSemana > 0 && (
-              <p className="text-xs text-amber-600/60 dark:text-amber-500/60 flex items-center gap-1.5 mt-1">
-                <Calendar className="h-3 w-3" />
-                La deuda de consignación se sigue acumulando y se incluirá en la próxima rendición.
-              </p>
-            )}
+          )}
         </div>
       )}
 
       {restriccion?.permitido && restriccion.rendicionExistenteEnMes && (
-        <div className="rounded-lg bg-blue-500/10 p-4 border border-blue-500/20">
-            <p className="text-sm text-blue-700 dark:text-blue-400 flex items-center gap-2">
-                <Calendar className="h-4 w-4 shrink-0" />
-                Ya existe una rendición este mes ({restriccion.rendicionExistenteEnMes.numeroRendicion}). 
-                Estás en la última semana del mes, por lo que podés generar una rendición adicional.
-            </p>
-        </div>
+        <p role="status" className="rounded-lg border border-border px-4 py-3 text-sm text-muted-foreground">
+          Ya existe una rendición este mes (
+          <span className="font-mono text-foreground">
+            {restriccion.rendicionExistenteEnMes.numeroRendicion}
+          </span>
+          ). Estás en la última semana del mes, por lo que podés generar una rendición adicional.
+        </p>
       )}
 
       {error && (
-        <div className="rounded-lg bg-red-500/10 p-4 border border-red-500/20">
-            <p className="text-sm font-bold text-red-600 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                {error}
-            </p>
-        </div>
+        <p role="alert" className="rounded-lg border border-border px-4 py-3 text-sm font-medium text-destructive">
+          {error}
+        </p>
       )}
 
       {preview && (
         <RendicionPreview
           preview={preview}
-          onConfirm={confirmarRendicion}
-          isLoading={isLoading}
+          onConfirm={() => void confirmarRendicion()}
+          isLoading={confirmando}
+          ocupado={calculando}
           monedaLiquidacion={monedaLiquidacion}
           onMonedaLiquidacionChange={setMonedaLiquidacion}
           cotizacionUsd={cotizacionUsd}

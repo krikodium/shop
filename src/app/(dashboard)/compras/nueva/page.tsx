@@ -3,9 +3,20 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { notificar } from "@/lib/notificar";
+import { formatARS } from "@/lib/formatCurrency";
 import {
   Select,
   SelectContent,
@@ -24,6 +35,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { Proveedor, Producto } from "@prisma/client";
+
+const claseLabel = "font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground";
 
 interface LineaItem {
   productoId: string;
@@ -44,13 +57,11 @@ export default function NuevaCompraPage() {
   const [cantidad, setCantidad] = useState(1);
   const [precioUnitario, setPrecioUnitario] = useState(0);
   const [notas, setNotas] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [modalNuevoProveedorOpen, setModalNuevoProveedorOpen] = useState(false);
   const [nuevoProveedorNombre, setNuevoProveedorNombre] = useState("");
   const [nuevoProveedorTelefono, setNuevoProveedorTelefono] = useState("");
-  const [guardandoProveedor, setGuardandoProveedor] = useState(false);
   const [errorProveedor, setErrorProveedor] = useState<string | null>(null);
 
   const [modalNuevoProductoOpen, setModalNuevoProductoOpen] = useState(false);
@@ -59,7 +70,6 @@ export default function NuevaCompraPage() {
   const [nuevoPrecioCompra, setNuevoPrecioCompra] = useState(0);
   const [nuevoPrecioVenta, setNuevoPrecioVenta] = useState(0);
   const [nuevaCantidad, setNuevaCantidad] = useState(1);
-  const [guardandoNuevo, setGuardandoNuevo] = useState(false);
 
   const loadProductos = () =>
     fetch("/api/productos")
@@ -71,14 +81,13 @@ export default function NuevaCompraPage() {
       .then((r) => r.json())
       .then((provs) => setProveedores(Array.isArray(provs) ? provs : []));
 
-  const crearProveedor = async () => {
+  const { run: crearProveedor, loading: guardandoProveedor } = useAsyncAction(async () => {
     const nombre = nuevoProveedorNombre.trim();
     if (!nombre) {
       setErrorProveedor("El nombre es obligatorio");
-      toast.error("El nombre es obligatorio");
+      notificar.error("El nombre es obligatorio");
       return;
     }
-    setGuardandoProveedor(true);
     setErrorProveedor(null);
     try {
       const res = await fetch("/api/proveedores", {
@@ -96,18 +105,16 @@ export default function NuevaCompraPage() {
       const proveedor = await res.json();
       await loadProveedores();
       setProveedorId(proveedor.id);
-      toast.success("Proveedor creado y asignado");
+      notificar.ok("Proveedor creado y asignado");
       setModalNuevoProveedorOpen(false);
       setNuevoProveedorNombre("");
       setNuevoProveedorTelefono("");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al crear proveedor";
       setErrorProveedor(msg);
-      toast.error(msg);
-    } finally {
-      setGuardandoProveedor(false);
+      notificar.error(msg);
     }
-  };
+  });
 
   useEffect(() => {
     Promise.all([
@@ -163,27 +170,26 @@ export default function NuevaCompraPage() {
     setItems((prev) => prev.filter((i) => i.productoId !== productoId));
   };
 
-  const crearYAgregarProducto = async () => {
+  const { run: crearYAgregarProducto, loading: guardandoNuevo } = useAsyncAction(async () => {
     const sku = nuevoSku.trim();
     const nombre = nuevoNombre.trim();
     if (!sku || !nombre) {
-      toast.error("SKU y nombre son obligatorios");
+      notificar.error("SKU y nombre son obligatorios");
       return;
     }
     if (nuevoPrecioCompra <= 0) {
-      toast.error("El precio de compra es obligatorio para la orden");
+      notificar.error("El precio de compra es obligatorio para la orden");
       return;
     }
     if (nuevoPrecioVenta <= 0) {
-      toast.error("El precio de venta es obligatorio");
+      notificar.error("El precio de venta es obligatorio");
       return;
     }
     const existeSku = productos.some((p) => p.sku.toLowerCase() === sku.toLowerCase());
     if (existeSku) {
-      toast.error("Ya existe un producto con ese SKU");
+      notificar.error("Ya existe un producto con ese SKU");
       return;
     }
-    setGuardandoNuevo(true);
     try {
       const res = await fetch("/api/productos", {
         method: "POST",
@@ -219,7 +225,7 @@ export default function NuevaCompraPage() {
           subtotal: sub,
         },
       ]);
-      toast.success("Producto creado y agregado a la orden");
+      notificar.ok("Producto creado y agregado a la orden");
       setModalNuevoProductoOpen(false);
       setNuevoSku("");
       setNuevoNombre("");
@@ -227,20 +233,17 @@ export default function NuevaCompraPage() {
       setNuevoPrecioVenta(0);
       setNuevaCantidad(1);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al crear producto");
-    } finally {
-      setGuardandoNuevo(false);
+      notificar.error(err instanceof Error ? err.message : "Error al crear producto");
     }
-  };
+  });
 
   const total = items.reduce((s, i) => s + i.subtotal, 0);
 
-  const crearOrden = async () => {
+  const { run: crearOrden, loading: isLoading } = useAsyncAction(async () => {
     if (!proveedorId || items.length === 0) {
       setError("Seleccioná proveedor y agregá al menos un producto");
       return;
     }
-    setIsLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/compras", {
@@ -265,25 +268,26 @@ export default function NuevaCompraPage() {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error");
-    } finally {
-      setIsLoading(false);
     }
-  };
+  });
 
   return (
     <div className="space-y-6">
-      <Link href="/compras">
-        <Button variant="ghost">← Órdenes</Button>
-      </Link>
-      <h1 className="text-2xl font-bold">Nueva orden de compra</h1>
+      <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+        <Link href="/compras">← Compras</Link>
+      </Button>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Proveedor</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <PageHeader
+        overline="Mercadería · Compras"
+        title="Nueva orden de compra"
+        description="Elegí el proveedor, cargá los productos y confirmá la orden."
+      />
+
+      <Panel>
+        <PanelHeader title="Proveedor" />
+        <PanelBody className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Select value={proveedorId} onValueChange={setProveedorId}>
-            <SelectTrigger className="min-h-10 flex-1 max-w-xs">
+            <SelectTrigger className="h-10 w-full sm:max-w-xs" aria-label="Proveedor">
               <SelectValue placeholder="Seleccionar proveedor" />
             </SelectTrigger>
             <SelectContent>
@@ -302,8 +306,8 @@ export default function NuevaCompraPage() {
             }}
           >
             <DialogTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="min-h-10">
-                + Nuevo proveedor
+              <Button type="button" variant="outline" className="h-10">
+                Nuevo proveedor
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-[min(95vw,400px)]">
@@ -313,18 +317,18 @@ export default function NuevaCompraPage() {
                   Nombre obligatorio. Teléfono opcional.
                 </p>
               </DialogHeader>
-              <div className="grid gap-5 pt-4">
-                <div className="space-y-2">
+              <div className="grid gap-4 pt-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="nuevo-proveedor-nombre">Nombre *</Label>
                   <Input
                     id="nuevo-proveedor-nombre"
                     placeholder="Nombre del proveedor"
                     value={nuevoProveedorNombre}
                     onChange={(e) => setNuevoProveedorNombre(e.target.value)}
-                    className="min-h-11"
+                    className="h-10"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="nuevo-proveedor-telefono">Teléfono</Label>
                   <Input
                     id="nuevo-proveedor-telefono"
@@ -332,111 +336,124 @@ export default function NuevaCompraPage() {
                     type="tel"
                     value={nuevoProveedorTelefono}
                     onChange={(e) => setNuevoProveedorTelefono(e.target.value)}
-                    className="min-h-11"
+                    className="h-10"
                   />
                 </div>
                 {errorProveedor && (
-                  <p className="text-sm text-destructive">{errorProveedor}</p>
-                )}
-                <Button
-                  onClick={crearProveedor}
-                  disabled={guardandoProveedor}
-                  className="min-h-11 w-full"
-                >
-                  {guardandoProveedor ? "Guardando…" : "Crear y asignar"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle>Agregar producto</CardTitle>
-          <Dialog open={modalNuevoProductoOpen} onOpenChange={setModalNuevoProductoOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                + Nuevo producto
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Crear producto y agregar a la orden</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-5 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nuevo-sku">SKU *</Label>
-                  <Input
-                    id="nuevo-sku"
-                    value={nuevoSku}
-                    onChange={(e) => setNuevoSku(e.target.value)}
-                    placeholder="Ej: PROD-001"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nuevo-nombre">Nombre *</Label>
-                  <Input
-                    id="nuevo-nombre"
-                    value={nuevoNombre}
-                    onChange={(e) => setNuevoNombre(e.target.value)}
-                    placeholder="Nombre del producto"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="nuevo-precio-compra">Precio compra *</Label>
-                    <CurrencyInput
-                      id="nuevo-precio-compra"
-                      value={nuevoPrecioCompra}
-                      onChange={(v) => setNuevoPrecioCompra(v ?? 0)}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="nuevo-precio-venta">Precio venta *</Label>
-                    <CurrencyInput
-                      id="nuevo-precio-venta"
-                      value={nuevoPrecioVenta}
-                      onChange={(v) => setNuevoPrecioVenta(v ?? 0)}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nueva-cantidad">Cantidad</Label>
-                  <Input
-                    id="nueva-cantidad"
-                    type="number"
-                    min={1}
-                    value={nuevaCantidad}
-                    onChange={(e) => setNuevaCantidad(parseInt(e.target.value, 10) || 1)}
-                  />
-                </div>
-                {proveedorId && (
-                  <p className="text-sm text-muted-foreground">
-                    Se asignará al proveedor seleccionado en la orden.
+                  <p role="alert" className="text-sm text-destructive">
+                    {errorProveedor}
                   </p>
                 )}
                 <Button
-                  onClick={crearYAgregarProducto}
-                  disabled={guardandoNuevo}
+                  onClick={() => void crearProveedor()}
+                  loading={guardandoProveedor}
+                  loadingText="Guardando…"
+                  className="w-full"
                 >
-                  {guardandoNuevo ? "Guardando…" : "Crear y agregar"}
+                  Crear y asignar
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[200px] flex-1">
-            <label className="mb-1 block text-sm">Producto</label>
-            <Select value={productoSeleccionado} onValueChange={(v) => {
-              setProductoSeleccionado(v);
-              const p = productos.find((x) => x.id === v);
-              if (p) setPrecioUnitario(Number(p.precioCompra ?? 0));
-            }}>
-              <SelectTrigger>
+        </PanelBody>
+      </Panel>
+
+      <Panel>
+        <PanelHeader
+          title="Agregar producto"
+          acciones={
+            <Dialog open={modalNuevoProductoOpen} onOpenChange={setModalNuevoProductoOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Nuevo producto
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Crear producto y agregar a la orden</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 pt-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="nuevo-sku">SKU *</Label>
+                    <Input
+                      id="nuevo-sku"
+                      value={nuevoSku}
+                      onChange={(e) => setNuevoSku(e.target.value)}
+                      placeholder="Ej: PROD-001"
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="nuevo-nombre">Nombre *</Label>
+                    <Input
+                      id="nuevo-nombre"
+                      value={nuevoNombre}
+                      onChange={(e) => setNuevoNombre(e.target.value)}
+                      placeholder="Nombre del producto"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="nuevo-precio-compra">Precio compra *</Label>
+                      <CurrencyInput
+                        id="nuevo-precio-compra"
+                        value={nuevoPrecioCompra}
+                        onChange={(v) => setNuevoPrecioCompra(v ?? 0)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="nuevo-precio-venta">Precio venta *</Label>
+                      <CurrencyInput
+                        id="nuevo-precio-venta"
+                        value={nuevoPrecioVenta}
+                        onChange={(v) => setNuevoPrecioVenta(v ?? 0)}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="nueva-cantidad">Cantidad</Label>
+                    <Input
+                      id="nueva-cantidad"
+                      type="number"
+                      min={1}
+                      value={nuevaCantidad}
+                      onChange={(e) => setNuevaCantidad(parseInt(e.target.value, 10) || 1)}
+                      className="font-mono tabular-nums"
+                    />
+                  </div>
+                  {proveedorId && (
+                    <p className="text-sm text-muted-foreground">
+                      Se asignará al proveedor seleccionado en la orden.
+                    </p>
+                  )}
+                  <Button
+                    onClick={() => void crearYAgregarProducto()}
+                    loading={guardandoNuevo}
+                    loadingText="Guardando…"
+                  >
+                    Crear y agregar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          }
+        />
+        <PanelBody className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[200px] flex-1 space-y-1.5">
+            <Label htmlFor="compra-producto" className={claseLabel}>
+              Producto
+            </Label>
+            <Select
+              value={productoSeleccionado}
+              onValueChange={(v) => {
+                setProductoSeleccionado(v);
+                const p = productos.find((x) => x.id === v);
+                if (p) setPrecioUnitario(Number(p.precioCompra ?? 0));
+              }}
+            >
+              <SelectTrigger id="compra-producto" className="h-10 w-full">
                 <SelectValue placeholder="Seleccionar" />
               </SelectTrigger>
               <SelectContent>
@@ -448,94 +465,116 @@ export default function NuevaCompraPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-24">
-            <label className="mb-1 block text-sm">Cantidad</label>
+          <div className="w-24 space-y-1.5">
+            <Label htmlFor="compra-cantidad" className={claseLabel}>
+              Cantidad
+            </Label>
             <Input
+              id="compra-cantidad"
               type="number"
               min={1}
               value={cantidad}
               onChange={(e) => setCantidad(parseInt(e.target.value, 10) || 1)}
+              className="h-10 font-mono tabular-nums"
             />
           </div>
-          <div className="w-32">
-            <label className="mb-1 block text-sm">P. unitario</label>
+          <div className="w-36 space-y-1.5">
+            <Label htmlFor="compra-precio" className={claseLabel}>
+              P. unitario
+            </Label>
             <CurrencyInput
+              id="compra-precio"
               value={precioUnitario}
               onChange={(v) => setPrecioUnitario(v ?? 0)}
               placeholder="0"
             />
           </div>
-          <Button onClick={agregarItem}>Agregar</Button>
-        </CardContent>
-      </Card>
+          <Button variant="outline" onClick={agregarItem} className="h-10">
+            Agregar
+          </Button>
+        </PanelBody>
+      </Panel>
 
       {items.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Items ({items.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="py-2 text-left">Producto</th>
-                  <th className="py-2 text-right">Cant.</th>
-                  <th className="py-2 text-right">P. unit.</th>
-                  <th className="py-2 text-right">Subtotal</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((i) => (
-                  <tr key={i.productoId} className="border-b">
-                    <td className="py-2">{i.productoNombre}</td>
-                    <td className="py-2 text-right">{i.cantidad}</td>
-                    <td className="py-2 text-right">
-                      ${i.precioUnitario.toFixed(2)}
-                    </td>
-                    <td className="py-2 text-right">
-                      ${i.subtotal.toFixed(2)}
-                    </td>
-                    <td>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() => quitarItem(i.productoId)}
-                      >
-                        ×
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="mt-4 flex justify-between">
-              <div>
-                <label className="mb-1 block text-sm">Notas</label>
-                <Input
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                  placeholder="Opcional"
-                  className="max-w-md"
-                />
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold">Total: ${total.toFixed(2)}</p>
-                <Button
-                  className="mt-2"
-                  onClick={crearOrden}
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Creando…" : "Crear orden"}
-                </Button>
-              </div>
+        <Panel>
+          <PanelHeader title="Items" descripcion={`${items.length} productos en la orden`} />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Producto</TableHead>
+                <TableHead className="text-right">Cant.</TableHead>
+                <TableHead className="text-right">P. unit.</TableHead>
+                <TableHead className="text-right">Subtotal</TableHead>
+                <TableHead className="w-[1%]">
+                  <span className="sr-only">Quitar</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((i) => (
+                <TableRow key={i.productoId}>
+                  <TableCell>
+                    <p className="font-medium">{i.productoNombre}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{i.productoSku}</p>
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{i.cantidad}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
+                    {formatARS(i.precioUnitario)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-semibold tabular-nums">
+                    {formatARS(i.subtotal)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => quitarItem(i.productoId)}
+                      aria-label={`Quitar ${i.productoNombre}`}
+                    >
+                      Quitar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <div className="flex flex-col gap-4 border-t border-border px-4 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-5">
+            <div className="w-full space-y-1.5 sm:max-w-md">
+              <Label htmlFor="compra-notas" className={claseLabel}>
+                Notas
+              </Label>
+              <Input
+                id="compra-notas"
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                placeholder="Opcional"
+                className="h-10"
+              />
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <p className="text-sm text-muted-foreground">
+                Total{" "}
+                <span className="font-mono text-lg font-semibold tabular-nums text-foreground">
+                  {formatARS(total)}
+                </span>
+              </p>
+              <Button
+                onClick={() => void crearOrden()}
+                loading={isLoading}
+                loadingText="Creando…"
+              >
+                Crear orden
+              </Button>
+            </div>
+          </div>
+        </Panel>
       )}
 
-      {error && <p className="text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

@@ -3,11 +3,18 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, PanelHeader } from "@/components/ui/panel";
+import { Resumen } from "@/components/ui/resumen";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { notificar } from "@/lib/notificar";
+import { formatARS } from "@/lib/formatCurrency";
 import {
   Table,
   TableBody,
@@ -29,10 +36,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CompraDetalleSkeleton } from "../ComprasSkeletons";
 
-const currencyFormatter = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-});
+/** El estado se lee por texto; todos los badges son outline. */
+const ESTADO_LABEL: Record<string, string> = {
+  PENDIENTE: "Pendiente",
+  PARCIAL: "Parcial",
+  RECIBIDO: "Recibido",
+  CANCELADO: "Cancelado",
+};
 
 interface ItemOrden {
   id: string;
@@ -81,7 +91,7 @@ export default function OrdenDetallePage() {
   const [orden, setOrden] = useState<OrdenDetalle | null>(null);
   const [loading, setLoading] = useState(true);
   const [cantidadesRecibir, setCantidadesRecibir] = useState<Record<string, number>>({});
-  const [recibiendo, setRecibiendo] = useState(false);
+  const [dialogCancelarOpen, setDialogCancelarOpen] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -103,14 +113,13 @@ export default function OrdenDetallePage() {
     load();
   }, [load]);
 
-  const recibir = async () => {
+  const { run: recibir, loading: recibiendo } = useAsyncAction(async () => {
     if (!orden) return;
     const recibirData = Object.entries(cantidadesRecibir)
       .filter(([, cant]) => cant > 0)
       .map(([itemId, cantidadRecibida]) => ({ itemId, cantidadRecibida }));
 
     if (recibirData.length === 0) return;
-    setRecibiendo(true);
     try {
       const res = await fetch(`/api/compras/${id}`, {
         method: "PATCH",
@@ -125,15 +134,13 @@ export default function OrdenDetallePage() {
       const normalized = normalizeOrden(updated);
       setOrden(normalized);
       setCantidadesRecibir(getCantidadesIniciales(normalized.items));
-      toast.success("Recepción registrada");
+      notificar.ok("Recepción registrada");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error");
-    } finally {
-      setRecibiendo(false);
+      notificar.error(err instanceof Error ? err.message : "Error");
     }
-  };
+  });
 
-  const cancelar = async () => {
+  const { run: cancelar, loading: cancelando } = useAsyncAction(async () => {
     if (!orden) return;
     try {
       const res = await fetch(`/api/compras/${id}`, {
@@ -146,11 +153,12 @@ export default function OrdenDetallePage() {
       const normalized = normalizeOrden(updated);
       setOrden(normalized);
       setCantidadesRecibir(getCantidadesIniciales(normalized.items));
-      toast.success("Orden cancelada");
+      notificar.ok("Orden cancelada");
+      setDialogCancelarOpen(false);
     } catch {
-      toast.error("Error al cancelar la orden");
+      notificar.error("Error al cancelar la orden");
     }
-  };
+  });
 
   const puedeRecibir = orden?.estado !== "RECIBIDO" && orden?.estado !== "CANCELADO";
   const hayAlgoQueRecibir = Object.values(cantidadesRecibir).some((c) => c > 0);
@@ -164,223 +172,192 @@ export default function OrdenDetallePage() {
     return { totalPedido, totalRecibido, pendientes, avance };
   }, [orden]);
 
-  const estadoVariant = (estado: string) =>
-    estado === "CANCELADO" ? "destructive" : estado === "PENDIENTE" ? "secondary" : "outline";
-
   if (loading) return <CompraDetalleSkeleton />;
   if (!orden) {
     return (
-      <div className="space-y-4">
-        <p>Orden no encontrada.</p>
-        <Link href="/compras">
-          <Button variant="outline">Volver</Button>
-        </Link>
-      </div>
+      <EmptyState
+        titulo="Orden no encontrada"
+        descripcion="Puede haber sido eliminada o el enlace ya no es válido."
+        accion={
+          <Button asChild variant="outline">
+            <Link href="/compras">Volver a compras</Link>
+          </Button>
+        }
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/compras">
-          <Button variant="ghost">← Órdenes</Button>
-        </Link>
-        <div className="flex gap-2">
-          {puedeRecibir && (
-            <>
-              <Button
-                onClick={recibir}
-                disabled={!hayAlgoQueRecibir || recibiendo}
-              >
-                {recibiendo ? "..." : "Registrar recepción"}
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline">Cancelar orden</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Cancelar esta orden?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      La orden {orden.numeroOrden} se marcará como cancelada. Esta acción no se puede deshacer.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>No</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={cancelar}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Sí, cancelar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          )}
-        </div>
-      </div>
+      <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+        <Link href="/compras">← Compras</Link>
+      </Button>
 
-      <div className="rounded-xl border bg-card/70 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5 sm:py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight md:text-2xl">{orden.numeroOrden}</h1>
-              <Badge variant={estadoVariant(orden.estado)}>{orden.estado}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {orden.proveedor?.nombre} · {new Date(orden.fecha).toLocaleDateString("es-AR")}
-            </p>
-          </div>
-          <div className="rounded-lg border bg-background px-4 py-3 text-left lg:text-right">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Total orden
-            </p>
-            <p className="mt-1 text-2xl font-bold tabular-nums">
-              {currencyFormatter.format(orden.total)}
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        overline={`Mercadería · Orden ${orden.numeroOrden}`}
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {orden.proveedor?.nombre || orden.numeroOrden}
+            <Badge variant="outline">{ESTADO_LABEL[orden.estado] ?? orden.estado}</Badge>
+          </span>
+        }
+        description={`Emitida el ${new Date(orden.fecha).toLocaleDateString("es-AR")}`}
+      >
+        {puedeRecibir && (
+          <>
+            <AlertDialog open={dialogCancelarOpen} onOpenChange={setDialogCancelarOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline">Cancelar orden</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Cancelar esta orden?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    La orden {orden.numeroOrden} se marcará como cancelada. Esta acción no se puede
+                    deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>No</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void cancelar();
+                    }}
+                    disabled={cancelando}
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                  >
+                    {cancelando && <Spinner className="text-white" />}
+                    {cancelando ? "Cancelando…" : "Sí, cancelar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button
+              onClick={() => void recibir()}
+              disabled={!hayAlgoQueRecibir}
+              loading={recibiendo}
+              loadingText="Registrando…"
+            >
+              Registrar recepción
+            </Button>
+          </>
+        )}
+      </PageHeader>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Items
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{orden.items.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Unidades pedidas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{resumen.totalPedido}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Recibidas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{resumen.totalRecibido}</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Avance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{resumen.avance}%</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {resumen.pendientes} unidades pendientes
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <Resumen
+        items={[
+          {
+            label: "Total orden",
+            valor: formatARS(orden.total),
+            hint: `${orden.items.length} items`,
+          },
+          { label: "Unidades pedidas", valor: resumen.totalPedido },
+          { label: "Recibidas", valor: resumen.totalRecibido },
+          {
+            label: "Avance",
+            valor: `${resumen.avance}%`,
+            hint: (
+              <span className="block space-y-1.5">
+                <Progress
+                  value={resumen.avance}
+                  aria-label="Avance de recepción"
+                  className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-muted-foreground/60"
+                />
+                <span className="block">{resumen.pendientes} unidades pendientes</span>
+              </span>
+            ),
+          },
+        ]}
+      />
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Recepción de mercadería</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Cargá solo las unidades que ingresan en esta operación.
-            </p>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto</TableHead>
-                  <TableHead className="text-right">Pedido</TableHead>
-                  <TableHead className="text-right">Recibido</TableHead>
-                  <TableHead className="text-right">Pendiente</TableHead>
-                  <TableHead className="text-right">P. unit.</TableHead>
-                  <TableHead className="text-right">Subtotal</TableHead>
+      <Panel>
+        <PanelHeader
+          title="Recepción de mercadería"
+          descripcion="Cargá solo las unidades que ingresan en esta operación."
+        />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Producto</TableHead>
+              <TableHead className="text-right">Pedido</TableHead>
+              <TableHead className="text-right">Recibido</TableHead>
+              <TableHead className="text-right">Pendiente</TableHead>
+              <TableHead className="text-right">P. unit.</TableHead>
+              <TableHead className="text-right">Subtotal</TableHead>
+              {puedeRecibir && <TableHead className="text-right">Recibir ahora</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orden.items.map((item) => {
+              const pendiente = item.cantidad - item.cantidadRecibida;
+              return (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <p className="font-medium">{item.producto?.nombre}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{item.producto?.sku}</p>
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{item.cantidad}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">
+                    {item.cantidadRecibida}
+                  </TableCell>
+                  <TableCell
+                    className={
+                      pendiente > 0
+                        ? "text-right font-mono tabular-nums text-num-warning"
+                        : "text-right font-mono tabular-nums text-muted-foreground"
+                    }
+                  >
+                    {Math.max(0, pendiente)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
+                    {formatARS(item.precioUnitario)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">
+                    {formatARS(item.subtotal)}
+                  </TableCell>
                   {puedeRecibir && (
-                    <TableHead className="text-right">Recibir ahora</TableHead>
+                    <TableCell className="text-right">
+                      {pendiente > 0 ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={pendiente}
+                          aria-label={`Unidades a recibir de ${item.producto?.nombre ?? "este producto"}`}
+                          className="ml-auto h-9 w-24 text-right font-mono tabular-nums"
+                          value={cantidadesRecibir[item.id] ?? 0}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value, 10) || 0;
+                            setCantidadesRecibir((prev) => ({
+                              ...prev,
+                              [item.id]: Math.min(Math.max(0, value), pendiente),
+                            }));
+                          }}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                   )}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orden.items.map((item) => {
-                  const pendiente = item.cantidad - item.cantidadRecibida;
-                  return (
-                    <TableRow key={item.id} className="hover:bg-muted/50">
-                      <TableCell>
-                        <div className="font-medium">{item.producto?.nombre}</div>
-                        <div className="text-xs text-muted-foreground">{item.producto?.sku}</div>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{item.cantidad}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {item.cantidadRecibida}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        <span className={pendiente > 0 ? "text-amber-700" : "text-muted-foreground"}>
-                          {Math.max(0, pendiente)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {currencyFormatter.format(item.precioUnitario)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {currencyFormatter.format(item.subtotal)}
-                      </TableCell>
-                      {puedeRecibir && (
-                        <TableCell className="text-right">
-                          {pendiente > 0 ? (
-                            <Input
-                              type="number"
-                              min={0}
-                              max={pendiente}
-                              className="ml-auto min-h-10 w-24 text-right tabular-nums"
-                              value={cantidadesRecibir[item.id] ?? 0}
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value, 10) || 0;
-                                setCantidadesRecibir((prev) => ({
-                                  ...prev,
-                                  [item.id]: Math.min(Math.max(0, value), pendiente),
-                                }));
-                              }}
-                            />
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="mt-6 flex flex-col gap-1 border-t pt-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              Total:{" "}
-              <span className="font-semibold text-foreground">
-                {currencyFormatter.format(orden.total)}
-              </span>
+              );
+            })}
+          </TableBody>
+        </Table>
+        <div className="flex flex-col gap-1 border-t border-border px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <p>
+            Total{" "}
+            <span className="font-mono font-semibold tabular-nums text-foreground">
+              {formatARS(orden.total)}
+            </span>
+          </p>
+          {orden.estado === "RECIBIDO" && orden.fechaRecepcion && (
+            <p className="font-mono text-xs tabular-nums">
+              Recibida el {new Date(orden.fechaRecepcion).toLocaleString("es-AR")}
             </p>
-            {orden.estado === "RECIBIDO" && orden.fechaRecepcion && (
-              <p>
-                Recibida el {new Date(orden.fechaRecepcion).toLocaleString()}
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </Panel>
     </div>
   );
 }

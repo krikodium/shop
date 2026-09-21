@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
 import {
   Select,
   SelectContent,
@@ -9,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar as CalendarIcon, User, Calculator, ArrowRight } from "lucide-react";
 
 interface Proveedor {
   id: string;
@@ -25,9 +26,14 @@ interface RendicionParamsProps {
   fechaHasta: string;
   setFechaHasta: (fecha: string) => void;
   onCalculate: () => void;
+  /** Cálculo del preview en curso: muestra el indicador en el botón. */
   isLoading: boolean;
+  /** Otra acción en vuelo (p. ej. confirmar): deshabilita sin indicador propio. */
+  ocupado?: boolean;
   bloqueado?: boolean;
 }
+
+const claseLabel = "font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground";
 
 export function RendicionParams({
   proveedores,
@@ -39,26 +45,23 @@ export function RendicionParams({
   setFechaHasta,
   onCalculate,
   isLoading,
+  ocupado = false,
   bloqueado = false,
 }: RendicionParamsProps) {
   return (
-    <Card className="border-none shadow-md bg-white dark:bg-zinc-900 overflow-hidden">
-      <CardHeader className="pb-4 border-b bg-muted/30">
-        <div className="flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Parámetros de Rendición</CardTitle>
-        </div>
-        <CardDescription>Seleccioná el proveedor y el rango de fechas para calcular las ventas pendientes</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-6">
-        <div className="grid gap-6 md:grid-cols-3 items-end">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <User className="h-3 w-3" />
-                Proveedor
-            </label>
+    <Panel>
+      <PanelHeader
+        title="Parámetros"
+        descripcion="Las fechas se sugieren a partir de la última rendición del proveedor."
+      />
+      <PanelBody>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[14rem] flex-1 space-y-1.5">
+            <Label htmlFor="rend-proveedor" className={claseLabel}>
+              Proveedor
+            </Label>
             <Select value={proveedorId} onValueChange={setProveedorId}>
-              <SelectTrigger className="bg-muted/50 border-none focus:ring-1 focus:ring-primary/20">
+              <SelectTrigger id="rend-proveedor" className="h-10 w-full">
                 <SelectValue placeholder="Seleccionar proveedor" />
               </SelectTrigger>
               <SelectContent>
@@ -71,47 +74,43 @@ export function RendicionParams({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <CalendarIcon className="h-3 w-3" />
-                Fecha Desde
-            </label>
-            <input
+          <div className="space-y-1.5">
+            <Label htmlFor="rend-desde" className={claseLabel}>
+              Desde
+            </Label>
+            <Input
+              id="rend-desde"
               type="date"
               value={fechaDesde}
               onChange={(e) => setFechaDesde(e.target.value)}
-              className="w-full rounded-md border-none bg-muted/50 px-3 py-2 text-sm focus:ring-1 focus:ring-primary/20"
+              className="h-10 w-[10rem]"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <CalendarIcon className="h-3 w-3" />
-                Fecha Hasta
-            </label>
-            <input
+          <div className="space-y-1.5">
+            <Label htmlFor="rend-hasta" className={claseLabel}>
+              Hasta
+            </Label>
+            <Input
+              id="rend-hasta"
               type="date"
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)}
-              className="w-full rounded-md border-none bg-muted/50 px-3 py-2 text-sm focus:ring-1 focus:ring-primary/20"
+              className="h-10 w-[10rem]"
             />
           </div>
-        </div>
 
-        <div className="mt-8 flex items-center justify-between border-t pt-6">
-          <p className="text-[10px] text-muted-foreground max-w-[250px]">
-            Las fechas se sugieren automáticamente basándose en la última rendición del proveedor seleccionado.
-          </p>
-          <Button 
-            onClick={onCalculate} 
-            disabled={isLoading || !proveedorId || bloqueado}
-            className="font-bold shadow-md px-8"
+          <Button
+            onClick={onCalculate}
+            loading={isLoading}
+            loadingText="Calculando…"
+            disabled={ocupado || !proveedorId || bloqueado}
+            className="h-10"
           >
-            {isLoading ? "Calculando..." : "Calcular Totales"}
-            <ArrowRight className="ml-2 h-4 w-4" />
+            Calcular totales
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </PanelBody>
+    </Panel>
   );
 }

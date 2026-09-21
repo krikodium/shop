@@ -18,16 +18,9 @@ const EXCLUIDOS = ["src/components/pdf", "src/app/api"];
  * La tarea final exige que este array quede vacío.
  */
 export const PENDIENTES: string[] = [
-  "src/app/(dashboard)/compras/[id]/page.tsx",
-  "src/app/(dashboard)/consignacion/ConsignacionDashboard.tsx",
-  "src/app/(dashboard)/consignacion/rendiciones/RendicionesTable.tsx",
-  "src/app/(dashboard)/consignacion/rendiciones/[id]/page.tsx",
-  "src/app/(dashboard)/consignacion/rendiciones/nueva/page.tsx",
   "src/app/(dashboard)/productos/[id]/editar/page.tsx",
   "src/app/(dashboard)/productos/page.tsx",
   "src/app/(dashboard)/proveedores/[id]/page.tsx",
-  "src/components/consignacion/rendicion-params.tsx",
-  "src/components/consignacion/rendicion-preview.tsx",
   "src/components/punto-venta/CarritoVenta.tsx",
   "src/components/punto-venta/ProductosGridPaginado.tsx",
 ];
