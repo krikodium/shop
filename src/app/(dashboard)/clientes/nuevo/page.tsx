@@ -1,13 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { ClienteForm } from "@/components/forms/ClienteForm";
+import { notificar } from "@/lib/notificar";
 import type { ClienteFormValues } from "@/lib/validaciones/clienteSchema";
 
 export default function NuevoClientePage() {
   const router = useRouter();
 
+  // El error se tira con su mensaje y el formulario lo avisa (notificar.error).
   const handleSubmit = async (data: ClienteFormValues) => {
     const res = await fetch("/api/clientes", {
       method: "POST",
@@ -16,20 +20,24 @@ export default function NuevoClientePage() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      const msg = err.error ?? "Error al crear cliente";
-      toast.error(msg);
-      throw new Error(msg);
+      throw new Error(err.error ?? "Error al crear cliente");
     }
     const cliente = await res.json();
-    toast.success("Cliente creado correctamente");
+    notificar.ok("Cliente creado correctamente");
     router.push(`/clientes/${cliente.id}`);
     router.refresh();
   };
 
   return (
-    <div className="max-w-lg space-y-4 md:space-y-6">
-      <h1 className="text-xl font-bold md:text-2xl">Nuevo cliente</h1>
-      <p className="text-sm text-muted-foreground">Nombre y teléfono. El resto es opcional.</p>
+    <div className="max-w-3xl space-y-6">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+        <Link href="/clientes">← Clientes</Link>
+      </Button>
+      <PageHeader
+        overline="Operación · Clientes"
+        title="Nuevo cliente"
+        description="Nombre y teléfono alcanzan para empezar."
+      />
       <ClienteForm onSubmit={handleSubmit} variant="quick" />
     </div>
   );

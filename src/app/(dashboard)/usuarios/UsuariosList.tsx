@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Pencil, Clock, Send } from "lucide-react";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -13,8 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { cn } from "@/lib/utils";
 import type { Usuario } from "./types";
-import { ROLES, DIAS_SEMANA, parseDiasTrabajo, inicialesUsuario } from "./constants";
+import { ROLES, DIAS_SEMANA, parseDiasTrabajo } from "./constants";
 
 // Reenvío por mail: apagado hasta configurar SMTP (NEXT_PUBLIC_EMAIL_ENABLED)
 const EMAIL_ENABLED = process.env.NEXT_PUBLIC_EMAIL_ENABLED === "true";
@@ -30,6 +40,65 @@ interface UsuariosListProps {
   onResend: (u: Usuario) => Promise<void> | void;
 }
 
+/** Días de trabajo en mono: activos marcados con borde, inactivos atenuados. */
+function DiasTrabajo({ dias }: { dias: string | null }) {
+  const activos = parseDiasTrabajo(dias);
+  const nombres = DIAS_SEMANA.filter(({ num }) => activos.has(num))
+    .map(({ letra }) => letra)
+    .join(" ");
+  return (
+    <span
+      className="inline-flex gap-0.5 font-mono text-[11px]"
+      aria-label={nombres ? `Trabaja: ${nombres}` : "Sin días asignados"}
+    >
+      {DIAS_SEMANA.map(({ letra, num }) => {
+        const on = activos.has(num);
+        return (
+          <span
+            key={num}
+            aria-hidden="true"
+            className={cn(
+              "flex size-5 items-center justify-center rounded-sm border",
+              on
+                ? "border-border-strong font-medium text-foreground"
+                : "border-transparent text-muted-foreground/50"
+            )}
+          >
+            {letra}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/** Cada fila tiene su propio estado de envío: un reenvío no bloquea a los demás. */
+function BotonReenviar({
+  usuario,
+  onResend,
+}: {
+  usuario: Usuario;
+  onResend: (u: Usuario) => Promise<void> | void;
+}) {
+  const { run, loading } = useAsyncAction(async () => {
+    await onResend(usuario);
+  });
+  const pendiente = usuario.tienePassword === false;
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      loading={loading}
+      loadingText="Enviando…"
+      onClick={() => void run()}
+      title={pendiente ? "Reenviar invitación" : "Enviar enlace de restablecimiento"}
+    >
+      {pendiente ? "Reenviar invitación" : "Restablecer acceso"}
+    </Button>
+  );
+}
+
 export function UsuariosList({
   usuarios,
   searchQuery,
@@ -41,151 +110,131 @@ export function UsuariosList({
   onResend,
 }: UsuariosListProps) {
   const showNoResults = totalBeforeFilter > 0 && usuarios.length === 0;
-  const [resendingId, setResendingId] = useState<string | null>(null);
+  const hayFiltros = searchQuery.trim() !== "" || roleFilter !== "all";
 
-  const handleResend = async (u: Usuario) => {
-    setResendingId(u.id);
-    try {
-      await onResend(u);
-    } finally {
-      setResendingId(null);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-md flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre o email…"
-            value={searchQuery}
-            onChange={(e) => onSearchQueryChange(e.target.value)}
-            className="border-border/80 bg-background/80 pl-9 shadow-sm transition-shadow focus-visible:shadow-md"
-          />
-        </div>
-        <Select value={roleFilter} onValueChange={onRoleFilterChange}>
-          <SelectTrigger className="w-full border-border/80 bg-background/80 shadow-sm sm:w-[200px]">
-            <SelectValue placeholder="Rol" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los roles</SelectItem>
-            {ROLES.map((r) => (
-              <SelectItem key={r.value} value={r.value}>
-                {r.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+  const filtros = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          placeholder="Nombre o email"
+          value={searchQuery}
+          onChange={(e) => onSearchQueryChange(e.target.value)}
+          className="h-10 w-44 pl-9 sm:w-56"
+          aria-label="Buscar usuarios"
+        />
       </div>
-
-      {showNoResults ? (
-        <Card className="border-dashed bg-muted/20 py-14 text-center">
-          <p className="text-muted-foreground">
-            No hay usuarios que coincidan con los filtros.
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Probá otra búsqueda o cambiá el filtro de rol.
-          </p>
-        </Card>
-      ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {usuarios.map((u) => (
-            <li key={u.id}>
-              <Card className="group h-full overflow-hidden border-border/70 bg-card/80 p-5 shadow-sm transition-all duration-200 hover:border-primary/25 hover:shadow-md">
-                <div className="flex gap-4">
-                  <div
-                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-semibold text-primary transition-colors group-hover:bg-primary/15"
-                    aria-hidden
-                  >
-                    {inicialesUsuario(u.name, u.email)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold leading-tight text-foreground">
-                      {u.name?.trim() || "Sin nombre"}
-                    </p>
-                    <p className="mt-0.5 truncate text-sm text-muted-foreground">{u.email}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Badge variant={u.role === "ADMIN" ? "default" : "secondary"}>
-                        {ROLES.find((r) => r.value === u.role)?.label ?? u.role}
-                      </Badge>
-                      {u.tienePassword === false && (
-                        <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
-                          Acceso pendiente
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
-                  <Clock className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
-                  <span>
-                    {u.horarioEntrada && u.horarioSalida
-                      ? `${u.horarioEntrada} – ${u.horarioSalida}`
-                      : "Sin horario"}
-                  </span>
-                </div>
-
-                {u.role === "VENDEDOR" && (
-                  <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Días de trabajo">
-                    {DIAS_SEMANA.map(({ letra, num }) => {
-                      const activos = parseDiasTrabajo(u.diasTrabajo);
-                      const on = activos.has(num);
-                      return (
-                        <span
-                          key={num}
-                          className={`flex h-6 w-6 items-center justify-center rounded text-[10px] font-semibold ${
-                            on
-                              ? "bg-green-600/90 text-white"
-                              : "bg-muted text-muted-foreground/70"
-                          }`}
-                          title={on ? `Trabaja ${letra}` : `No ${letra}`}
-                        >
-                          {letra}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="flex-1 gap-2 transition-colors hover:bg-primary/10 hover:text-primary"
-                    onClick={() => onEdit(u)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Editar
-                  </Button>
-                  {EMAIL_ENABLED && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="gap-2"
-                    disabled={resendingId === u.id}
-                    onClick={() => handleResend(u)}
-                    title={
-                      u.tienePassword === false
-                        ? "Reenviar invitación"
-                        : "Enviar enlace de restablecimiento"
-                    }
-                  >
-                    <Send className="h-4 w-4" />
-                    {resendingId === u.id
-                      ? "Enviando…"
-                      : u.tienePassword === false
-                        ? "Reenviar"
-                        : "Reset"}
-                  </Button>
-                  )}
-                </div>
-              </Card>
-            </li>
+      <Select value={roleFilter} onValueChange={onRoleFilterChange}>
+        <SelectTrigger className="h-10 w-40" aria-label="Filtrar por rol">
+          <SelectValue placeholder="Rol" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los roles</SelectItem>
+          {ROLES.map((r) => (
+            <SelectItem key={r.value} value={r.value}>
+              {r.label}
+            </SelectItem>
           ))}
-        </ul>
+        </SelectContent>
+      </Select>
+      {hayFiltros && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            onSearchQueryChange("");
+            onRoleFilterChange("all");
+          }}
+        >
+          Limpiar filtros
+        </Button>
       )}
     </div>
+  );
+
+  return (
+    <Panel>
+      <PanelHeader
+        title="Equipo"
+        descripcion={
+          <span className="font-mono tabular-nums">
+            {usuarios.length === totalBeforeFilter
+              ? `${totalBeforeFilter} usuarios`
+              : `${usuarios.length} de ${totalBeforeFilter} usuarios`}
+          </span>
+        }
+        acciones={filtros}
+      />
+      {showNoResults ? (
+        <PanelBody>
+          <EmptyState
+            titulo="Ningún usuario coincide con los filtros"
+            descripcion="Probá otra búsqueda o cambiá el filtro de rol."
+          />
+        </PanelBody>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Usuario</TableHead>
+              <TableHead>Rol</TableHead>
+              <TableHead>Horario</TableHead>
+              <TableHead>Días</TableHead>
+              <TableHead className="text-right">
+                <span className="sr-only">Acciones</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {usuarios.map((u) => (
+              <TableRow key={u.id}>
+                <TableCell className="max-w-[18rem]">
+                  <p className="truncate font-medium">{u.name?.trim() || "Sin nombre"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                </TableCell>
+                <TableCell>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant={u.role === "ADMIN" ? "default" : "outline"}>
+                      {ROLES.find((r) => r.value === u.role)?.label ?? u.role}
+                    </Badge>
+                    {u.tienePassword === false && (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        Acceso pendiente
+                      </Badge>
+                    )}
+                  </span>
+                </TableCell>
+                <TableCell className="font-mono text-sm tabular-nums">
+                  {u.horarioEntrada && u.horarioSalida ? (
+                    `${u.horarioEntrada}–${u.horarioSalida}`
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {u.role === "VENDEDOR" ? (
+                    <DiasTrabajo dias={u.diasTrabajo} />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <span className="inline-flex items-center justify-end gap-1">
+                    {EMAIL_ENABLED && <BotonReenviar usuario={u} onResend={onResend} />}
+                    <Button type="button" variant="ghost" size="sm" onClick={() => onEdit(u)}>
+                      Editar
+                    </Button>
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Panel>
   );
 }

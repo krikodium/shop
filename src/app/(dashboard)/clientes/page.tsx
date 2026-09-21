@@ -7,13 +7,13 @@ export default function ClientesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        overline="Gestión · Clientes"
+        overline="Operación · Clientes"
         title="Clientes"
-        description="Base de clientes y segmentación"
+        description="Base de clientes y su historial de compras"
       >
-        <Link href="/clientes/nuevo">
-          <Button>Nuevo cliente</Button>
-        </Link>
+        <Button asChild>
+          <Link href="/clientes/nuevo">Nuevo cliente</Link>
+        </Button>
       </PageHeader>
       <ClientesTable />
     </div>

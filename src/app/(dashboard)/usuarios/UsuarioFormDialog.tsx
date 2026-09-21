@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { notificar } from "@/lib/notificar";
+import { cn } from "@/lib/utils";
 import type { Usuario } from "./types";
 import { DIAS_SEMANA, ROLES, parseDiasTrabajo, serializeDiasTrabajo } from "./constants";
 
@@ -47,14 +49,11 @@ export function UsuarioFormDialog({
     horarioSalida: "",
     diasTrabajo: "",
   });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   // Para usuarios nuevos: enviar invitación por mail en vez de fijar contraseña.
   const [invitar, setInvitar] = useState(EMAIL_ENABLED);
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
     setInvitar(EMAIL_ENABLED);
     if (userToEdit) {
       setForm({
@@ -79,10 +78,7 @@ export function UsuarioFormDialog({
     }
   }, [open, userToEdit]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
+  const { run: guardar, loading: saving } = useAsyncAction(async () => {
     try {
       if (userToEdit) {
         const body: Record<string, unknown> = {
@@ -134,9 +130,9 @@ export function UsuarioFormDialog({
           if (!res.ok) throw new Error(d.error ?? "Error");
           onSaved({ ...(d.user as Usuario), tienePassword: false }, "create");
           if (d.emailEnviado) {
-            toast.success(`Invitación enviada a ${form.email}`);
+            notificar.ok(`Invitación enviada a ${form.email}`);
           } else {
-            toast.warning(
+            notificar.advertencia(
               d.error ?? "Usuario creado, pero no se pudo enviar el mail. Reenviá la invitación."
             );
           }
@@ -167,10 +163,13 @@ export function UsuarioFormDialog({
       }
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar");
-    } finally {
-      setSaving(false);
+      notificar.error(err instanceof Error ? err.message : "Error al guardar");
     }
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void guardar();
   };
 
   return (
@@ -186,8 +185,9 @@ export function UsuarioFormDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 pt-2">
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label htmlFor="usuario-email">Email</Label>
             <Input
+              id="usuario-email"
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               type="email"
@@ -196,19 +196,20 @@ export function UsuarioFormDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>Nombre</Label>
+            <Label htmlFor="usuario-nombre">Nombre</Label>
             <Input
+              id="usuario-nombre"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </div>
           {!userToEdit && EMAIL_ENABLED && (
-            <label className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
+            <label className="flex items-start gap-3 rounded-md border border-border p-3">
               <input
                 type="checkbox"
                 checked={invitar}
                 onChange={(e) => setInvitar(e.target.checked)}
-                className="mt-0.5 h-4 w-4 accent-primary"
+                className="mt-0.5 size-4 accent-foreground"
               />
               <span className="text-sm">
                 <span className="font-medium">Enviar invitación por email</span>
@@ -221,8 +222,9 @@ export function UsuarioFormDialog({
           )}
           {(userToEdit || !invitar) && (
             <div className="space-y-2">
-              <Label>Contraseña {userToEdit && "(dejar vacío para no cambiar)"}</Label>
+              <Label htmlFor="usuario-password">Contraseña {userToEdit && "(dejar vacío para no cambiar)"}</Label>
               <Input
+                id="usuario-password"
                 value={form.password}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                 type="password"
@@ -232,12 +234,12 @@ export function UsuarioFormDialog({
             </div>
           )}
           <div className="space-y-2">
-            <Label>Rol</Label>
+            <Label htmlFor="usuario-rol">Rol</Label>
             <Select
               value={form.role}
               onValueChange={(v) => setForm((f) => ({ ...f, role: v }))}
             >
-              <SelectTrigger>
+              <SelectTrigger id="usuario-rol" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -251,9 +253,11 @@ export function UsuarioFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Horario entrada</Label>
+              <Label htmlFor="usuario-entrada">Horario entrada</Label>
               <Input
+                id="usuario-entrada"
                 type="time"
+                className="font-mono tabular-nums"
                 value={form.horarioEntrada}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, horarioEntrada: e.target.value }))
@@ -261,9 +265,11 @@ export function UsuarioFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Horario salida</Label>
+              <Label htmlFor="usuario-salida">Horario salida</Label>
               <Input
+                id="usuario-salida"
                 type="time"
+                className="font-mono tabular-nums"
                 value={form.horarioSalida}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, horarioSalida: e.target.value }))
@@ -275,7 +281,7 @@ export function UsuarioFormDialog({
             <div className="space-y-2">
               <Label>Días de trabajo habitual</Label>
               <p className="text-xs text-muted-foreground">
-                L a D = lunes a domingo. Verde = trabaja ese día.
+                L a D = lunes a domingo. Marcá los días que trabaja.
               </p>
               <div className="flex flex-wrap items-center gap-1">
                 {DIAS_SEMANA.map(({ letra, num }) => {
@@ -294,11 +300,13 @@ export function UsuarioFormDialog({
                           diasTrabajo: serializeDiasTrabajo(nuevo),
                         }));
                       }}
-                      className={`h-8 w-8 rounded font-semibold text-sm transition-colors ${
+                      aria-pressed={trabaja}
+                      className={cn(
+                        "size-8 rounded-md border font-mono text-xs transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                         trabaja
-                          ? "bg-green-600 text-white hover:bg-green-700"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
-                      }`}
+                          ? "border-action bg-action font-medium text-action-foreground"
+                          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                      )}
                       title={trabaja ? "Quitar día" : "Agregar día"}
                     >
                       {letra}
@@ -308,13 +316,12 @@ export function UsuarioFormDialog({
               </div>
             </div>
           )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Guardando…" : "Guardar"}
+            <Button type="submit" loading={saving} loadingText="Guardando…">
+              Guardar
             </Button>
           </div>
         </form>

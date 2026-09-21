@@ -5,22 +5,17 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useAsyncAction } from "@/hooks/use-async-action";
+import { MarcoAcceso } from "@/app/login/MarcoAcceso";
+
+const claseLinkSecundario =
+  "rounded-sm text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
+  const { run: enviar, loading } = useAsyncAction(async () => {
     try {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
@@ -37,59 +32,53 @@ export default function ForgotPasswordPage() {
       setMessage(
         "Si el email corresponde a una cuenta, te enviamos un enlace."
       );
-    } finally {
-      setLoading(false);
     }
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void enviar();
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Restablecer contraseña</CardTitle>
-          <CardDescription>
-            Ingresá tu email y te enviamos un enlace para elegir una nueva
-            contraseña.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {message ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{message}</p>
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/login">Volver a iniciar sesión</Link>
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@empresa.com"
-                  required
-                  autoComplete="email"
-                  className="mt-1"
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Enviando…" : "Enviar enlace"}
-              </Button>
-              <div className="text-center">
-                <Link
-                  href="/login"
-                  className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-                >
-                  Volver a iniciar sesión
-                </Link>
-              </div>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <MarcoAcceso
+      titulo="Restablecer contraseña"
+      descripcion="Te enviamos un enlace para elegir una contraseña nueva."
+    >
+      {message ? (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground" role="status">
+            {message}
+          </p>
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/login">Volver a iniciar sesión</Link>
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tu@empresa.com"
+              required
+              autoComplete="email"
+              className="h-10"
+            />
+          </div>
+          <Button type="submit" className="w-full" loading={loading} loadingText="Enviando…">
+            Enviar enlace
+          </Button>
+          <div className="text-center">
+            <Link href="/login" className={claseLinkSecundario}>
+              Volver a iniciar sesión
+            </Link>
+          </div>
+        </form>
+      )}
+    </MarcoAcceso>
   );
 }

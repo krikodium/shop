@@ -131,18 +131,18 @@ export function PedidoDetalleDemo({ pedido }: { pedido: PedidoDemo }) {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/muestra-pedidos/pedidos" className="inline-flex min-h-10 items-center gap-2 rounded-md text-sm font-medium text-zinc-600 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+        <Link href="/muestra-pedidos/pedidos" className="inline-flex min-h-10 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver a pedidos
+          Pedidos
         </Link>
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-zinc-500">Paso 3 de 3 · Pedido ficticio</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground/60">Paso 3 de 3 · Pedido ficticio</p>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{pedidoActual.numero}</h1>
-              <span className="font-mono text-sm text-zinc-500">Creado {formatFechaDemo(pedidoActual.fecha, true)}</span>
+              <span className="font-mono text-sm text-muted-foreground">Creado {formatFechaDemo(pedidoActual.fecha, true)}</span>
             </div>
-            <p className="mt-2 text-base text-zinc-700">{pedidoActual.clienta.nombre} · {pedidoActual.clienta.telefono}</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">{pedidoActual.clienta.nombre} · {pedidoActual.clienta.telefono}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <EstadoPagoBadge estado={estadoPagoActual} />
@@ -152,9 +152,9 @@ export function PedidoDetalleDemo({ pedido }: { pedido: PedidoDemo }) {
       </div>
 
       {mensaje ? (
-        <div role="status" aria-live="polite" className="flex items-center justify-between gap-3 rounded-lg border border-zinc-950 bg-zinc-100 px-4 py-3 text-sm font-medium">
+        <div role="status" aria-live="polite" className="flex items-center justify-between gap-3 rounded-lg border border-border-strong bg-surface px-4 py-3 text-sm font-medium">
           <span>{mensaje}</span>
-          <button type="button" onClick={() => setMensaje(null)} className="min-h-10 shrink-0 rounded-md px-3 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+          <button type="button" onClick={() => setMensaje(null)} className="min-h-10 shrink-0 rounded-md px-3 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             Cerrar
           </button>
         </div>
@@ -163,30 +163,30 @@ export function PedidoDetalleDemo({ pedido }: { pedido: PedidoDemo }) {
       <ResumenImportes totalCentavos={pedidoActual.totalCentavos} cobradoCentavos={cobradoAcumulado} />
 
       <div className="flex flex-wrap gap-2" aria-label="Acciones del pedido ficticio">
-        <Button className="bg-zinc-950 text-white hover:bg-zinc-800" onClick={() => setPanelCobro((actual) => !actual)}>
-          <Banknote className="size-4" />
+        <Button onClick={() => setPanelCobro((actual) => !actual)}>
+          <Banknote aria-hidden="true" />
           Registrar pago
         </Button>
-        <Button variant="outline" className="border-zinc-300" onClick={() => simularAccion("Marcar encargado")}>
-          <Factory className="size-4" /> Marcar encargado
+        <Button variant="outline" onClick={() => simularAccion("Marcar encargado")}>
+          <Factory aria-hidden="true" /> Marcar encargado
         </Button>
-        <Button variant="outline" className="border-zinc-300" onClick={() => simularAccion("Registrar recepción")}>
-          <Truck className="size-4" /> Registrar recepción
+        <Button variant="outline" onClick={() => simularAccion("Registrar recepción")}>
+          <Truck aria-hidden="true" /> Registrar recepción
         </Button>
-        <Button variant="outline" className="border-zinc-300" onClick={() => simularAccion("Registrar entrega")}>
-          <PackageCheck className="size-4" /> Registrar entrega
+        <Button variant="outline" onClick={() => simularAccion("Registrar entrega")}>
+          <PackageCheck aria-hidden="true" /> Registrar entrega
         </Button>
-        <Button variant="outline" className="border-zinc-300" onClick={() => simularAccion("Agregar anotación")}>
-          <MessageSquarePlus className="size-4" /> Agregar anotación
+        <Button variant="outline" onClick={() => simularAccion("Agregar anotación")}>
+          <MessageSquarePlus aria-hidden="true" /> Agregar anotación
         </Button>
       </div>
 
       {panelCobro ? (
-        <section aria-labelledby="titulo-cobro-demo" className="rounded-xl border-2 border-zinc-950 bg-white p-4 sm:p-5">
+        <section aria-labelledby="titulo-cobro-demo" className="rounded-lg border border-border-strong bg-card p-4 sm:p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 id="titulo-cobro-demo" className="text-lg font-semibold">Registrar pago posterior</h2>
-              <p className="mt-1 text-sm leading-6 text-zinc-600">Completar hasta 50% alcanza la mitad acumulada; no vuelve a cobrar el 50% entero.</p>
+              <h2 id="titulo-cobro-demo" className="text-sm font-semibold tracking-tight">Registrar pago posterior</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">Completar hasta 50% alcanza la mitad acumulada; no vuelve a cobrar el 50% entero.</p>
             </div>
             <DemoBadge>Saldo actual {formatImporteDemo(saldoCentavos)}</DemoBadge>
           </div>
@@ -205,8 +205,8 @@ export function PedidoDetalleDemo({ pedido }: { pedido: PedidoDemo }) {
                     setError(null);
                   }}
                   className={cn(
-                    "flex min-h-16 items-center justify-between gap-3 rounded-md border px-3 text-left disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2",
-                    activa ? "border-zinc-950 bg-zinc-950 text-white" : "border-zinc-300 bg-white hover:bg-zinc-100"
+                    "flex min-h-16 items-center justify-between gap-3 rounded-md border px-3 text-left disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    activa ? "border-action bg-action text-action-foreground" : "border-border bg-card hover:bg-accent"
                   )}
                 >
                   <span className="text-sm font-medium">{opcion.label}</span>
@@ -221,15 +221,11 @@ export function PedidoDetalleDemo({ pedido }: { pedido: PedidoDemo }) {
               <Input id="demo-otro-pago" inputMode="decimal" value={otroImporte} onChange={(event) => setOtroImporte(event.target.value)} aria-invalid={Boolean(error)} />
             </div>
           ) : null}
-          {error ? <p role="alert" className="mt-4 rounded-md border border-zinc-950 bg-zinc-100 p-3 text-sm font-medium">{error}</p> : null}
-          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-zinc-200 pt-5 sm:flex-row sm:justify-end">
-            <Button variant="outline" className="border-zinc-300" onClick={() => setPanelCobro(false)}>Cancelar</Button>
-            <Button className="bg-zinc-950 text-white hover:bg-zinc-800" onClick={simularCobro} disabled={guardando || saldoCentavos === 0}>
-              {guardando ? (
-                <><span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white motion-reduce:animate-none" aria-hidden="true" />Registrando…</>
-              ) : (
-                <>Confirmar {formatImporteDemo(importeSeleccionado)}</>
-              )}
+          {error ? <p role="alert" className="mt-4 rounded-md border border-border-strong bg-surface p-3 text-sm font-medium">{error}</p> : null}
+          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-border pt-5 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setPanelCobro(false)}>Cancelar</Button>
+            <Button onClick={simularCobro} loading={guardando} loadingText="Registrando…" disabled={saldoCentavos === 0}>
+              Confirmar {formatImporteDemo(importeSeleccionado)}
             </Button>
           </div>
         </section>
@@ -240,30 +236,30 @@ export function PedidoDetalleDemo({ pedido }: { pedido: PedidoDemo }) {
           <DemoSection title="Productos y seguimiento" description="Cantidades recibidas y entregadas se controlan por línea.">
             <div className="space-y-4">
               {pedidoActual.items.map((item) => (
-                <article key={item.id} className="rounded-lg border border-zinc-300 p-4">
+                <article key={item.id} className="rounded-lg border border-border p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="font-semibold">{item.nombre}</p>
-                      <p className="mt-1 font-mono text-xs text-zinc-500">{item.sku} · {item.modoEntrega}</p>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">{item.sku} · {item.modoEntrega}</p>
                     </div>
                     <EstadoProductoBadge estado={item.estadoProducto} />
                   </div>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Especificaciones</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Especificaciones</p>
                       <ul className="mt-2 space-y-1.5 text-sm leading-6">
                         {item.especificaciones.map((especificacion) => <li key={especificacion} className="flex gap-2"><span aria-hidden="true">—</span>{especificacion}</li>)}
                       </ul>
                     </div>
                     <div className="space-y-3">
-                      <div><p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Responsable</p><p className="mt-1 text-sm">{item.responsable}</p></div>
-                      <div><p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Anotación interna</p><p className="mt-1 text-sm leading-6">{item.anotacionInterna}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Responsable</p><p className="mt-1 text-sm">{item.responsable}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Anotación interna</p><p className="mt-1 text-sm leading-6">{item.anotacionInterna}</p></div>
                     </div>
                   </div>
-                  <dl className="mt-4 grid grid-cols-3 overflow-hidden rounded-lg border border-zinc-300 text-sm">
-                    <div className="p-3"><dt className="text-xs text-zinc-500">Pedidas</dt><dd className="mt-1 font-mono text-lg font-semibold">{item.cantidad}</dd></div>
-                    <div className="border-l border-zinc-300 p-3"><dt className="text-xs text-zinc-500">Recibidas</dt><dd className="mt-1 font-mono text-lg font-semibold">{item.cantidadRecibida}</dd></div>
-                    <div className="border-l border-zinc-300 p-3"><dt className="text-xs text-zinc-500">Entregadas</dt><dd className="mt-1 font-mono text-lg font-semibold">{item.cantidadEntregada}</dd></div>
+                  <dl className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border text-sm">
+                    <div className="bg-card px-3 py-2.5"><dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Pedidas</dt><dd className="mt-1 font-mono text-base font-semibold tabular-nums">{item.cantidad}</dd></div>
+                    <div className="bg-card px-3 py-2.5"><dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Recibidas</dt><dd className="mt-1 font-mono text-base font-semibold tabular-nums">{item.cantidadRecibida}</dd></div>
+                    <div className="bg-card px-3 py-2.5"><dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Entregadas</dt><dd className="mt-1 font-mono text-base font-semibold tabular-nums">{item.cantidadEntregada}</dd></div>
                   </dl>
                 </article>
               ))}
@@ -273,23 +269,23 @@ export function PedidoDetalleDemo({ pedido }: { pedido: PedidoDemo }) {
           <DemoSection title="Historial de pagos" description="Cada cobro conserva fecha, medio, referencia, moneda y autor.">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[620px] text-sm">
-                <thead><tr className="border-b border-zinc-300 text-left text-xs uppercase tracking-wider text-zinc-500"><th className="px-2 py-3 font-medium">Fecha</th><th className="px-2 py-3 font-medium">Medio</th><th className="px-2 py-3 font-medium">Referencia</th><th className="px-2 py-3 font-medium">Autor</th><th className="px-2 py-3 text-right font-medium">Importe</th></tr></thead>
+                <thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground"><th className="px-2 py-3 font-medium">Fecha</th><th className="px-2 py-3 font-medium">Medio</th><th className="px-2 py-3 font-medium">Referencia</th><th className="px-2 py-3 font-medium">Autor</th><th className="px-2 py-3 text-right font-medium">Importe</th></tr></thead>
                 <tbody>
                   {pedidoActual.pagos.map((pago) => (
-                    <tr key={pago.id} className="border-b border-zinc-200 last:border-0"><td className="px-2 py-3">{formatFechaDemo(pago.fecha, true)}</td><td className="px-2 py-3">{pago.medio}</td><td className="px-2 py-3 font-mono text-xs">{pago.referencia}</td><td className="px-2 py-3">{pago.autor}</td><td className="px-2 py-3 text-right font-mono font-semibold tabular-nums">{formatImporteDemo(pago.importeCentavos, pago.moneda)}</td></tr>
+                    <tr key={pago.id} className="border-b border-border last:border-0"><td className="px-2 py-3 font-mono text-xs tabular-nums">{formatFechaDemo(pago.fecha, true)}</td><td className="px-2 py-3">{pago.medio}</td><td className="px-2 py-3 font-mono text-xs">{pago.referencia}</td><td className="px-2 py-3">{pago.autor}</td><td className="px-2 py-3 text-right font-mono font-semibold tabular-nums">{formatImporteDemo(pago.importeCentavos, pago.moneda)}</td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="mt-4 border-t border-zinc-200 pt-4 text-xs leading-5 text-zinc-500">Comprobantes: pendientes para la etapa de pagos persistidos. No se genera ningún documento real en esta muestra.</p>
+            <p className="mt-4 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">Comprobantes: pendientes para la etapa de pagos persistidos. No se genera ningún documento real en esta muestra.</p>
           </DemoSection>
         </div>
 
         <div className="min-w-0 space-y-6">
           <DemoSection title="Anotaciones" description="Las notas internas no se incluyen en comunicaciones a la clienta.">
             <div className="space-y-4">
-              <div><p className="text-xs font-medium uppercase tracking-wider text-zinc-500">General</p><p className="mt-2 text-sm leading-6">{pedidoActual.anotacionGeneral}</p></div>
-              <div className="border-t border-zinc-200 pt-4"><p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Visible para la clienta</p><p className="mt-2 text-sm italic text-zinc-500">Sin mensaje cargado.</p></div>
+              <div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">General</p><p className="mt-2 text-sm leading-6">{pedidoActual.anotacionGeneral}</p></div>
+              <div className="border-t border-border pt-4"><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Visible para la clienta</p><p className="mt-2 text-sm italic text-muted-foreground">Sin mensaje cargado.</p></div>
             </div>
           </DemoSection>
 
@@ -299,12 +295,12 @@ export function PedidoDetalleDemo({ pedido }: { pedido: PedidoDemo }) {
                 const Icon = iconoEvento(evento.tipo);
                 return (
                   <li key={evento.id} className="relative grid grid-cols-[2rem_1fr] gap-3 pb-5 last:pb-0">
-                    {index < pedidoActual.eventos.length - 1 ? <span className="absolute bottom-0 left-[0.94rem] top-8 w-px bg-zinc-300" aria-hidden="true" /> : null}
-                    <span className="relative z-10 flex size-8 items-center justify-center rounded-full border border-zinc-300 bg-white"><Icon className="size-3.5" aria-hidden="true" /></span>
+                    {index < pedidoActual.eventos.length - 1 ? <span className="absolute bottom-0 left-[0.97rem] top-8 w-px bg-border" aria-hidden="true" /> : null}
+                    <span className="relative z-10 flex size-8 items-center justify-center bg-card"><Icon className="size-4 text-muted-foreground" aria-hidden="true" /></span>
                     <div>
-                      <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="text-sm font-semibold">{evento.titulo}</p><time className="font-mono text-xs text-zinc-500">{formatFechaDemo(evento.fecha, true)}</time></div>
-                      <p className="mt-1 text-sm leading-6 text-zinc-600">{evento.detalle}</p>
-                      <p className="mt-1 text-xs text-zinc-500">Por {evento.autor}</p>
+                      <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="text-sm font-semibold">{evento.titulo}</p><time className="font-mono text-xs text-muted-foreground">{formatFechaDemo(evento.fecha, true)}</time></div>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{evento.detalle}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Por {evento.autor}</p>
                     </div>
                   </li>
                 );
