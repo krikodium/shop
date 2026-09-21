@@ -3,14 +3,21 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel } from "@/components/ui/panel";
+import { Resumen } from "@/components/ui/resumen";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   ProductoForm,
   productoToFormValues,
 } from "@/components/forms/ProductoForm";
+import { claseTonoCifra, tonoStock } from "@/components/productos/stock";
+import { formatARS } from "@/lib/formatCurrency";
+import { notificar } from "@/lib/notificar";
 import type { ProductoFormValues } from "@/lib/validaciones/productoSchema";
 import type {
   Categoria,
@@ -18,7 +25,6 @@ import type {
   Producto,
   ProductoParteProveedor,
 } from "@prisma/client";
-import { Package, ArrowLeft, AlertTriangle } from "lucide-react";
 
 interface ProductoConRelaciones extends Producto {
   categoria: Categoria | null;
@@ -26,62 +32,46 @@ interface ProductoConRelaciones extends Producto {
   partesProveedor: (ProductoParteProveedor & { proveedor: Proveedor })[];
 }
 
+function VolverAProductos() {
+  return (
+    <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+      <Link href="/productos">← Productos</Link>
+    </Button>
+  );
+}
+
 function ProductoEditSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 animate-in fade-in duration-300 sm:px-6">
-      <div className="flex justify-center sm:justify-start">
-        <Skeleton className="h-10 w-24 rounded-md animate-skeleton-shimmer" />
+    <div className="max-w-3xl space-y-6" aria-busy="true">
+      <Skeleton className="h-8 w-28 rounded-md animate-skeleton-shimmer" />
+      <div className="space-y-2 border-b pb-5">
+        <Skeleton className="h-3 w-40 animate-skeleton-shimmer" />
+        <Skeleton className="h-8 w-3/4 animate-skeleton-shimmer" />
+        <Skeleton className="h-4 w-32 animate-skeleton-shimmer" />
       </div>
-
-      {/* Header skeleton */}
-      <div className="flex gap-6">
-        <Skeleton className="h-32 w-32 shrink-0 rounded-xl animate-skeleton-shimmer" />
-        <div className="flex-1 space-y-3">
-          <Skeleton className="h-8 w-3/4 animate-skeleton-shimmer" />
-          <Skeleton className="h-5 w-1/3 animate-skeleton-shimmer" />
-          <div className="flex gap-2">
-            <Skeleton className="h-6 w-16 rounded-full animate-skeleton-shimmer" />
-            <Skeleton className="h-6 w-20 rounded-full animate-skeleton-shimmer" />
+      <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-card px-4 py-3.5">
+            <Skeleton className="h-3 w-20 animate-skeleton-shimmer" />
+            <Skeleton className="mt-2.5 h-6 w-28 animate-skeleton-shimmer" />
           </div>
-        </div>
+        ))}
       </div>
-
-      {/* Form skeleton */}
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-32 animate-skeleton-shimmer" />
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-16 animate-skeleton-shimmer" />
-              <Skeleton className="h-10 w-full animate-skeleton-shimmer" />
-            </div>
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-20 animate-skeleton-shimmer" />
-              <Skeleton className="h-10 w-full animate-skeleton-shimmer" />
-            </div>
+      {[1, 2].map((i) => (
+        <Panel key={i}>
+          <div className="border-b border-border px-4 py-3.5 sm:px-5">
+            <Skeleton className="h-4 w-32 animate-skeleton-shimmer" />
           </div>
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-24 animate-skeleton-shimmer" />
-            <Skeleton className="h-24 w-full animate-skeleton-shimmer" />
+          <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
+            {[1, 2].map((j) => (
+              <div key={j} className="space-y-2">
+                <Skeleton className="h-4 w-20 animate-skeleton-shimmer" />
+                <Skeleton className="h-9 w-full animate-skeleton-shimmer" />
+              </div>
+            ))}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-28 animate-skeleton-shimmer" />
-              <Skeleton className="h-10 w-full animate-skeleton-shimmer" />
-            </div>
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-24 animate-skeleton-shimmer" />
-              <Skeleton className="h-10 w-full animate-skeleton-shimmer" />
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <Skeleton className="h-10 w-24 animate-skeleton-shimmer" />
-            <Skeleton className="h-10 w-28 animate-skeleton-shimmer" />
-          </div>
-        </CardContent>
-      </Card>
+        </Panel>
+      ))}
     </div>
   );
 }
@@ -109,6 +99,7 @@ export default function EditarProductoPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // Si falla, lanza: el formulario muestra el error con `notificar`.
   const handleSubmit = async (data: ProductoFormValues) => {
     const res = await fetch(`/api/productos/${id}`, {
       method: "PATCH",
@@ -121,6 +112,7 @@ export default function EditarProductoPage() {
     }
     const updated = await res.json();
     setProducto(updated);
+    notificar.ok("Producto actualizado");
     router.refresh();
   };
 
@@ -128,140 +120,85 @@ export default function EditarProductoPage() {
 
   if (!producto) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6 px-4 animate-in fade-in duration-300 sm:px-6">
-        <div className="flex justify-center sm:justify-start">
-          <Link href="/productos">
-            <Button variant="ghost" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Productos
+      <div className="max-w-3xl space-y-6">
+        <VolverAProductos />
+        <EmptyState
+          icono={Package}
+          titulo="Producto no encontrado"
+          descripcion="El producto que buscás no existe o fue eliminado."
+          accion={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/productos">Volver a productos</Link>
             </Button>
-          </Link>
-        </div>
-        <Card className="border-destructive/50">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Package className="h-16 w-16 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Producto no encontrado</p>
-            <p className="text-sm text-muted-foreground mb-6">
-              El producto que buscás no existe o fue eliminado.
-            </p>
-            <Link href="/productos">
-              <Button variant="outline">Volver a productos</Button>
-            </Link>
-          </CardContent>
-        </Card>
+          }
+        />
       </div>
     );
   }
 
-  const bajoStock = producto.stockActual <= producto.stockMinimo;
+  const tono = tonoStock(producto.stockActual, producto.stockMinimo);
   const precioVenta = Number(producto.precioVenta);
   const precioCompra = producto.precioCompra != null ? Number(producto.precioCompra) : null;
+  const partes = producto.partesProveedor ?? [];
+  const proveedoresEnDesglose = new Set(partes.map((p) => p.proveedorId)).size;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500 sm:px-6">
-      <div className="flex justify-center sm:justify-start">
-        <Link href="/productos">
-          <Button variant="ghost" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Productos
-          </Button>
-        </Link>
-      </div>
+    <div className="max-w-3xl space-y-6">
+      <VolverAProductos />
 
-      {/* Header con imagen y datos clave */}
-      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-        <div className="relative h-36 w-36 shrink-0 overflow-hidden rounded-xl border bg-muted">
-          {producto.imagenUrl ? (
-            <img
-              src={producto.imagenUrl}
-              alt={producto.nombre}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Package className="h-16 w-16 text-muted-foreground/50" />
-            </div>
-          )}
-        </div>
-        <div className="min-w-0 flex-1 space-y-3 text-center sm:text-left">
-          <h1 className="text-2xl font-bold tracking-tight">{producto.nombre}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{producto.sku}</p>
-          <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
-            <Badge variant="secondary">{producto.categoria?.nombre ?? "Sin categoría"}</Badge>
-            {producto.enConsignacion && (
-              <Badge variant="outline">Consignación</Badge>
-            )}
-            {!producto.activo && (
-              <Badge variant="destructive">Inactivo</Badge>
-            )}
-            {bajoStock && (
-              <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
-                <AlertTriangle className="mr-1 h-3 w-3" />
-                Stock bajo
-              </Badge>
-            )}
-          </div>
-          <div className="flex flex-wrap justify-center gap-4 pt-2 text-sm sm:justify-start">
-            <div>
-              <span className="text-muted-foreground">P. venta:</span>{" "}
-              <span className="font-semibold tabular-nums">
-                ${precioVenta.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            {precioCompra != null && (
-              <div>
-                <span className="text-muted-foreground">P. compra:</span>{" "}
-                <span className="tabular-nums">
-                  ${precioCompra.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            )}
-            <div>
-              <span className="text-muted-foreground">Stock:</span>{" "}
-              <span className={bajoStock ? "font-semibold text-amber-600" : "tabular-nums"}>
-                {producto.stockActual}
-              </span>
-              {producto.stockMinimo > 0 && (
-                <span className="text-muted-foreground"> / mín. {producto.stockMinimo}</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        overline="Mercadería · Productos"
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {producto.nombre}
+            {producto.enConsignacion && <Badge variant="outline">Consignación</Badge>}
+            {!producto.activo && <Badge variant="outline">Inactivo</Badge>}
+          </span>
+        }
+        description={
+          <>
+            <span className="font-mono">{producto.sku}</span>
+            {" · "}
+            {producto.categoria?.nombre ?? "Sin categoría"}
+          </>
+        }
+      />
 
-      {/* Formulario de edición */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Editar datos</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Modificá los campos que necesites y guardá los cambios.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-              <p className="text-muted-foreground">Partes cargadas</p>
-              <p className="font-semibold tabular-nums">{producto.partesProveedor?.length ?? 0}</p>
-            </div>
-            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-              <p className="text-muted-foreground">Proveedores en desglose</p>
-              <p className="font-semibold tabular-nums">
-                {new Set((producto.partesProveedor ?? []).map((p) => p.proveedorId)).size}
-              </p>
-            </div>
-            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-              <p className="text-muted-foreground">Proveedor principal</p>
-              <p className="font-semibold truncate">{producto.proveedor?.nombre ?? "Sin definir"}</p>
-            </div>
-          </div>
-          <ProductoForm
-            defaultValues={productoToFormValues(producto)}
-            categorias={categorias}
-            proveedores={proveedores}
-            onSubmit={handleSubmit}
-          />
-        </CardContent>
-      </Card>
+      <Resumen
+        items={[
+          { label: "P. venta", valor: formatARS(precioVenta) },
+          {
+            label: "P. compra",
+            valor: precioCompra != null ? formatARS(precioCompra) : "—",
+          },
+          {
+            label: "Stock",
+            valor: <span className={claseTonoCifra[tono]}>{producto.stockActual}</span>,
+            hint:
+              tono === "negativo"
+                ? "Sin stock"
+                : producto.stockMinimo > 0
+                  ? `mín. ${producto.stockMinimo}${tono === "alerta" ? " · en o bajo el mínimo" : ""}`
+                  : undefined,
+          },
+          {
+            label: "Proveedor",
+            valor: (
+              <span className="block truncate font-sans text-base">
+                {producto.proveedor?.nombre ?? "Sin definir"}
+              </span>
+            ),
+            hint: `${partes.length} ${partes.length === 1 ? "parte" : "partes"} · ${proveedoresEnDesglose} en desglose`,
+          },
+        ]}
+      />
+
+      <ProductoForm
+        defaultValues={productoToFormValues(producto)}
+        categorias={categorias}
+        proveedores={proveedores}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

@@ -7,13 +7,13 @@ export default function ProveedoresPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        overline="Gestión · Proveedores"
+        overline="Mercadería"
         title="Proveedores"
         description="Proveedores regulares y en consignación"
       >
-        <Link href="/proveedores/nuevo">
-          <Button>Nuevo proveedor</Button>
-        </Link>
+        <Button asChild>
+          <Link href="/proveedores/nuevo">Nuevo proveedor</Link>
+        </Button>
       </PageHeader>
       <ProveedoresTable />
     </div>

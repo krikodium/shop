@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Truck } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,12 +13,16 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { Proveedor } from "@prisma/client";
 
 interface ProveedorConCount extends Proveedor {
   _count: { productos: number };
 }
+
+const claseLinkFila =
+  "rounded-sm text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export function ProveedoresTable() {
   const [proveedores, setProveedores] = useState<ProveedorConCount[]>([]);
@@ -33,59 +38,77 @@ export function ProveedoresTable() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) {
-    return <TableSkeleton rows={6} cols={5} />;
-  }
-
-  if (proveedores.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center text-muted-foreground">
-        No hay proveedores.{" "}
-        <Link href="/proveedores/nuevo" className="font-medium text-primary hover:underline">
-          Crear uno
-        </Link>
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-lg border bg-card overflow-hidden shadow-sm">
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Nombre</TableHead>
-          <TableHead>Tipo</TableHead>
-          <TableHead>Contacto</TableHead>
-          <TableHead>Productos</TableHead>
-          <TableHead className="w-[100px]"></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {proveedores.map((p) => (
-          <TableRow key={p.id}>
-            <TableCell className="font-medium">{p.nombre}</TableCell>
-            <TableCell>
-              <Badge
-                variant={p.tipoProveedor === "CONSIGNACION" ? "default" : "secondary"}
-              >
-                {p.tipoProveedor === "CONSIGNACION" ? "Consignación" : "Regular"}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              {p.telefono || p.email || "—"}
-            </TableCell>
-            <TableCell>{p._count.productos}</TableCell>
-            <TableCell>
-              <Link href={`/proveedores/${p.id}`}>
-                <Button variant="ghost" size="sm">
-                  Ver / Editar
-                </Button>
-              </Link>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-    </div>
+    <Panel>
+      <PanelHeader
+        title="Listado"
+        descripcion={
+          loading
+            ? undefined
+            : `${proveedores.length} ${proveedores.length === 1 ? "proveedor" : "proveedores"}`
+        }
+      />
+      {loading ? (
+        <div className="divide-y divide-border" aria-busy="true" aria-label="Cargando proveedores">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3.5 sm:px-5">
+              <div className="h-4 flex-1 animate-skeleton-shimmer rounded" />
+              <div className="h-4 w-24 animate-skeleton-shimmer rounded" />
+              <div className="h-4 w-10 animate-skeleton-shimmer rounded" />
+            </div>
+          ))}
+        </div>
+      ) : proveedores.length === 0 ? (
+        <PanelBody>
+          <EmptyState
+            icono={Truck}
+            titulo="Todavía no hay proveedores"
+            descripcion="Cargá el primero para asociarle productos y ver sus métricas."
+            accion={
+              <Button asChild size="sm">
+                <Link href="/proveedores/nuevo">Nuevo proveedor</Link>
+              </Button>
+            }
+          />
+        </PanelBody>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Contacto</TableHead>
+              <TableHead className="text-right">Productos</TableHead>
+              <TableHead className="w-[110px]">
+                <span className="sr-only">Acciones</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {proveedores.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">{p.nombre}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">
+                    {p.tipoProveedor === "CONSIGNACION" ? "Consignación" : "Regular"}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {p.telefono || p.email || "—"}
+                </TableCell>
+                <TableCell className="text-right font-mono tabular-nums">
+                  {p._count.productos}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Link href={`/proveedores/${p.id}`} className={claseLinkFila}>
+                    Ver / Editar
+                  </Link>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Panel>
   );
 }

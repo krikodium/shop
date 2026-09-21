@@ -3,31 +3,64 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ChevronDown, ChevronUp, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, PanelHeader } from "@/components/ui/panel";
+import { Resumen, type ItemResumen } from "@/components/ui/resumen";
+import { DataList, DataRow } from "@/components/ui/data-list";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ProveedorForm, proveedorToFormValues } from "@/components/forms/ProveedorForm";
+import { claseTonoCifra, tonoStock } from "@/components/productos/stock";
+import { formatARS } from "@/lib/formatCurrency";
+import { notificar } from "@/lib/notificar";
+import { cn } from "@/lib/utils";
 import type { ProveedorFormValues } from "@/lib/validaciones/proveedorSchema";
 import type { Proveedor } from "@prisma/client";
-import {
-  Package,
-  TrendingUp,
-  CreditCard,
-  Receipt,
-  ShoppingCart,
-  ChevronDown,
-  ChevronUp,
-  AlertTriangle,
-  ExternalLink,
-} from "lucide-react";
 
-const fmt = (n: number) =>
-  new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+const claseLinkFila =
+  "rounded-sm text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+function VolverAProveedores() {
+  return (
+    <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+      <Link href="/proveedores">← Proveedores</Link>
+    </Button>
+  );
+}
+
+function ProveedorDetalleSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true">
+      <div className="h-8 w-32 animate-skeleton-shimmer rounded-md" />
+      <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <div className="h-3 w-40 animate-skeleton-shimmer rounded" />
+          <div className="h-8 w-56 animate-skeleton-shimmer rounded-md" />
+        </div>
+        <div className="h-9 w-32 animate-skeleton-shimmer rounded-md" />
+      </div>
+      <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-card px-4 py-3.5">
+            <div className="h-3 w-24 animate-skeleton-shimmer rounded" />
+            <div className="mt-2.5 h-6 w-32 animate-skeleton-shimmer rounded" />
+          </div>
+        ))}
+      </div>
+      <div className="h-64 animate-skeleton-shimmer rounded-lg" />
+    </div>
+  );
+}
 
 interface AnalyticsData {
   proveedor: { id: string; nombre: string; tipoProveedor: string };
@@ -105,6 +138,7 @@ export default function ProveedorDetallePage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // Si falla, lanza: el formulario muestra el error con `notificar`.
   const handleSubmit = async (data: ProveedorFormValues) => {
     const res = await fetch(`/api/proveedores/${id}`, {
       method: "PATCH",
@@ -117,6 +151,7 @@ export default function ProveedorDetallePage() {
     }
     const updated = await res.json();
     setProveedor(updated);
+    notificar.ok("Proveedor actualizado");
     router.refresh();
     // Refrescar analytics
     fetch(`/api/proveedores/${id}/analytics`)
@@ -124,14 +159,21 @@ export default function ProveedorDetallePage() {
       .then((a) => a && setAnalytics(a));
   };
 
-  if (loading) return <p className="text-muted-foreground">Cargando…</p>;
+  if (loading) return <ProveedorDetalleSkeleton />;
   if (!proveedor) {
     return (
-      <div className="space-y-4">
-        <p>Proveedor no encontrado.</p>
-        <Link href="/proveedores">
-          <Button variant="outline">Volver a proveedores</Button>
-        </Link>
+      <div className="space-y-6">
+        <VolverAProveedores />
+        <EmptyState
+          icono={Truck}
+          titulo="Proveedor no encontrado"
+          descripcion="Puede haber sido eliminado o el enlace ya no es válido."
+          accion={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/proveedores">Volver a proveedores</Link>
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -139,38 +181,82 @@ export default function ProveedorDetallePage() {
   const a = analytics;
   const esConsignacion = proveedor.tipoProveedor === "CONSIGNACION";
 
+  const resumenItems: ItemResumen[] = [];
+  if (a) {
+    resumenItems.push(
+      {
+        label: "Productos",
+        valor: a.productos.cantidad,
+        hint: `${a.productos.cantidadActivos} activos · inventario ${formatARS(a.productos.valorInventario)}`,
+      },
+      {
+        label: "Total vendido",
+        valor: formatARS(a.ventas.totalVendido),
+        hint: `${a.ventas.cantidadVentas} ventas con sus productos`,
+      }
+    );
+    if (esConsignacion && a.consignacion) {
+      resumenItems.push(
+        {
+          label: "Deuda pendiente",
+          valor: (
+            <span className={a.consignacion.deudaPendiente > 0 ? "text-num-warning" : undefined}>
+              {formatARS(a.consignacion.deudaPendiente)}
+            </span>
+          ),
+          hint: "Por rendir al proveedor",
+        },
+        {
+          label: "Total rendido",
+          valor: formatARS(a.consignacion.totalRendido),
+          hint: "Histórico pagado al proveedor",
+        }
+      );
+    }
+    if (!esConsignacion) {
+      resumenItems.push({
+        label: "Total comprado",
+        valor: formatARS(a.compras.totalCompras),
+        hint: `${a.compras.cantidadOrdenes} órdenes de compra`,
+      });
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/proveedores">
-          <Button variant="ghost">← Proveedores</Button>
-        </Link>
-        <div className="flex items-center gap-2">
-          <Badge variant={esConsignacion ? "secondary" : "outline"}>
-            {esConsignacion ? "Consignación" : "Regular"}
-          </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFormOpen(!formOpen)}
-          >
-            {formOpen ? (
-              <>
-                <ChevronUp className="h-4 w-4" />
-                Ocultar edición
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-4 w-4" />
-                Editar datos
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      <VolverAProveedores />
+
+      <PageHeader
+        overline="Mercadería · Proveedores"
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {proveedor.nombre}
+            <Badge variant="outline">{esConsignacion ? "Consignación" : "Regular"}</Badge>
+          </span>
+        }
+        description={
+          proveedor.telefono || proveedor.email
+            ? [proveedor.telefono, proveedor.email].filter(Boolean).join(" · ")
+            : undefined
+        }
+      >
+        <Button
+          variant="outline"
+          onClick={() => setFormOpen(!formOpen)}
+          aria-expanded={formOpen}
+          aria-controls="proveedor-edicion"
+        >
+          {formOpen ? (
+            <ChevronUp aria-hidden="true" className="text-muted-foreground" />
+          ) : (
+            <ChevronDown aria-hidden="true" className="text-muted-foreground" />
+          )}
+          {formOpen ? "Ocultar edición" : "Editar datos"}
+        </Button>
+      </PageHeader>
 
       {formOpen && (
-        <div className="rounded-lg border bg-card p-4">
+        <div id="proveedor-edicion" className="max-w-3xl">
           <ProveedorForm
             defaultValues={proveedorToFormValues(proveedor)}
             onSubmit={handleSubmit}
@@ -178,317 +264,185 @@ export default function ProveedorDetallePage() {
         </div>
       )}
 
-      <div>
-        <h1 className="text-2xl font-bold">{proveedor.nombre}</h1>
-        {(proveedor.telefono || proveedor.email) && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            {[proveedor.telefono, proveedor.email].filter(Boolean).join(" · ")}
-          </p>
-        )}
-      </div>
-
       {!a ? (
-        <p className="text-muted-foreground">Cargando estadísticas…</p>
+        <p className="text-sm text-muted-foreground">No se pudieron cargar las estadísticas.</p>
       ) : (
         <>
-          {/* KPIs */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Productos en dominio
-                </CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{a.productos.cantidad}</p>
-                <p className="text-xs text-muted-foreground">
-                  {a.productos.cantidadActivos} activos · Valor inventario {fmt(a.productos.valorInventario)}
-                </p>
-              </CardContent>
-            </Card>
+          <Resumen items={resumenItems} />
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total vendido
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-green-600">
-                  {fmt(a.ventas.totalVendido)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {a.ventas.cantidadVentas} ventas con sus productos
-                </p>
-              </CardContent>
-            </Card>
-
-            {esConsignacion && a.consignacion && (
-              <>
-                <Card className="border-amber-200 dark:border-amber-900">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Deuda pendiente
-                    </CardTitle>
-                    <CreditCard className="h-4 w-4 text-amber-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold text-amber-600">
-                      {fmt(a.consignacion.deudaPendiente)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Por rendir al proveedor
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Total rendido
-                    </CardTitle>
-                    <Receipt className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold">
-                      {fmt(a.consignacion.totalRendido)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Histórico pagado al proveedor
-                    </p>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-
-            {!esConsignacion && (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total comprado
-                  </CardTitle>
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold">{fmt(a.compras.totalCompras)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {a.compras.cantidadOrdenes} órdenes de compra
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Productos en dominio */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Productos en dominio</CardTitle>
-              <Link href={`/productos?proveedorId=${id}`}>
-                <Button variant="ghost" size="sm">
-                  Ver todos <ExternalLink className="ml-1 h-3 w-3" />
+          <Panel>
+            <PanelHeader
+              title="Productos en dominio"
+              descripcion={`${a.productos.lista.length} ${a.productos.lista.length === 1 ? "producto" : "productos"}`}
+              acciones={
+                <Button asChild variant="ghost" size="sm">
+                  <Link href={`/productos?proveedorId=${id}`}>Ver en productos</Link>
                 </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {a.productos.lista.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  No hay productos asignados a este proveedor
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="py-2 text-left">Producto</th>
-                        <th className="py-2 text-left">SKU</th>
-                        <th className="py-2 text-right">Stock</th>
-                        <th className="py-2 text-right">P. venta</th>
-                        <th className="py-2 text-right">Valor</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {a.productos.lista.map((p) => {
-                        const bajoStock = p.stockActual <= p.stockMinimo;
-                        return (
-                          <tr key={p.id} className="border-b">
-                            <td className="py-2">
-                              <div className="flex items-center gap-2">
-                                {!p.activo && (
-                                  <span className="text-xs text-muted-foreground">(inactivo)</span>
-                                )}
-                                <Link
-                                  href={`/productos/${p.id}/editar`}
-                                  className="font-medium hover:underline"
-                                >
-                                  {p.nombre}
-                                </Link>
-                              </div>
-                            </td>
-                            <td className="py-2 text-muted-foreground">{p.sku}</td>
-                            <td className="py-2 text-right">
-                              <span className={bajoStock ? "text-amber-600" : ""}>
-                                {p.stockActual}
-                                {bajoStock && (
-                                  <AlertTriangle className="ml-1 inline h-3 w-3" />
-                                )}
-                              </span>
-                            </td>
-                            <td className="py-2 text-right tabular-nums">
-                              {fmt(p.precioVenta)}
-                            </td>
-                            <td className="py-2 text-right tabular-nums">
-                              {fmt(p.precioVenta * p.stockActual)}
-                            </td>
-                            <td>
-                              <Link href={`/productos/${p.id}/editar`}>
-                                <Button variant="ghost" size="sm">
-                                  Editar
-                                </Button>
-                              </Link>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              }
+            />
+            {a.productos.lista.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
+                No hay productos asignados a este proveedor.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead className="text-right">P. venta</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="w-[80px]">
+                      <span className="sr-only">Acciones</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {a.productos.lista.map((p) => {
+                    const tono = tonoStock(p.stockActual, p.stockMinimo);
+                    return (
+                      <TableRow
+                        key={p.id}
+                        className={p.activo ? undefined : "text-muted-foreground"}
+                      >
+                        <TableCell>
+                          <span className="font-medium">{p.nombre}</span>
+                          {!p.activo && (
+                            <Badge variant="outline" className="ml-2 align-middle">
+                              Inactivo
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {p.sku}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            "text-right font-mono tabular-nums",
+                            claseTonoCifra[tono],
+                            tono !== "neutro" && "font-semibold"
+                          )}
+                          title={
+                            tono === "negativo"
+                              ? "Sin stock"
+                              : tono === "alerta"
+                                ? `En o bajo el mínimo (${p.stockMinimo})`
+                                : undefined
+                          }
+                        >
+                          {p.stockActual}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">
+                          {formatARS(p.precioVenta)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">
+                          {formatARS(p.precioVenta * p.stockActual)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/productos/${p.id}/editar`} className={claseLinkFila}>
+                            Editar
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </Panel>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            {/* Ventas recientes */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Ventas recientes con sus productos</CardTitle>
-                <Link href="/ventas">
-                  <Button variant="ghost" size="sm">
-                    Ver ventas <ExternalLink className="ml-1 h-3 w-3" />
+            <Panel>
+              <PanelHeader
+                title="Ventas recientes"
+                descripcion="Ventas que incluyen productos de este proveedor"
+                acciones={
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/ventas">Ver ventas</Link>
                   </Button>
-                </Link>
-              </CardHeader>
-              <CardContent>
-                {a.ventasRecientes.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    Sin ventas registradas
+                }
+              />
+              {a.ventasRecientes.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
+                  Sin ventas registradas.
+                </p>
+              ) : (
+                <DataList className="rounded-none border-0">
+                  {a.ventasRecientes.map((v) => (
+                    <DataRow
+                      key={v.id}
+                      href={`/ventas/${v.id}`}
+                      titulo={<span className="font-mono">{v.numeroVenta}</span>}
+                      meta={new Date(v.fecha).toLocaleString("es-AR")}
+                      valor={formatARS(v.total)}
+                      valorHint={`sus productos ${formatARS(v.subtotalProveedor)}`}
+                    />
+                  ))}
+                </DataList>
+              )}
+            </Panel>
+
+            {esConsignacion && a.consignacion ? (
+              <Panel>
+                <PanelHeader
+                  title="Rendiciones"
+                  acciones={
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/consignacion/rendiciones/nueva?proveedorId=${id}`}>
+                        Nueva rendición
+                      </Link>
+                    </Button>
+                  }
+                />
+                {a.consignacion.rendiciones.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
+                    Sin rendiciones.
                   </p>
                 ) : (
-                  <ul className="space-y-3">
-                    {a.ventasRecientes.map((v) => (
-                      <li
-                        key={v.id}
-                        className="flex items-center justify-between rounded-lg border p-3"
-                      >
-                        <div>
-                          <Link
-                            href={`/ventas/${v.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {v.numeroVenta}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(v.fecha).toLocaleString("es-AR")}
-                          </p>
-                          <p className="text-xs text-amber-600">
-                            Sus productos: {fmt(v.subtotalProveedor)}
-                          </p>
-                        </div>
-                        <span className="font-semibold">{fmt(v.total)}</span>
-                      </li>
+                  <DataList className="rounded-none border-0">
+                    {a.consignacion.rendiciones.map((r) => (
+                      <DataRow
+                        key={r.id}
+                        href={`/consignacion/rendiciones/${r.id}`}
+                        titulo={<span className="font-mono">{r.numeroRendicion}</span>}
+                        etiquetas={<Badge variant="outline">{r.estado}</Badge>}
+                        meta={`${new Date(r.fechaDesde).toLocaleDateString("es-AR")} – ${new Date(r.fechaHasta).toLocaleDateString("es-AR")}`}
+                        valor={formatARS(r.totalARendir)}
+                        valorHint="a rendir"
+                      />
                     ))}
-                  </ul>
+                  </DataList>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Rendiciones o Órdenes de compra */}
-            {esConsignacion && a.consignacion ? (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Rendiciones</CardTitle>
-                  <Link href={`/consignacion/rendiciones/nueva?proveedorId=${id}`}>
-                    <Button size="sm">Nueva rendición</Button>
-                  </Link>
-                </CardHeader>
-                <CardContent>
-                  {a.consignacion.rendiciones.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      Sin rendiciones
-                    </p>
-                  ) : (
-                    <ul className="space-y-3">
-                      {a.consignacion.rendiciones.map((r) => (
-                        <li
-                          key={r.id}
-                          className="flex items-center justify-between rounded-lg border p-3"
-                        >
-                          <div>
-                            <Link
-                              href={`/consignacion/rendiciones/${r.id}`}
-                              className="font-medium hover:underline"
-                            >
-                              {r.numeroRendicion}
-                            </Link>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(r.fechaDesde).toLocaleDateString("es-AR")} -{" "}
-                              {new Date(r.fechaHasta).toLocaleDateString("es-AR")}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-amber-600">
-                              {fmt(r.totalARendir)}
-                            </p>
-                            <Badge variant="outline" className="text-xs">
-                              {r.estado}
-                            </Badge>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+              </Panel>
             ) : (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Órdenes de compra</CardTitle>
-                  <Link href="/compras/nueva">
-                    <Button size="sm">Nueva orden</Button>
-                  </Link>
-                </CardHeader>
-                <CardContent>
-                  {a.compras.ultimas.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      Sin órdenes de compra
-                    </p>
-                  ) : (
-                    <ul className="space-y-3">
-                      {a.compras.ultimas.map((o) => (
-                        <li
-                          key={o.id}
-                          className="flex items-center justify-between rounded-lg border p-3"
-                        >
-                          <div>
-                            <Link
-                              href={`/compras/${o.id}`}
-                              className="font-medium hover:underline"
-                            >
-                              {o.numeroOrden}
-                            </Link>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(o.fecha).toLocaleDateString("es-AR")}
-                            </p>
-                          </div>
-                          <span className="font-semibold">{fmt(o.total)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+              <Panel>
+                <PanelHeader
+                  title="Órdenes de compra"
+                  acciones={
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/compras/nueva">Nueva orden</Link>
+                    </Button>
+                  }
+                />
+                {a.compras.ultimas.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
+                    Sin órdenes de compra.
+                  </p>
+                ) : (
+                  <DataList className="rounded-none border-0">
+                    {a.compras.ultimas.map((o) => (
+                      <DataRow
+                        key={o.id}
+                        href={`/compras/${o.id}`}
+                        titulo={<span className="font-mono">{o.numeroOrden}</span>}
+                        meta={new Date(o.fecha).toLocaleDateString("es-AR")}
+                        valor={formatARS(o.total)}
+                      />
+                    ))}
+                  </DataList>
+                )}
+              </Panel>
             )}
           </div>
         </>

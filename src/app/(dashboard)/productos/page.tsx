@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -22,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/ui/page-header";
+import { useAsyncAction } from "@/hooks/use-async-action";
 import { ProductosTable } from "./ProductosTable";
 import type { Categoria, Proveedor } from "@prisma/client";
 
@@ -40,7 +41,6 @@ export default function ProductosPage() {
   const [filtroBusqueda, setFiltroBusqueda] = useState("");
   const [modalCarga, setModalCarga] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
-  const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState<{
     creados: number;
     errores: number;
@@ -61,9 +61,8 @@ export default function ProductosPage() {
     if (proveedorIdFromUrl) setFiltroProveedor(proveedorIdFromUrl);
   }, [proveedorIdFromUrl]);
 
-  const handleCargaMasiva = async () => {
+  const { run: handleCargaMasiva, loading: cargando } = useAsyncAction(async () => {
     if (!archivo) return;
-    setCargando(true);
     setResultado(null);
     try {
       const formData = new FormData();
@@ -89,10 +88,8 @@ export default function ProductosPage() {
         errores: 1,
         mensajesError: [err instanceof Error ? err.message : "Error al procesar"],
       });
-    } finally {
-      setCargando(false);
     }
-  };
+  });
 
   const limpiarFiltros = () => {
     setFiltroBusqueda("");
@@ -109,88 +106,196 @@ export default function ProductosPage() {
   if (filtroStock && filtroStock !== "__all__") queryParams.set("stockBajo", filtroStock);
   if (filtroBusqueda) queryParams.set("q", filtroBusqueda);
 
+  const hayFiltros =
+    filtroBusqueda !== "" ||
+    filtroCategoria !== "__all__" ||
+    filtroProveedor !== (proveedorIdFromUrl ?? "__all__") ||
+    filtroConsignacion !== "__all__" ||
+    filtroStock !== "__all__";
+
+  const filtros = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative min-w-[12rem] flex-1">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          id="filtro-busqueda"
+          placeholder="Buscar por nombre o SKU"
+          aria-label="Buscar producto"
+          value={filtroBusqueda}
+          onChange={(e) => setFiltroBusqueda(e.target.value)}
+          className="h-9 pl-9"
+        />
+      </div>
+
+      <Label htmlFor="filtro-categoria" className="sr-only">
+        Categoría
+      </Label>
+      <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+        <SelectTrigger id="filtro-categoria" className="h-9 w-full sm:w-44">
+          <SelectValue placeholder="Categoría" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todas las categorías</SelectItem>
+          {categorias.map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.nombre}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Label htmlFor="filtro-proveedor" className="sr-only">
+        Proveedor
+      </Label>
+      <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
+        <SelectTrigger id="filtro-proveedor" className="h-9 w-full sm:w-44">
+          <SelectValue placeholder="Proveedor" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todos los proveedores</SelectItem>
+          {proveedores.map((p) => (
+            <SelectItem key={p.id} value={p.id}>
+              {p.nombre}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Label htmlFor="filtro-tipo" className="sr-only">
+        Tipo de producto
+      </Label>
+      <Select value={filtroConsignacion} onValueChange={setFiltroConsignacion}>
+        <SelectTrigger id="filtro-tipo" className="h-9 w-full sm:w-36">
+          <SelectValue placeholder="Tipo" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todos los tipos</SelectItem>
+          <SelectItem value="true">Consignación</SelectItem>
+          <SelectItem value="false">Regular</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Label htmlFor="filtro-stock" className="sr-only">
+        Estado de stock
+      </Label>
+      <Select value={filtroStock} onValueChange={setFiltroStock}>
+        <SelectTrigger id="filtro-stock" className="h-9 w-full sm:w-36">
+          <SelectValue placeholder="Stock" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todo el stock</SelectItem>
+          <SelectItem value="bajo">Stock bajo</SelectItem>
+          <SelectItem value="sin">Sin stock</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={limpiarFiltros}
+        disabled={!hayFiltros}
+        className="text-muted-foreground"
+      >
+        Limpiar
+      </Button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
-        overline="Gestión · Inventario"
+        overline="Mercadería"
         title="Productos"
         description="Catálogo e inventario"
       >
-        <div className="flex gap-2">
-          <Dialog open={modalCarga} onOpenChange={setModalCarga}>
-            <DialogTrigger asChild>
-              <Button variant="outline">Carga masiva Excel</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Carga masiva desde Excel</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-5 pt-4">
-                {/* Instrucciones */}
-                <div className="rounded-lg border bg-muted/30 p-4 text-sm space-y-4">
-                  <p className="font-medium">Instrucciones</p>
-                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                    <li>La primera fila debe contener los encabezados exactos.</li>
-                    <li>Columnas obligatorias: <strong>SKU</strong> y <strong>Nombre</strong>.</li>
-                    <li>SKU debe ser único (no puede repetirse).</li>
-                    <li>Precio venta es obligatorio y debe ser mayor a 0.</li>
-                    <li>Categoría y Proveedor: usar el nombre exacto como está en el sistema.</li>
-                    <li>Consignación: S, Si, Yes, 1 o True para sí; cualquier otro valor = no.</li>
-                    <li>
-                      <strong>Porcentaje consignación (propio)</strong>: solo si Consignación = S — porcentaje
-                      que se queda el negocio; el proveedor recibe el resto. Vacío = usar el % por defecto
-                      del proveedor en ventas (si no hay, la lógica del sistema).
-                    </li>
-                    <li>Imagen URL: URL completa de la imagen (ej: https://...). Dejar vacío si no tiene.</li>
-                  </ul>
-                </div>
+        <Dialog open={modalCarga} onOpenChange={setModalCarga}>
+          <DialogTrigger asChild>
+            <Button variant="outline">Carga masiva Excel</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Carga masiva desde Excel</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-5 pt-2">
+              <section className="space-y-2 text-sm">
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Instrucciones
+                </h3>
+                <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                  <li>La primera fila debe contener los encabezados exactos.</li>
+                  <li>
+                    Columnas obligatorias: <strong className="text-foreground">SKU</strong> y{" "}
+                    <strong className="text-foreground">Nombre</strong>.
+                  </li>
+                  <li>SKU debe ser único (no puede repetirse).</li>
+                  <li>Precio venta es obligatorio y debe ser mayor a 0.</li>
+                  <li>Categoría y Proveedor: usar el nombre exacto como está en el sistema.</li>
+                  <li>Consignación: S, Si, Yes, 1 o True para sí; cualquier otro valor = no.</li>
+                  <li>
+                    <strong className="text-foreground">Porcentaje consignación (propio)</strong>: solo
+                    si Consignación = S — porcentaje que se queda el negocio; el proveedor recibe el
+                    resto. Vacío = usar el % por defecto del proveedor en ventas (si no hay, la lógica
+                    del sistema).
+                  </li>
+                  <li>Imagen URL: URL completa de la imagen (ej: https://...). Dejar vacío si no tiene.</li>
+                </ul>
+              </section>
 
-                {/* Descargas */}
-                <div className="flex flex-col gap-3">
-                  <p className="font-medium text-sm">Descargar modelo</p>
-                  <div className="flex gap-2 flex-wrap">
-                    <a
-                      href="/api/productos/plantilla"
-                      download="plantilla-productos.xlsx"
-                    >
-                      <Button variant="outline" size="sm" type="button">
-                        Plantilla vacía
-                      </Button>
+              <section className="space-y-2 border-t border-border pt-4">
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Descargar modelo
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild variant="outline" size="sm">
+                    <a href="/api/productos/plantilla" download="plantilla-productos.xlsx">
+                      Plantilla vacía
                     </a>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
                     <a
                       href="/api/productos/plantilla?modelo=prueba"
                       download="modelo-prueba-productos.xlsx"
                     >
-                      <Button variant="outline" size="sm" type="button">
-                        Modelo de prueba (2 ejemplos)
-                      </Button>
+                      Modelo de prueba (2 ejemplos)
                     </a>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    El modelo de prueba incluye 1 fila con URL de imagen y 1 sin imagen.
-                  </p>
+                  </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  El modelo de prueba incluye 1 fila con URL de imagen y 1 sin imagen.
+                </p>
+              </section>
 
-                {/* Importar */}
-                <div className="space-y-3 pt-4 border-t">
-                  <p className="font-medium text-sm">Importar archivo</p>
-                  <Input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-                  />
+              <section className="space-y-3 border-t border-border pt-4">
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Importar archivo
+                </h3>
+                <Input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  aria-label="Archivo Excel"
+                  onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+                />
                 {resultado && (
-                  <div className="rounded border p-3 text-sm">
-                    <p className="font-medium text-green-600">
-                      {resultado.creados} productos creados
+                  <div className="space-y-1 text-sm" aria-live="polite">
+                    <p>
+                      <span className="font-mono font-semibold tabular-nums text-num-positive">
+                        {resultado.creados}
+                      </span>{" "}
+                      productos creados
                     </p>
                     {resultado.errores > 0 && (
-                      <p className="text-destructive">
-                        {resultado.errores} errores
+                      <p>
+                        <span className="font-mono font-semibold tabular-nums text-num-negative">
+                          {resultado.errores}
+                        </span>{" "}
+                        errores
                       </p>
                     )}
                     {resultado.mensajesError.length > 0 && (
-                      <ul className="mt-2 max-h-32 overflow-auto text-muted-foreground">
+                      <ul className="mt-2 max-h-32 space-y-0.5 overflow-auto font-mono text-xs text-muted-foreground">
                         {resultado.mensajesError.map((m, i) => (
                           <li key={i}>{m}</li>
                         ))}
@@ -199,115 +304,26 @@ export default function ProductosPage() {
                   </div>
                 )}
                 <Button
-                  onClick={handleCargaMasiva}
-                  disabled={!archivo || cargando}
+                  onClick={() => void handleCargaMasiva()}
+                  disabled={!archivo}
+                  loading={cargando}
+                  loadingText="Procesando…"
                 >
-                  {cargando ? "Procesando…" : "Importar"}
+                  Importar
                 </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Link href="/productos/nuevo">
-            <Button>Nuevo producto</Button>
-          </Link>
-        </div>
+              </section>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Button asChild>
+          <Link href="/productos/nuevo">Nuevo producto</Link>
+        </Button>
       </PageHeader>
-
-      <Card className="border-border/70">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-base">Filtros de inventario</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Encontrá productos por texto, proveedor, categoría, tipo y estado de stock.
-              </p>
-            </div>
-            <Button variant="ghost" onClick={limpiarFiltros} className="self-start sm:self-auto">
-              Limpiar filtros
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <div className="space-y-2 xl:col-span-2">
-              <Label htmlFor="filtro-busqueda">Buscar producto</Label>
-              <Input
-                id="filtro-busqueda"
-                placeholder="Nombre o SKU"
-                value={filtroBusqueda}
-                onChange={(e) => setFiltroBusqueda(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filtro-categoria">Categoría</Label>
-              <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-                <SelectTrigger id="filtro-categoria">
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todas</SelectItem>
-                  {categorias.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filtro-proveedor">Proveedor</Label>
-              <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
-                <SelectTrigger id="filtro-proveedor">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  {proveedores.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filtro-tipo">Tipo de producto</Label>
-              <Select value={filtroConsignacion} onValueChange={setFiltroConsignacion}>
-                <SelectTrigger id="filtro-tipo">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  <SelectItem value="true">Consignación</SelectItem>
-                  <SelectItem value="false">Regular</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filtro-stock">Estado de stock</Label>
-              <Select value={filtroStock} onValueChange={setFiltroStock}>
-                <SelectTrigger id="filtro-stock">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  <SelectItem value="bajo">Stock bajo</SelectItem>
-                  <SelectItem value="sin">Sin stock</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <ProductosTable
         queryParams={queryParams.toString()}
         onRefresh={() => window.location.reload()}
+        filtros={filtros}
       />
     </div>
   );

@@ -7,8 +7,8 @@ import { ProductoForm } from "@/components/forms/ProductoForm";
 import { Button } from "@/components/ui/button";
 import type { ProductoFormValues } from "@/lib/validaciones/productoSchema";
 import type { Categoria, Proveedor } from "@prisma/client";
-import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
+import { notificar } from "@/lib/notificar";
 
 export type SubmitPhase = "idle" | "sending" | "redirecting";
 
@@ -66,7 +66,7 @@ export function NuevoProductoCliente({
       router.push(`/productos/${producto.id}/editar`);
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al crear producto");
+      notificar.error(e instanceof Error ? e.message : "Error al crear producto");
       setSubmitPhase("idle");
     }
   };
@@ -74,23 +74,16 @@ export function NuevoProductoCliente({
   const busy = submitPhase !== "idle";
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500 sm:px-6">
-      <div className="flex justify-center sm:justify-start">
-        <Link href="/productos">
-          <Button variant="ghost" className="gap-2" type="button">
-            <ArrowLeft className="h-4 w-4" />
-            Productos
-          </Button>
-        </Link>
-      </div>
+    <div className="max-w-3xl space-y-6">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+        <Link href="/productos">← Productos</Link>
+      </Button>
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Nuevo producto</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Cargá los datos del ítem; podés completar partes y detalles después
-          desde la ficha.
-        </p>
-      </div>
+      <PageHeader
+        overline="Mercadería · Productos"
+        title="Nuevo producto"
+        description="Cargá los datos del ítem; las partes y los detalles se pueden completar después desde la ficha."
+      />
 
       <ProductoForm
         categorias={categorias}

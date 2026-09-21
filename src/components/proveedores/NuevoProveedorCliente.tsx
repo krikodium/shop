@@ -6,8 +6,8 @@ import Link from "next/link";
 import { ProveedorForm } from "@/components/forms/ProveedorForm";
 import { Button } from "@/components/ui/button";
 import type { ProveedorFormValues } from "@/lib/validaciones/proveedorSchema";
-import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
+import { notificar } from "@/lib/notificar";
 
 type SubmitPhase = "idle" | "sending" | "redirecting";
 
@@ -57,9 +57,7 @@ export function NuevoProveedorCliente() {
       router.push(`/proveedores/${proveedor.id}`);
       router.refresh();
     } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Error al crear proveedor"
-      );
+      notificar.error(e instanceof Error ? e.message : "Error al crear proveedor");
       setSubmitPhase("idle");
     }
   };
@@ -67,23 +65,16 @@ export function NuevoProveedorCliente() {
   const busy = submitPhase !== "idle";
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500 sm:px-6">
-      <div className="flex justify-center sm:justify-start">
-        <Link href="/proveedores">
-          <Button variant="ghost" className="gap-2" type="button">
-            <ArrowLeft className="h-4 w-4" />
-            Proveedores
-          </Button>
-        </Link>
-      </div>
+    <div className="max-w-3xl space-y-6">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+        <Link href="/proveedores">← Proveedores</Link>
+      </Button>
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Nuevo proveedor</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Cargá los datos básicos; después podés asociar productos y ver métricas
-          en la ficha.
-        </p>
-      </div>
+      <PageHeader
+        overline="Mercadería · Proveedores"
+        title="Nuevo proveedor"
+        description="Cargá los datos básicos; después podés asociarle productos y ver sus métricas en la ficha."
+      />
 
       <ProveedorForm
         onSubmit={handleSubmit}
