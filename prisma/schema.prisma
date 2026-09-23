@@ -14,70 +14,70 @@ datasource db {
 // PROVEEDORES
 // ============================================
 model Proveedor {
-  id                String    @id @default(cuid())
-  nombre            String
-  contacto          String?
-  telefono          String?
-  email             String?
-  direccion         String?
-  tipoProveedor     TipoProveedor @default(REGULAR)
+  id            String        @id @default(cuid())
+  nombre        String
+  contacto      String?
+  telefono      String?
+  email         String?
+  direccion     String?
+  tipoProveedor TipoProveedor @default(REGULAR)
 
   // Para proveedores en consignación
-  comisionPorDefecto Decimal?  @db.Decimal(5, 2) // % que se queda el shop (ej: 30.00)
+  comisionPorDefecto Decimal? @db.Decimal(5, 2) // % que se queda el shop (ej: 30.00)
   /// Preferencia: al generar rendición, liquidar en USD (el TC se ingresa en ese momento)
-  liquidacionUsd    Boolean   @default(false)
+  liquidacionUsd     Boolean  @default(false)
 
-  productos         Producto[]
-  partesProducto    ProductoParteProveedor[]
-  ordenesCompra     OrdenCompra[]
-  rendiciones       Rendicion[]
+  productos      Producto[]
+  partesProducto ProductoParteProveedor[]
+  ordenesCompra  OrdenCompra[]
+  rendiciones    Rendicion[]
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum TipoProveedor {
-  REGULAR       // Compra directa
-  CONSIGNACION  // Productos en consignación
+  REGULAR // Compra directa
+  CONSIGNACION // Productos en consignación
 }
 
 // ============================================
 // PRODUCTOS
 // ============================================
 model Producto {
-  id                String    @id @default(cuid())
-  sku               String    @unique
-  nombre            String
-  descripcion       String?
-  categoria         Categoria? @relation(fields: [categoriaId], references: [id])
-  categoriaId       String?
+  id          String     @id @default(cuid())
+  sku         String     @unique
+  nombre      String
+  descripcion String?
+  categoria   Categoria? @relation(fields: [categoriaId], references: [id])
+  categoriaId String?
 
   // PRICING - CRÍTICO
-  precioCompra      Decimal?  @db.Decimal(10, 2) // Para productos regulares
-  precioVenta       Decimal   @db.Decimal(10, 2)
+  precioCompra Decimal? @db.Decimal(10, 2) // Para productos regulares
+  precioVenta  Decimal  @db.Decimal(10, 2)
 
   // CONSIGNACIÓN - CRÍTICO
-  enConsignacion    Boolean   @default(false)
+  enConsignacion       Boolean  @default(false)
   comisionConsignacion Decimal? @db.Decimal(5, 2) // Override del % del proveedor
 
   // STOCK
-  stockActual       Int       @default(0)
-  stockMinimo       Int       @default(5)
+  stockActual Int @default(0)
+  stockMinimo Int @default(5)
 
   // RELACIONES
-  proveedor         Proveedor? @relation(fields: [proveedorId], references: [id])
-  proveedorId       String?
-  partesProveedor   ProductoParteProveedor[]
+  proveedor       Proveedor?               @relation(fields: [proveedorId], references: [id])
+  proveedorId     String?
+  partesProveedor ProductoParteProveedor[]
 
-  itemsVenta        ItemVenta[]
-  itemsOrdenCompra  ItemOrdenCompra[]
-  movimientosStock  MovimientoStock[]
+  itemsVenta       ItemVenta[]
+  itemsOrdenCompra ItemOrdenCompra[]
+  movimientosStock MovimientoStock[]
 
   // METADATA
-  imagenUrl         String?
-  activo            Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  imagenUrl String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([categoriaId])
   @@index([proveedorId])
@@ -96,9 +96,9 @@ model ProductoParteProveedor {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  @@unique([productoId, parteNombre, proveedorId])
   @@index([productoId])
   @@index([proveedorId])
-  @@unique([productoId, parteNombre, proveedorId])
 }
 
 model Categoria {
@@ -106,62 +106,64 @@ model Categoria {
   nombre      String     @unique
   descripcion String?
   productos   Producto[]
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime   @default(now())
 }
 
 // ============================================
 // VENTAS - NÚCLEO DEL SISTEMA
 // ============================================
 model Venta {
-  id              String    @id @default(cuid())
-  numeroVenta     String    @unique // Auto-incremental: V-00001
-  fecha           DateTime  @default(now())
+  id          String   @id @default(cuid())
+  numeroVenta String   @unique // Auto-incremental: V-00001
+  fecha       DateTime @default(now())
 
   // CLIENTE
-  cliente         Cliente?  @relation(fields: [clienteId], references: [id])
-  clienteId       String?
-  clienteNombre   String?   // Para ventas sin cliente registrado
+  cliente       Cliente? @relation(fields: [clienteId], references: [id])
+  clienteId     String?
+  clienteNombre String? // Para ventas sin cliente registrado
 
   // TOTALES - CALCULADOS
-  subtotal        Decimal   @db.Decimal(10, 2)
-  descuento       Decimal   @default(0) @db.Decimal(10, 2)
-  total           Decimal   @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+  descuento Decimal @default(0) @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
 
   // COSTOS Y MÁRGENES - CRÍTICO
-  costoTotal      Decimal   @db.Decimal(10, 2) // Suma de costos de items
-  gananciaBruta   Decimal   @db.Decimal(10, 2) // total - costoTotal
-  margenPorcentaje Decimal  @db.Decimal(5, 2)  // (gananciaBruta/total)*100
+  costoTotal       Decimal @db.Decimal(10, 2) // Suma de costos de items
+  gananciaBruta    Decimal @db.Decimal(10, 2) // total - costoTotal
+  margenPorcentaje Decimal @db.Decimal(5, 2) // (gananciaBruta/total)*100
 
   // CONSIGNACIÓN - CRÍTICO
   deudaConsignacion Decimal @default(0) @db.Decimal(10, 2) // Cuánto se debe a proveedores
 
   // PAGO
-  metodoPago      MetodoPago
-  estadoPago      EstadoPago @default(PENDIENTE)
+  metodoPago           MetodoPago
+  estadoPago           EstadoPago  @default(PENDIENTE)
   /// Segundo método cuando la venta se divide en dos pagos (ej. USD + ARS)
   metodoPagoSecundario MetodoPago?
   /// Monto en ARS imputado al primer método (obligatorio si hay segundo método)
-  montoPago1Ars   Decimal?  @db.Decimal(12, 2)
+  montoPago1Ars        Decimal?    @db.Decimal(12, 2)
   /// Monto en ARS imputado al segundo método
-  montoPago2Ars   Decimal?  @db.Decimal(12, 2)
+  montoPago2Ars        Decimal?    @db.Decimal(12, 2)
   /// USD recibidos en el primer tramo (si aplica)
-  usdPago1        Decimal?  @db.Decimal(12, 2)
+  usdPago1             Decimal?    @db.Decimal(12, 2)
   /// USD recibidos en el segundo tramo (si aplica)
-  usdPago2        Decimal?  @db.Decimal(12, 2)
+  usdPago2             Decimal?    @db.Decimal(12, 2)
   /// Cotización ARS por 1 USD usada al registrar (referencia)
-  cotizacionUsd   Decimal?  @db.Decimal(12, 4)
+  cotizacionUsd        Decimal?    @db.Decimal(12, 4)
 
   // RELACIONES
-  items           ItemVenta[]
+  items ItemVenta[]
+  /// Cobros imputados a esta venta. El saldo sale de acá, no de un campo suelto.
+  pagos PagoVenta[]
 
   // METADATA
-  notas           String?
-  usuario         String?   // Nombre (legacy)
-  usuarioId       String?   // Usuario que registró la venta
-  user            User?     @relation(fields: [usuarioId], references: [id])
-  anulada         Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  notas     String?
+  usuario   String? // Nombre (legacy)
+  usuarioId String? // Usuario que registró la venta
+  user      User?    @relation(fields: [usuarioId], references: [id])
+  anulada   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([fecha])
   @@index([clienteId])
@@ -169,36 +171,70 @@ model Venta {
 }
 
 model ItemVenta {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  venta           Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
-  ventaId         String
+  venta   Venta  @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  ventaId String
 
-  producto        Producto  @relation(fields: [productoId], references: [id])
-  productoId      String
+  producto   Producto @relation(fields: [productoId], references: [id])
+  productoId String
 
   // SNAPSHOT de datos al momento de venta (por si cambian precios después)
-  productoNombre  String
-  productoSku     String
+  productoNombre String
+  productoSku    String
 
-  cantidad        Int
-  precioUnitario  Decimal   @db.Decimal(10, 2)
-  subtotal        Decimal   @db.Decimal(10, 2) // cantidad * precioUnitario
+  cantidad       Int
+  precioUnitario Decimal @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2) // cantidad * precioUnitario
 
   // COSTOS - CRÍTICO PARA CONSIGNACIÓN
-  costoUnitario   Decimal   @db.Decimal(10, 2) // Costo real del producto
-  costoTotal      Decimal   @db.Decimal(10, 2) // cantidad * costoUnitario
+  costoUnitario Decimal @db.Decimal(10, 2) // Costo real del producto
+  costoTotal    Decimal @db.Decimal(10, 2) // cantidad * costoUnitario
 
   // CONSIGNACIÓN - CRÍTICO
-  esConsignacion  Boolean   @default(false)
-  comisionShop    Decimal?  @db.Decimal(5, 2)  // % que se queda el shop
-  deudaProveedor  Decimal?  @db.Decimal(10, 2) // Cuánto se le debe al proveedor por este item
-  proveedorId     String?   // Para tracking de consignación
+  esConsignacion Boolean  @default(false)
+  comisionShop   Decimal? @db.Decimal(5, 2) // % que se queda el shop
+  deudaProveedor Decimal? @db.Decimal(10, 2) // Cuánto se le debe al proveedor por este item
+  proveedorId    String? // Para tracking de consignación
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([ventaId])
   @@index([productoId])
+}
+
+/// ============================================
+/// PAGOS DE UNA VENTA
+/// Una venta puede cobrarse en varias veces: seña hoy, saldo después.
+/// El total pagado y el saldo se derivan SIEMPRE de estas filas; no hay
+/// un campo "montoPagado" que pueda quedar desincronizado.
+/// ============================================
+model PagoVenta {
+  id String @id @default(cuid())
+
+  venta   Venta  @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  ventaId String
+
+  fecha DateTime @default(now())
+
+  /// Importe imputado a la venta, siempre en ARS (la venta se expresa en ARS).
+  montoArs   Decimal    @db.Decimal(12, 2)
+  metodoPago MetodoPago
+
+  /// Si el cobro entró en dólares: cuántos y a qué cotización se convirtió.
+  /// Son datos de referencia: lo que salda la venta es `montoArs`.
+  montoUsd      Decimal? @db.Decimal(12, 2)
+  cotizacionUsd Decimal? @db.Decimal(12, 4)
+
+  notas String?
+
+  /// Rastro de auditoría: quién cobró y cuándo.
+  usuarioId String?
+  user      User?    @relation(fields: [usuarioId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([ventaId])
+  @@index([fecha])
 }
 
 enum MetodoPago {
@@ -220,39 +256,39 @@ enum EstadoPago {
 // CONSIGNACIÓN - RENDICIONES
 // ============================================
 model Rendicion {
-  id              String    @id @default(cuid())
-  numeroRendicion String    @unique // R-00001
+  id              String @id @default(cuid())
+  numeroRendicion String @unique // R-00001
 
-  proveedor       Proveedor @relation(fields: [proveedorId], references: [id])
-  proveedorId     String
+  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
+  proveedorId String
 
-  fechaDesde      DateTime
-  fechaHasta      DateTime
-  fechaRendicion  DateTime  @default(now())
+  fechaDesde     DateTime
+  fechaHasta     DateTime
+  fechaRendicion DateTime @default(now())
 
   // TOTALES
-  totalVendido    Decimal   @db.Decimal(10, 2) // Total precio venta de productos vendidos
-  comisionShop    Decimal   @db.Decimal(10, 2) // Lo que se queda el shop
-  totalARendir    Decimal   @db.Decimal(10, 2) // Lo que se le paga al proveedor (siempre en ARS de referencia de ventas)
+  totalVendido Decimal @db.Decimal(10, 2) // Total precio venta de productos vendidos
+  comisionShop Decimal @db.Decimal(10, 2) // Lo que se queda el shop
+  totalARendir Decimal @db.Decimal(10, 2) // Lo que se le paga al proveedor (siempre en ARS de referencia de ventas)
 
   /// Moneda en que se liquida al proveedor (ARS o USD); el TC solo aplica si es USD
   monedaLiquidacion MonedaLiquidacion @default(ARS)
   /// Cotización ARS por 1 USD al generar la rendición (obligatoria si monedaLiquidacion = USD)
-  cotizacionUsd     Decimal?  @db.Decimal(12, 4)
+  cotizacionUsd     Decimal?          @db.Decimal(12, 4)
   /// Equivalente en USD del neto a rendir (totalARendir / cotizacionUsd) cuando liquida en USD
-  totalARendirUsd   Decimal?  @db.Decimal(12, 2)
+  totalARendirUsd   Decimal?          @db.Decimal(12, 2)
 
   // ESTADO
-  estado          EstadoRendicion @default(PENDIENTE)
-  fechaPago       DateTime?
-  metodoPago      MetodoPago?
+  estado     EstadoRendicion @default(PENDIENTE)
+  fechaPago  DateTime?
+  metodoPago MetodoPago?
 
   // DETALLES
-  detalleItems    Json      // Array de items vendidos en este período
-  notas           String?
+  detalleItems Json // Array de items vendidos en este período
+  notas        String?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([proveedorId])
   @@index([fechaRendicion])
@@ -273,12 +309,12 @@ enum MonedaLiquidacion {
 // CLIENTES Y CRM
 // ============================================
 model Cliente {
-  id              String    @id @default(cuid())
-  nombre          String
-  email           String?   @unique
-  telefono        String?
-  dni             String?
-  direccion       String?
+  id        String  @id @default(cuid())
+  nombre    String
+  email     String? @unique
+  telefono  String?
+  dni       String?
+  direccion String?
 
   // SEGMENTACIÓN
   totalCompras    Decimal   @default(0) @db.Decimal(10, 2)
@@ -286,14 +322,14 @@ model Cliente {
   ticketPromedio  Decimal   @default(0) @db.Decimal(10, 2)
   ultimaCompra    DateTime?
 
-  ventas          Venta[]
+  ventas Venta[]
 
   // NOTIFICACIONES
   recibeNotificaciones Boolean @default(true)
 
-  notas           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  notas     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([telefono])
@@ -303,40 +339,40 @@ model Cliente {
 // COMPRAS Y ÓRDENES
 // ============================================
 model OrdenCompra {
-  id              String    @id @default(cuid())
-  numeroOrden     String    @unique // OC-00001
-  fecha           DateTime  @default(now())
+  id          String   @id @default(cuid())
+  numeroOrden String   @unique // OC-00001
+  fecha       DateTime @default(now())
 
-  proveedor       Proveedor @relation(fields: [proveedorId], references: [id])
-  proveedorId     String
+  proveedor   Proveedor @relation(fields: [proveedorId], references: [id])
+  proveedorId String
 
-  total           Decimal   @db.Decimal(10, 2)
-  estado          EstadoOrden @default(PENDIENTE)
+  total  Decimal     @db.Decimal(10, 2)
+  estado EstadoOrden @default(PENDIENTE)
 
-  items           ItemOrdenCompra[]
+  items ItemOrdenCompra[]
 
-  fechaRecepcion  DateTime?
-  notas           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  fechaRecepcion DateTime?
+  notas          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([proveedorId])
 }
 
 model ItemOrdenCompra {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  orden           OrdenCompra @relation(fields: [ordenId], references: [id], onDelete: Cascade)
-  ordenId         String
+  orden   OrdenCompra @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  ordenId String
 
-  producto        Producto  @relation(fields: [productoId], references: [id])
-  productoId      String
+  producto   Producto @relation(fields: [productoId], references: [id])
+  productoId String
 
-  cantidad        Int
-  precioUnitario  Decimal   @db.Decimal(10, 2)
-  subtotal        Decimal   @db.Decimal(10, 2)
+  cantidad       Int
+  precioUnitario Decimal @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2)
 
-  cantidadRecibida Int      @default(0)
+  cantidadRecibida Int @default(0)
 
   @@index([ordenId])
 }
@@ -352,21 +388,21 @@ enum EstadoOrden {
 // MOVIMIENTOS DE STOCK
 // ============================================
 model MovimientoStock {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  producto        Producto  @relation(fields: [productoId], references: [id])
-  productoId      String
+  producto   Producto @relation(fields: [productoId], references: [id])
+  productoId String
 
-  tipo            TipoMovimiento
-  cantidad        Int       // Positivo para entradas, negativo para salidas
-  stockAnterior   Int
-  stockNuevo      Int
+  tipo          TipoMovimiento
+  cantidad      Int // Positivo para entradas, negativo para salidas
+  stockAnterior Int
+  stockNuevo    Int
 
-  motivo          String
-  referencia      String?   // ID de venta, orden compra, etc.
+  motivo     String
+  referencia String? // ID de venta, orden compra, etc.
 
-  usuario         String?
-  fecha           DateTime  @default(now())
+  usuario String?
+  fecha   DateTime @default(now())
 
   @@index([productoId])
   @@index([fecha])
@@ -385,40 +421,41 @@ enum TipoMovimiento {
 // USUARIOS Y AUTENTICACIÓN
 // ============================================
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  password      String?   // Hash bcrypt para login con credenciales
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  password          String? // Hash bcrypt para login con credenciales
   /// Momento del último cambio de contraseña: invalida las sesiones JWT emitidas antes
   passwordChangedAt DateTime?
-  emailVerified DateTime?
-  image         String?
-  role          UserRole  @default(VENDEDOR)
+  emailVerified     DateTime?
+  image             String?
+  role              UserRole  @default(VENDEDOR)
 
-  horarioEntrada String?  // ej: "09:00"
-  horarioSalida  String?  // ej: "18:00"
-  diasTrabajo    String?  // ej: "1,2,3,4,5" = L,M,X,J,V (1=Lunes, 7=Domingo)
+  horarioEntrada String? // ej: "09:00"
+  horarioSalida  String? // ej: "18:00"
+  diasTrabajo    String? // ej: "1,2,3,4,5" = L,M,X,J,V (1=Lunes, 7=Domingo)
 
-  ventas        Venta[]
-  jornadas      JornadaLaboral[]
-  cajas         CajaChica[]
+  ventas         Venta[]
+  pagosVenta     PagoVenta[]
+  jornadas       JornadaLaboral[]
+  cajas          CajaChica[]
   passwordTokens PasswordToken[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Tokens de un solo uso para invitación (definir contraseña) y reset de contraseña.
 // Se guarda el HASH del token; el link enviado por mail lleva el token en crudo.
 model PasswordToken {
-  id        String     @id @default(cuid())
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  tokenHash String     @unique
+  tokenHash String    @unique
   tipo      TokenTipo
   expires   DateTime
   usedAt    DateTime?
-  createdAt DateTime   @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
@@ -444,7 +481,7 @@ model JornadaLaboral {
   horaSalida  String?
   notas       String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([fecha])
@@ -454,35 +491,35 @@ model JornadaLaboral {
 // CAJA CHICA
 // ============================================
 model CajaChica {
-  id              String    @id @default(cuid())
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId          String
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 
-  fechaApertura   DateTime  @default(now())
+  fechaApertura   DateTime   @default(now())
   fechaCierre     DateTime?
-  montoInicial    Decimal   @db.Decimal(10, 2)
-  montoInicialUsd Decimal?  @db.Decimal(10, 2)
+  montoInicial    Decimal    @db.Decimal(10, 2)
+  montoInicialUsd Decimal?   @db.Decimal(10, 2)
   estado          EstadoCaja @default(ABIERTA)
 
-  movimientos     MovimientoCaja[]
+  movimientos MovimientoCaja[]
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([fechaApertura])
 }
 
 model MovimientoCaja {
-  id        String   @id @default(cuid())
-  caja      CajaChica @relation(fields: [cajaId], references: [id], onDelete: Cascade)
-  cajaId    String
+  id     String    @id @default(cuid())
+  caja   CajaChica @relation(fields: [cajaId], references: [id], onDelete: Cascade)
+  cajaId String
 
-  tipo      TipoMovimientoCaja
-  monto     Decimal  @db.Decimal(10, 2)
-  moneda    String   @default("ARS")
-  concepto  String?
-  fecha     DateTime @default(now())
+  tipo     TipoMovimientoCaja
+  monto    Decimal            @db.Decimal(10, 2)
+  moneda   String             @default("ARS")
+  concepto String?
+  fecha    DateTime           @default(now())
 
   @@index([cajaId])
 }

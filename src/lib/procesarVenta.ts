@@ -5,6 +5,11 @@
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import {
+  aDecimal,
+  estadoDePago,
+  validarMontoPago,
+} from "@/lib/calculadores/pagosVenta";
 
 export interface ItemVentaInput {
   productoId: string;
@@ -36,6 +41,20 @@ export interface VentaInput {
   usdPago1?: number | null;
   usdPago2?: number | null;
   cotizacionUsd?: number | null;
+  /**
+   * Cuánto se cobra en el momento de registrar la venta.
+   * - `undefined` → se cobra el total (comportamiento histórico).
+   * - `montoArs: 0` → no se cobra nada ahora; la venta queda PENDIENTE.
+   * - un importe menor al total → seña; la venta queda PARCIAL.
+   * El resto se cobra después con `registrarPagoVenta`.
+   */
+  cobroInicial?: {
+    montoArs: number | string;
+    metodoPago: string;
+    montoUsd?: number | string | null;
+    cotizacionUsd?: number | string | null;
+    notas?: string | null;
+  } | null;
 }
 
 export async function procesarVenta(input: VentaInput) {
@@ -62,6 +81,26 @@ export async function procesarVenta(input: VentaInput) {
       .reduce((s, i) => s + (i.deudaProveedor ?? 0), 0);
     const gananciaBruta = total - costoTotal;
     const margenPorcentaje = total > 0 ? (gananciaBruta / total) * 100 : 0;
+
+    // Cobro del momento. Sin `cobroInicial` se cobra el total, que es como
+    // venía funcionando el sistema hasta ahora.
+    const totalDec = new Prisma.Decimal(total);
+    const montoCobradoAhora = input.cobroInicial
+      ? aDecimal(input.cobroInicial.montoArs)
+      : totalDec;
+
+    if (montoCobradoAhora.isNegative()) {
+      throw new Error("El importe cobrado no puede ser negativo");
+    }
+    if (montoCobradoAhora.greaterThan(totalDec)) {
+      throw new Error(
+        `El importe cobrado (${montoCobradoAhora.toFixed(2)}) supera el total de la venta (${totalDec.toFixed(2)})`
+      );
+    }
+    if (montoCobradoAhora.greaterThan(0)) {
+      const validacion = validarMontoPago(montoCobradoAhora, totalDec);
+      if (!validacion.ok) throw new Error(validacion.error ?? "Importe cobrado inválido");
+    }
 
     for (const item of input.items) {
       const producto = await tx.producto.findUnique({
@@ -96,7 +135,7 @@ export async function procesarVenta(input: VentaInput) {
         margenPorcentaje: new Prisma.Decimal(margenPorcentaje),
         deudaConsignacion: new Prisma.Decimal(deudaConsignacion),
         metodoPago: input.metodoPago as "EFECTIVO" | "TARJETA_DEBITO" | "TARJETA_CREDITO" | "TRANSFERENCIA" | "MERCADOPAGO" | "MULTIPLE",
-        estadoPago: "PAGADO",
+        estadoPago: estadoDePago(totalDec, [{ montoArs: montoCobradoAhora }]),
         notas: input.notas ?? null,
         metodoPagoSecundario: input.metodoPagoSecundario
           ? (input.metodoPagoSecundario as
@@ -116,6 +155,34 @@ export async function procesarVenta(input: VentaInput) {
           input.cotizacionUsd != null ? new Prisma.Decimal(input.cotizacionUsd) : null,
       },
     });
+
+    // 3.b Registrar el cobro del momento como un pago de la venta, en la misma
+    // transacción: si algo falla después, no queda un cobro huérfano.
+    if (montoCobradoAhora.greaterThan(0)) {
+      await tx.pagoVenta.create({
+        data: {
+          venta: { connect: { id: venta.id } },
+          montoArs: montoCobradoAhora,
+          metodoPago: (input.cobroInicial?.metodoPago ?? input.metodoPago) as
+            | "EFECTIVO"
+            | "TARJETA_DEBITO"
+            | "TARJETA_CREDITO"
+            | "TRANSFERENCIA"
+            | "MERCADOPAGO"
+            | "MULTIPLE",
+          montoUsd:
+            input.cobroInicial?.montoUsd != null
+              ? aDecimal(input.cobroInicial.montoUsd)
+              : null,
+          cotizacionUsd:
+            input.cobroInicial?.cotizacionUsd != null
+              ? aDecimal(input.cobroInicial.cotizacionUsd)
+              : null,
+          notas: input.cobroInicial?.notas ?? null,
+          ...(input.usuarioId ? { user: { connect: { id: input.usuarioId } } } : {}),
+        },
+      });
+    }
 
     // 4. Crear items y actualizar stock
     for (const item of input.items) {

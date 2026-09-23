@@ -98,6 +98,7 @@ export async function POST(request: Request) {
       usdPago1: data.usdPago1 ?? null,
       usdPago2: data.usdPago2 ?? null,
       cotizacionUsd: data.cotizacionUsd ?? null,
+      cobroInicial: data.cobroInicial ?? null,
     });
 
     return NextResponse.json(venta, { status: 201 });
