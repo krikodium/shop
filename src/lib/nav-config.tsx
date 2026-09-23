@@ -44,14 +44,6 @@ export const navAdmin: NavItem[] = [
   { href: "/estadisticas-vendedores", label: "Estadísticas vendedores", icon: TrendingUp },
 ];
 
-/** Menú reducido solo para el sheet móvil (hamburguesa). Escritorio sigue usando navBase + navAdmin. */
-export const navMobile: NavItem[] = [
-  { href: "/productos", label: "Inventario", icon: Package },
-  { href: "/reportes", label: "Reportes", icon: BarChart3 },
-  { href: "/ventas/nueva", label: "Venta rápida", icon: ShoppingCart },
-  { href: "/muestra-pedidos/nueva-venta", label: "Muestra pedidos", icon: ClipboardList },
-];
-
 export function isActive(pathname: string, href: string, allNav: { href: string }[]) {
   if (href === "/") return pathname === "/";
   if (pathname === href) return true;

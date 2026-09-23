@@ -116,7 +116,7 @@ export default function ClienteDetallePage() {
       </Button>
 
       <PageHeader
-        overline="Operación · Cliente"
+        overline="Operación · Clientes"
         title={cliente.nombre}
         description={contacto || undefined}
       />

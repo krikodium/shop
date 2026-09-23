@@ -141,7 +141,7 @@ export function PedidosBandejaDemo() {
               <p className="text-sm font-semibold">No pudimos cargar los pedidos</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">Estado ficticio para revisar el mensaje, el foco y la acción de reintento.</p>
               <Button className="mt-5" onClick={() => setVista("datos")}>
-                <RotateCcw className="size-4" />
+                <RotateCcw className="size-4" aria-hidden="true" />
                 Reintentar
               </Button>
             </div>

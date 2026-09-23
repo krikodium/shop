@@ -40,37 +40,38 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="flex h-auto w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-accent"
+          className="flex h-auto min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-accent"
+          aria-label={`Cuenta de ${displayName}`}
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-medium text-foreground">
+          <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-medium text-foreground">
             {initials}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
+          </span>
+          <span className="block min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-foreground">
               {displayName}
-            </p>
+            </span>
             {session.user.email && (
-              <p className="truncate text-xs text-muted-foreground">
+              <span className="block truncate text-xs text-muted-foreground">
                 {session.user.email}
-              </p>
+              </span>
             )}
-          </div>
+          </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuItem
           onClick={() => setPasswordOpen(true)}
-          className="gap-2"
+          className="min-h-10 gap-2"
         >
-          <KeyRound className="size-4" />
+          <KeyRound className="size-4" aria-hidden="true" />
           Cambiar contraseña
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="gap-2"
+          className="min-h-10 gap-2"
         >
-          <LogOut className="size-4" />
+          <LogOut className="size-4" aria-hidden="true" />
           Cerrar sesión
         </DropdownMenuItem>
       </DropdownMenuContent>

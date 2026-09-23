@@ -283,7 +283,7 @@ export function UsuarioFormDialog({
               <p className="text-xs text-muted-foreground">
                 L a D = lunes a domingo. Marcá los días que trabaja.
               </p>
-              <div className="flex flex-wrap items-center gap-1">
+              <div className="grid max-w-xs grid-cols-7 gap-1">
                 {DIAS_SEMANA.map(({ letra, num }) => {
                   const activos = parseDiasTrabajo(form.diasTrabajo || null);
                   const trabaja = activos.has(num);
@@ -302,7 +302,9 @@ export function UsuarioFormDialog({
                       }}
                       aria-pressed={trabaja}
                       className={cn(
-                        "size-8 rounded-md border font-mono text-xs transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                        // Control segmentado compacto: en celular el objetivo táctil
+                        // manda, pero siete días tienen que entrar en 375 px.
+                        "h-10 w-full rounded-md border font-mono text-xs transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                         trabaja
                           ? "border-action bg-action font-medium text-action-foreground"
                           : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"

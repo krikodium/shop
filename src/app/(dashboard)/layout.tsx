@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
 import { SidebarNav } from "@/components/layout/SidebarNav";
@@ -19,21 +20,30 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden flex-col lg:flex-row">
-      {/* Header móvil */}
-      <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 shadow-sm lg:hidden">
+      {/* Header móvil: no scrollea, no tapa el contenido (el main es el que scrollea). */}
+      <header className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-3 py-2 lg:hidden">
         <MobileNav />
-        <Link href="/" className="font-semibold text-lg tracking-tight">
+        <Link
+          href="/"
+          className="mr-auto min-w-0 truncate rounded-sm text-lg font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           Shop
         </Link>
-        <Button asChild size="sm">
-          <Link href="/ventas/nueva">+ Venta</Link>
+        <Button asChild className="shrink-0">
+          <Link href="/ventas/nueva">
+            <Plus aria-hidden="true" />
+            Venta
+          </Link>
         </Button>
       </header>
 
       {/* Sidebar desktop */}
       <aside className="hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card lg:flex">
         <div className="border-b border-border px-5 py-5">
-          <Link href="/" className="block">
+          <Link
+            href="/"
+            className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             <span className="block font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground/60">
               Gestión
             </span>
