@@ -10,6 +10,14 @@ const CON_COLOR_PERMITIDO = [
   "--num-negative",
   "--num-warning",
   "--destructive",
+  // Los tokens de gráfico llevan color por pedido explícito del dueño
+  // (2026-09-23): en un gráfico el color identifica la serie, así que es
+  // información, no decoración. El resto de la interfaz sigue en croma 0.
+  "--chart-1",
+  "--chart-2",
+  "--chart-3",
+  "--chart-4",
+  "--chart-5",
 ];
 
 function escaparRegExp(texto: string): string {

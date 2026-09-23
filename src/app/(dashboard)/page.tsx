@@ -37,9 +37,12 @@ import {
 import { formatARS, formatUSD } from "@/lib/formatCurrency";
 import {
   COLORES_GRAFICO,
+  barraGrafico,
+  donaGrafico,
   ejeGrafico,
   formatoEjeMonto,
   grillaGrafico,
+  leyendaGrafico,
   tooltipGrafico,
 } from "@/lib/chart-theme";
 
@@ -284,7 +287,7 @@ export default function DashboardPage() {
                         (Array.isArray(payload) && payload[0]?.payload?.label) ?? ""
                       }
                     />
-                    <Bar dataKey="total" fill="var(--chart-1)" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="total" fill="var(--chart-1)" {...barraGrafico} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -313,12 +316,8 @@ export default function DashboardPage() {
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
-                      cy="50%"
-                      outerRadius={92}
-                      innerRadius={52}
-                      paddingAngle={2}
-                      stroke="var(--card)"
-                      strokeWidth={2}
+                      cy="42%"
+                      {...donaGrafico}
                     >
                       {metodoPago.map((entrada, i) => (
                         <Cell
@@ -328,8 +327,7 @@ export default function DashboardPage() {
                       ))}
                     </Pie>
                     <Legend
-                      verticalAlign="bottom"
-                      height={32}
+                      {...leyendaGrafico}
                       formatter={(value: unknown) => (
                         <span className="text-xs text-muted-foreground">{String(value)}</span>
                       )}
@@ -343,6 +341,21 @@ export default function DashboardPage() {
                     />
                   </PieChart>
                 </ResponsiveContainer>
+              ) : null}
+              {metodoPago.length > 0 ? (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none -mt-[178px] flex h-0 items-center justify-center"
+                >
+                  <div className="text-center">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Cobrado
+                    </p>
+                    <p className="font-mono text-base font-semibold tabular-nums">
+                      {formatARS(resumen.totalVentasMes)}
+                    </p>
+                  </div>
+                </div>
               ) : (
                 <EmptyState
                   className="h-full justify-center"

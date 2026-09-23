@@ -52,3 +52,27 @@ export const grillaGrafico = {
   stroke: "var(--border)",
   vertical: false,
 } as const;
+
+/** Barras: finas, con la esquina superior apenas redondeada. */
+export const barraGrafico = {
+  radius: [4, 4, 0, 0] as [number, number, number, number],
+  maxBarSize: 34,
+} as const;
+
+/** Dona: anillo delgado, con aire entre porciones y puntas redondeadas. */
+export const donaGrafico = {
+  innerRadius: "62%",
+  outerRadius: "88%",
+  paddingAngle: 2,
+  cornerRadius: 4,
+  stroke: "var(--card)",
+  strokeWidth: 2,
+} as const;
+
+/** Leyenda compacta, alineada con la tipografía del resto de la app. */
+export const leyendaGrafico = {
+  verticalAlign: "bottom" as const,
+  height: 28,
+  iconType: "circle" as const,
+  iconSize: 8,
+};
