@@ -2,9 +2,11 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { ProductosGridPaginado } from "@/components/punto-venta/ProductosGridPaginado";
 import { CarritoVenta } from "@/components/punto-venta/CarritoVenta";
+import { GuiaCargaVenta } from "@/components/punto-venta/GuiaCargaVenta";
+import { PageHeader } from "@/components/ui/page-header";
+import { notificar } from "@/lib/notificar";
 import { calcularTotalesVenta } from "@/lib/calculadores/ventasCalculator";
 import {
   AlertDialog,
@@ -25,7 +27,6 @@ export default function NuevaVentaPage() {
   const [items, setItems] = useState<ItemVentaInput[]>([]);
   const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showStockDialog, setShowStockDialog] = useState(false);
   const [exceededItems, setExceededItems] = useState<ExcedidoStock[]>([]);
   const [pendingSale, setPendingSale] = useState<OpcionesProcesarVenta | null>(null);
@@ -63,7 +64,6 @@ export default function NuevaVentaPage() {
       }
       return [...prev, item];
     });
-    setError(null);
   }, []);
 
   const cambiarCantidad = useCallback((index: number, cantidad: number) => {
@@ -127,13 +127,11 @@ export default function NuevaVentaPage() {
   const procesarVenta = useCallback(
     async (opts: OpcionesProcesarVenta) => {
       if (items.length === 0) {
-        setError("Agregá al menos un producto");
-        toast.error("Agregá al menos un producto");
+        notificar.error("Agregá al menos un producto");
         return;
       }
 
       setIsLoading(true);
-      setError(null);
 
       try {
         const ids = items.map((i) => i.productoId);
@@ -163,13 +161,12 @@ export default function NuevaVentaPage() {
         }
 
         const venta = await enviarVenta(opts, false);
-        toast.success("Venta registrada correctamente");
+        notificar.ok("Venta registrada correctamente");
         router.push(`/ventas/${venta.id}`);
         router.refresh();
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Error al procesar";
-        setError(msg);
-        toast.error(msg);
+        notificar.error(msg);
       } finally {
         setIsLoading(false);
       }
@@ -183,35 +180,44 @@ export default function NuevaVentaPage() {
     setShowStockDialog(false);
     setExceededItems([]);
     setPendingSale(null);
-    setError(null);
     try {
       const venta = await enviarVenta(pendingSale, true);
-      toast.success("Venta registrada correctamente");
+      notificar.ok("Venta registrada correctamente");
       router.push(`/ventas/${venta.id}`);
       router.refresh();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al procesar";
-      setError(msg);
-      toast.error(msg);
+      notificar.error(msg);
     } finally {
       setIsLoading(false);
     }
   }, [pendingSale, enviarVenta, router]);
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-bold tracking-tight md:text-xl">Nueva venta</h1>
-        <p className="mt-1 text-xs text-muted-foreground md:text-sm">Punto de venta — buscá productos y agregalos al carrito</p>
-      </div>
+  // Cantidad ya cargada por producto, solo para marcarla en el catálogo.
+  const enCarrito = useMemo(
+    () => new Map(items.map((i) => [i.productoId, i.cantidad])),
+    [items]
+  );
 
-      {/* Mobile: un poco más de ancho útil; desktop: carrito ~40% (antes ~33%) */}
-      <div className="-mx-1 flex flex-col gap-4 px-1 sm:-mx-2 sm:px-2 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-6 lg:px-0">
-        <div className="min-h-0 lg:col-span-3">
-          <ProductosGridPaginado onAgregar={agregarProducto} />
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        overline="Operación · Punto de venta"
+        title="Nueva venta"
+        description="Buscá en el catálogo, armá la venta a la derecha y confirmá el cobro."
+      />
+
+      <GuiaCargaVenta carritoVacio={items.length === 0} />
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_24rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
+        <div className="min-w-0">
+          <ProductosGridPaginado onAgregar={agregarProducto} enCarrito={enCarrito} />
         </div>
 
-        <div className="min-w-0 lg:col-span-2 lg:sticky lg:top-4 lg:self-start">
+        <aside
+          aria-label="Venta en curso"
+          className="min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto"
+        >
           <CarritoVenta
             items={items}
             totales={totales}
@@ -222,10 +228,7 @@ export default function NuevaVentaPage() {
             onProcesar={procesarVenta}
             isLoading={isLoading}
           />
-          {error && (
-            <p className="mt-2 text-sm text-destructive">{error}</p>
-          )}
-        </div>
+        </aside>
       </div>
 
       <AlertDialog
@@ -243,12 +246,12 @@ export default function NuevaVentaPage() {
               ¿Querés continuar igual? (el inventario puede estar desactualizado)
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <ul className="rounded-md border bg-muted/50 p-3 text-sm">
+          <ul className="divide-y divide-border border-y border-border text-sm">
             {exceededItems.map((e, i) => (
-              <li key={i} className="flex justify-between gap-2">
-                <span className="font-medium">{e.productoNombre}</span>
-                <span className="text-muted-foreground">
-                  pedido: {e.cantidad} · stock: {e.stockActual}
+              <li key={i} className="flex items-baseline justify-between gap-3 py-2">
+                <span className="min-w-0 truncate font-medium">{e.productoNombre}</span>
+                <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                  pedido <span className="text-num-negative">{e.cantidad}</span> · stock {e.stockActual}
                 </span>
               </li>
             ))}

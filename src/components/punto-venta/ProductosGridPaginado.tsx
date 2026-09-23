@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Info, Package, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Panel, PanelHeader } from "@/components/ui/panel";
 import {
   Dialog,
   DialogClose,
@@ -13,42 +18,77 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  SelectorVistaCatalogo,
+  VISTAS_CATALOGO,
+  esVistaCatalogo,
+  type VistaCatalogo,
+} from "@/components/punto-venta/SelectorVistaCatalogo";
+import { usePreferenciaLocal } from "@/hooks/use-preferencia-local";
+import { formatARS } from "@/lib/formatCurrency";
+import { cn } from "@/lib/utils";
 import type { ProductoConProveedor } from "@/types";
 import { calcularCostosItemVenta } from "@/lib/calculadores/ventasCalculator";
 import type { ItemVentaInput } from "@/types";
-import { Package, Search, Warehouse, X } from "lucide-react";
 
-const POR_PAGINA = 12;
-
-const formatPrecio = (n: number) =>
-  new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(n);
+const CLAVE_VISTA = "punto-venta:vista-catalogo";
 
 interface ProductosGridPaginadoProps {
   onAgregar: (item: ItemVentaInput) => void;
+  /** Cantidad ya cargada en la venta, por productoId. Solo para mostrarla. */
+  enCarrito?: ReadonlyMap<string, number>;
 }
 
-export function ProductosGridPaginado({ onAgregar }: ProductosGridPaginadoProps) {
+type EstadoStock = "sin" | "bajo" | "ok";
+
+function estadoStock(p: ProductoConProveedor): EstadoStock {
+  if (p.stockActual <= 0) return "sin";
+  if (p.stockActual <= p.stockMinimo) return "bajo";
+  return "ok";
+}
+
+const TEXTO_STOCK: Record<EstadoStock, string> = {
+  sin: "Sin stock",
+  bajo: "Stock bajo",
+  ok: "Disponible",
+};
+
+/** El color va solo en la cifra de stock. */
+const TONO_STOCK: Record<EstadoStock, string> = {
+  sin: "text-num-negative",
+  bajo: "text-num-warning",
+  ok: "text-foreground",
+};
+
+export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPaginadoProps) {
   const [query, setQuery] = useState("");
   const [productos, setProductos] = useState<ProductoConProveedor[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [detalleProducto, setDetalleProducto] = useState<ProductoConProveedor | null>(null);
+  const [vistaGuardada, setVistaGuardada] = usePreferenciaLocal<VistaCatalogo>(
+    CLAVE_VISTA,
+    "fotos"
+  );
+  // Lo guardado puede venir de una versión vieja o estar adulterado.
+  const vista: VistaCatalogo = esVistaCatalogo(vistaGuardada) ? vistaGuardada : "fotos";
+  const porPagina = VISTAS_CATALOGO.find((v) => v.id === vista)?.porPagina ?? 12;
 
-  const cargar = useCallback(async (q: string, p: number) => {
+  // Descarta respuestas que llegan después de una búsqueda más nueva.
+  const ultimaConsulta = useRef(0);
+
+  const cargar = useCallback(async (q: string, p: number, limite: number) => {
+    const consulta = ++ultimaConsulta.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
       params.set("page", String(p));
-      params.set("limit", String(POR_PAGINA));
+      params.set("limit", String(limite));
       if (q && q.length >= 1) params.set("q", q);
       const res = await fetch(`/api/productos?${params}`);
       const data = await res.json();
+      if (consulta !== ultimaConsulta.current) return;
       if (data.productos && typeof data.total === "number") {
         setProductos(data.productos);
         setTotal(data.total);
@@ -57,18 +97,25 @@ export function ProductosGridPaginado({ onAgregar }: ProductosGridPaginadoProps)
         setTotal(Array.isArray(data) ? data.length : 0);
       }
     } catch {
+      if (consulta !== ultimaConsulta.current) return;
       setProductos([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (consulta === ultimaConsulta.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    cargar(query, page);
-  }, [query, page, cargar]);
+    cargar(query, page, porPagina);
+  }, [query, page, porPagina, cargar]);
 
-  const totalPaginas = Math.ceil(total / POR_PAGINA);
+  const totalPaginas = Math.ceil(total / porPagina);
+
+  const cambiarVista = (nueva: VistaCatalogo) => {
+    setVistaGuardada(nueva);
+    // Cambia el tamaño de página: la página actual deja de tener sentido.
+    setPage(1);
+  };
 
   const handleAgregar = (p: ProductoConProveedor) => {
     const costos = calcularCostosItemVenta(p, 1);
@@ -89,319 +136,507 @@ export function ProductosGridPaginado({ onAgregar }: ProductosGridPaginadoProps)
     });
   };
 
-  const stockLabel = (p: ProductoConProveedor) => {
-    if (p.stockActual <= 0) return { text: "Sin stock", variant: "destructive" as const };
-    if (p.stockActual <= p.stockMinimo) return { text: "Stock bajo", variant: "secondary" as const };
-    return { text: "Disponible", variant: "outline" as const };
+  /**
+   * Enter en el buscador: si el texto es exactamente el SKU de un producto
+   * listado (o hay un único resultado), lo agrega y limpia la búsqueda.
+   * Pensado para cargar rápido por código o con lector.
+   */
+  const alPresionarEnBuscador = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter" || loading) return;
+    const texto = query.trim().toLowerCase();
+    if (!texto) return;
+    const exacto = productos.find((p) => p.sku.toLowerCase() === texto);
+    const candidato = exacto ?? (productos.length === 1 ? productos[0] : undefined);
+    if (!candidato || candidato.stockActual <= 0) return;
+    e.preventDefault();
+    handleAgregar(candidato);
+    setQuery("");
+    setPage(1);
   };
 
+  const desde = total === 0 ? 0 : (page - 1) * porPagina + 1;
+  const hasta = Math.min(page * porPagina, total);
+
   return (
-    <div className="space-y-4">
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60"
-          strokeWidth={1.35}
-          aria-hidden
-        />
-        <Input
-          placeholder="Buscar por nombre o SKU..."
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(1);
-          }}
-          className="min-h-10 border-border/80 bg-background pl-9 text-sm shadow-sm"
-        />
+    <Panel>
+      <PanelHeader
+        title="Catálogo"
+        descripcion={
+          loading && total === 0
+            ? "Cargando productos…"
+            : `${total} producto${total !== 1 ? "s" : ""}${query.trim() ? " para la búsqueda" : " activos"}`
+        }
+        acciones={<SelectorVistaCatalogo valor={vista} onCambiar={cambiarVista} />}
+      />
+
+      <div className="border-b border-border px-4 py-3 sm:px-5">
+        <Label htmlFor="pv-buscar" className="sr-only">
+          Buscar producto por nombre o SKU
+        </Label>
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            id="pv-buscar"
+            type="search"
+            autoComplete="off"
+            placeholder="Buscar por nombre o SKU…"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+            onKeyDown={alPresionarEnBuscador}
+            className="h-11 pl-9 text-sm"
+          />
+        </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex min-h-[140px] flex-col rounded-xl border bg-card p-4"
-            >
-              <div className="h-5 w-48 animate-skeleton-shimmer rounded" />
-              <div className="mt-2 h-4 w-24 animate-skeleton-shimmer rounded" />
-              <div className="mt-auto h-9 w-40 animate-skeleton-shimmer rounded" />
-            </div>
-          ))}
-        </div>
-      ) : productos.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-muted/30 py-16 text-center text-muted-foreground">
-          <Package className="mx-auto mb-2 size-10 opacity-40" />
-          <p className="font-medium">Sin productos</p>
-          <p className="text-sm">Probá otra búsqueda</p>
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {productos.map((p) => {
-              const stock = stockLabel(p);
-              const precio = Number(p.precioVenta);
-              return (
-                <div
-                  key={p.id}
-                  className="group relative flex min-h-[160px] flex-col rounded-xl border border-border/80 bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
-                >
-                  <button
-                    type="button"
-                    title="Ver detalle"
-                    aria-label="Ver detalle del producto"
-                    onClick={() => setDetalleProducto(p)}
-                    className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-background/90 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/35 hover:text-primary active:scale-95"
-                  >
-                    <Search className="size-3.5" strokeWidth={1.35} aria-hidden />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleAgregar(p)}
-                    disabled={p.stockActual <= 0}
-                    className="flex min-h-[160px] flex-1 flex-col p-4 text-left transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45 touch-manipulation"
-                  >
-                    <div className="flex gap-3">
-                      <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
-                        {p.imagenUrl ? (
-                          <img
-                            src={p.imagenUrl}
-                            alt=""
-                            className="size-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex size-full items-center justify-center text-muted-foreground/50">
-                            <Package className="size-7" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1 pr-6">
-                        <h3
-                          className="line-clamp-2 text-sm font-semibold leading-snug text-foreground group-hover:text-primary md:text-[15px]"
-                          title={p.nombre}
-                        >
-                          {p.nombre}
-                        </h3>
-                        <p className="mt-0.5 font-mono text-xs text-muted-foreground">SKU {p.sku}</p>
-                        {p.categoria?.nombre && (
-                          <p className="mt-1 truncate text-[11px] uppercase tracking-wide text-muted-foreground">
-                            {p.categoria.nombre}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      <Badge variant={stock.variant} className="text-[10px] font-normal">
-                        <Warehouse className="mr-1 size-3" />
-                        {stock.text} · {p.stockActual} u.
-                      </Badge>
-                      {p.enConsignacion && (
-                        <Badge className="bg-amber-500/15 text-[10px] font-medium text-amber-800 hover:bg-amber-500/20 dark:text-amber-200">
-                          Consignación
-                        </Badge>
-                      )}
-                    </div>
-
-                    {p.proveedor?.nombre && (
-                      <p className="mt-2 truncate text-[11px] text-muted-foreground" title={p.proveedor.nombre}>
-                        {p.proveedor.nombre}
-                      </p>
-                    )}
-
-                    <div className="mt-auto flex items-end justify-between border-t border-border/60 pt-3">
-                      <span className="text-base font-bold tabular-nums tracking-tight text-primary md:text-lg">
-                        {formatPrecio(precio)}
-                      </span>
-                      <span className="text-[10px] font-medium text-muted-foreground group-hover:text-primary sm:text-[11px]">
-                        Agregar →
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              );
-            })}
+      <div aria-busy={loading || undefined}>
+        {loading && productos.length === 0 ? (
+          <EsqueletoCatalogo vista={vista} />
+        ) : productos.length === 0 ? (
+          <div className="p-4 sm:p-5">
+            <EmptyState
+              className="py-8"
+              titulo="Sin productos"
+              descripcion={
+                query.trim()
+                  ? `No hay coincidencias para “${query.trim()}”. Probá con parte del nombre o el SKU.`
+                  : "No hay productos activos para vender."
+              }
+            />
           </div>
+        ) : (
+          <div className={cn("transition-opacity", loading && "opacity-60")}>
+            {vista === "fotos" && (
+              <VistaFotos
+                productos={productos}
+                enCarrito={enCarrito}
+                onAgregar={handleAgregar}
+                onDetalle={setDetalleProducto}
+              />
+            )}
+            {vista === "lista" && (
+              <VistaLista
+                productos={productos}
+                enCarrito={enCarrito}
+                onAgregar={handleAgregar}
+                onDetalle={setDetalleProducto}
+              />
+            )}
+            {vista === "compacta" && (
+              <VistaCompacta
+                productos={productos}
+                enCarrito={enCarrito}
+                onAgregar={handleAgregar}
+              />
+            )}
+          </div>
+        )}
+      </div>
 
-          {totalPaginas > 1 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
-              <span className="text-sm text-muted-foreground">
-                {total} producto{total !== 1 ? "s" : ""} · Pág. {page} / {totalPaginas}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="min-h-10 min-w-10 touch-manipulation"
-                >
-                  ←
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
-                  disabled={page >= totalPaginas}
-                  className="min-h-10 min-w-10 touch-manipulation"
-                >
-                  →
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-2.5 sm:px-5">
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+            {desde}–{hasta} de {total} · pág. {page}/{totalPaginas}
+          </span>
+          <div className="flex gap-1.5">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft aria-hidden="true" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
+              disabled={page >= totalPaginas}
+              aria-label="Página siguiente"
+            >
+              <ChevronRight aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
       )}
 
-      <Dialog open={detalleProducto != null} onOpenChange={(o) => !o && setDetalleProducto(null)}>
-        <DialogContent
-          showCloseButton={false}
-          className="flex max-h-[min(94vh,820px)] flex-col gap-0 overflow-hidden border-border/50 p-0 shadow-xl sm:max-w-[420px]"
-        >
-          {detalleProducto && (
-            <>
-              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 bg-background px-4 py-3.5 sm:px-5">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Detalle
+      <DetalleProducto
+        producto={detalleProducto}
+        onCerrar={() => setDetalleProducto(null)}
+        onAgregar={(p) => {
+          handleAgregar(p);
+          setDetalleProducto(null);
+        }}
+      />
+    </Panel>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* Vistas                                                                    */
+/* ------------------------------------------------------------------------ */
+
+interface VistaProps {
+  productos: ProductoConProveedor[];
+  enCarrito?: ReadonlyMap<string, number>;
+  onAgregar: (p: ProductoConProveedor) => void;
+  onDetalle?: (p: ProductoConProveedor) => void;
+}
+
+function EnLaVenta({ cantidad }: { cantidad?: number }) {
+  if (!cantidad) return null;
+  return (
+    <span className="font-mono text-[11px] tabular-nums text-foreground">
+      {cantidad} en la venta
+    </span>
+  );
+}
+
+function VistaFotos({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) {
+  return (
+    <ul className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:p-5 2xl:grid-cols-4">
+      {productos.map((p) => {
+        const estado = estadoStock(p);
+        const cantidad = enCarrito?.get(p.id);
+        return (
+          <li
+            key={p.id}
+            className={cn(
+              "group flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card transition-colors hover:border-border-strong",
+              cantidad && "border-foreground/40"
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => onAgregar(p)}
+              disabled={estado === "sin"}
+              aria-label={`Agregar ${p.nombre}, ${formatARS(Number(p.precioVenta))}`}
+              className="flex flex-1 flex-col text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
+            >
+              <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
+                {p.imagenUrl ? (
+                  // Las fotos conservan su color real: nada de filtros ni grises.
+                  <img
+                    src={p.imagenUrl}
+                    alt=""
+                    loading="lazy"
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <span className="flex size-full items-center justify-center">
+                    <Package className="size-5 text-muted-foreground" aria-hidden="true" />
+                  </span>
+                )}
+              </span>
+              <span className="flex flex-1 flex-col gap-1 p-2.5">
+                <span className="line-clamp-2 text-sm font-medium leading-snug" title={p.nombre}>
+                  {p.nombre}
                 </span>
-                <DialogClose asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="Cerrar"
-                  >
-                    <X className="size-4" strokeWidth={1.5} />
-                  </Button>
-                </DialogClose>
-              </div>
+                <span className="font-mono text-[11px] text-muted-foreground">{p.sku}</span>
+                <span className="mt-auto flex items-baseline justify-between gap-2 pt-1">
+                  <span className="font-mono text-sm font-semibold tabular-nums">
+                    {formatARS(Number(p.precioVenta))}
+                  </span>
+                  <span className={cn("font-mono text-[11px] tabular-nums", TONO_STOCK[estado])}>
+                    {estado === "sin" ? "sin stock" : `${p.stockActual} u.`}
+                  </span>
+                </span>
+              </span>
+            </button>
+            <div className="flex min-h-8 items-center justify-between gap-2 border-t border-border px-2.5">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <EnLaVenta cantidad={cantidad} />
+                {!cantidad && p.enConsignacion && (
+                  <span className="text-[11px] text-muted-foreground">Consignación</span>
+                )}
+              </span>
+              {onDetalle && (
+                <button
+                  type="button"
+                  onClick={() => onDetalle(p)}
+                  className="-mr-1 rounded px-1 py-0.5 text-[11px] text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Ver detalle de ${p.nombre}`}
+                >
+                  Detalle
+                </button>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
-              <div className="shrink-0 px-4 pt-3 sm:px-5">
-                <div className="relative aspect-[5/2] w-full max-h-[142px] overflow-hidden rounded-xl bg-muted ring-1 ring-inset ring-black/5 dark:ring-white/10 sm:max-h-[158px]">
-                  {detalleProducto.imagenUrl ? (
-                    <img
-                      src={detalleProducto.imagenUrl}
-                      alt=""
-                      className="size-full object-cover object-center"
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center text-muted-foreground/35">
-                      <Package className="size-12" strokeWidth={1} />
-                    </div>
+function VistaLista({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) {
+  return (
+    <div>
+      <div
+        className="hidden grid-cols-[minmax(0,1fr)_5.5rem_7.5rem_2.25rem] gap-3 border-b border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:grid sm:px-5"
+        aria-hidden="true"
+      >
+        <span>Producto</span>
+        <span className="text-right">Stock</span>
+        <span className="text-right">Precio</span>
+        <span />
+      </div>
+      <ul className="divide-y divide-border">
+        {productos.map((p) => {
+          const estado = estadoStock(p);
+          const cantidad = enCarrito?.get(p.id);
+          return (
+            <li key={p.id} className="flex items-stretch">
+              <button
+                type="button"
+                onClick={() => onAgregar(p)}
+                disabled={estado === "sin"}
+                aria-label={`Agregar ${p.nombre}, ${formatARS(Number(p.precioVenta))}`}
+                className="grid min-h-12 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:grid-cols-[minmax(0,1fr)_5.5rem_7.5rem] sm:pl-5 touch-manipulation"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">{p.nombre}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-x-2 font-mono text-[11px] text-muted-foreground">
+                    <span>{p.sku}</span>
+                    {p.enConsignacion && <span className="font-sans">· Consignación</span>}
+                    {cantidad ? (
+                      <span className="text-foreground">· {cantidad} en la venta</span>
+                    ) : null}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    "hidden text-right font-mono text-xs tabular-nums sm:block",
+                    TONO_STOCK[estado]
                   )}
-                </div>
-              </div>
+                >
+                  {estado === "sin" ? "sin stock" : `${p.stockActual} u.`}
+                </span>
+                <span className="text-right font-mono text-sm font-semibold tabular-nums">
+                  {formatARS(Number(p.precioVenta))}
+                  <span
+                    className={cn(
+                      "block text-[11px] font-normal sm:hidden",
+                      TONO_STOCK[estado]
+                    )}
+                  >
+                    {estado === "sin" ? "sin stock" : `${p.stockActual} u.`}
+                  </span>
+                </span>
+              </button>
+              {onDetalle && (
+                <button
+                  type="button"
+                  onClick={() => onDetalle(p)}
+                  aria-label={`Ver detalle de ${p.nombre}`}
+                  className="flex w-9 shrink-0 items-center justify-center text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:mr-2"
+                >
+                  <Info className="size-4" aria-hidden="true" />
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-1 sm:px-5 sm:pb-5">
-                <DialogHeader className="m-0 shrink-0 space-y-0 p-0 text-left">
-                  <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
-                    <DialogTitle className="text-balance text-left text-base font-semibold leading-snug tracking-tight sm:text-[17px]">
-                      {detalleProducto.nombre}
-                    </DialogTitle>
-                    {detalleProducto.enConsignacion && (
-                      <Badge className="shrink-0 border-amber-500/20 bg-amber-500/10 text-[10px] font-medium text-amber-900 dark:text-amber-200">
+function VistaCompacta({ productos, enCarrito, onAgregar }: VistaProps) {
+  return (
+    <ul className="divide-y divide-border">
+      {productos.map((p) => {
+        const estado = estadoStock(p);
+        const cantidad = enCarrito?.get(p.id);
+        return (
+          <li key={p.id}>
+            <button
+              type="button"
+              onClick={() => onAgregar(p)}
+              disabled={estado === "sin"}
+              title={`${p.nombre} · ${TEXTO_STOCK[estado]}`}
+              aria-label={`Agregar ${p.sku} ${p.nombre}, ${formatARS(Number(p.precioVenta))}`}
+              className="grid min-h-9 w-full grid-cols-[6.5rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 px-4 py-1 text-left text-xs outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 touch-manipulation"
+            >
+              <span className="truncate font-mono text-muted-foreground">{p.sku}</span>
+              <span className="truncate">
+                {cantidad ? (
+                  <span className="mr-1.5 font-mono tabular-nums text-foreground">×{cantidad}</span>
+                ) : null}
+                {p.nombre}
+              </span>
+              <span className={cn("text-right font-mono tabular-nums", TONO_STOCK[estado])}>
+                {estado === "sin" ? "0" : p.stockActual}
+              </span>
+              <span className="min-w-[5.5rem] text-right font-mono font-semibold tabular-nums">
+                {formatARS(Number(p.precioVenta))}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function EsqueletoCatalogo({ vista }: { vista: VistaCatalogo }) {
+  if (vista === "fotos") {
+    return (
+      <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:p-5 2xl:grid-cols-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="overflow-hidden rounded-md border border-border">
+            <div className="aspect-[4/3] animate-skeleton-shimmer" />
+            <div className="space-y-2 p-2.5">
+              <div className="h-4 w-3/4 animate-skeleton-shimmer rounded" />
+              <div className="h-3 w-1/3 animate-skeleton-shimmer rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const filas = vista === "lista" ? 8 : 12;
+  return (
+    <div className="divide-y divide-border">
+      {Array.from({ length: filas }).map((_, i) => (
+        <div
+          key={i}
+          className={cn("flex items-center gap-3 px-4 sm:px-5", vista === "lista" ? "h-12" : "h-9")}
+        >
+          <div className="h-3.5 w-1/2 animate-skeleton-shimmer rounded" />
+          <div className="ml-auto h-3.5 w-16 animate-skeleton-shimmer rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* Detalle                                                                   */
+/* ------------------------------------------------------------------------ */
+
+function FilaDato({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-2.5">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-right">{children}</dd>
+    </div>
+  );
+}
+
+function DetalleProducto({
+  producto,
+  onCerrar,
+  onAgregar,
+}: {
+  producto: ProductoConProveedor | null;
+  onCerrar: () => void;
+  onAgregar: (p: ProductoConProveedor) => void;
+}) {
+  const estado = producto ? estadoStock(producto) : "ok";
+  return (
+    <Dialog open={producto != null} onOpenChange={(o) => !o && onCerrar()}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[min(94vh,820px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[420px]"
+      >
+        {producto && (
+          <>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Detalle del producto
+              </span>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" size="icon-sm" aria-label="Cerrar">
+                  <X aria-hidden="true" />
+                </Button>
+              </DialogClose>
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-4 sm:px-5">
+              {producto.imagenUrl && (
+                <div className="mb-4 aspect-[5/2] w-full overflow-hidden rounded-md border border-border bg-muted">
+                  <img src={producto.imagenUrl} alt="" className="size-full object-cover" />
+                </div>
+              )}
+              <DialogHeader className="m-0 space-y-0 p-0 text-left">
+                <DialogTitle className="text-balance text-left text-base font-semibold leading-snug">
+                  {producto.nombre}
+                </DialogTitle>
+                <DialogDescription asChild>
+                  <p className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <span>{producto.sku}</span>
+                    {producto.enConsignacion && (
+                      <Badge variant="outline" className="font-sans text-[10px] font-normal">
                         Consignación
                       </Badge>
                     )}
-                  </div>
-                  <DialogDescription asChild>
-                    <p className="mt-2 font-mono text-[11px] leading-none tracking-wide text-muted-foreground">
-                      {detalleProducto.sku}
-                    </p>
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="mt-3">
-                  {detalleProducto.descripcion?.trim() ? (
-                    <p className="text-[13px] leading-relaxed text-muted-foreground">{detalleProducto.descripcion}</p>
-                  ) : (
-                    <p className="text-[13px] italic text-muted-foreground/65">Sin descripción</p>
-                  )}
-                </div>
-
-                <div className="mt-5">
-                  <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">
-                    Datos
                   </p>
-                  <dl className="divide-y divide-border/50 overflow-hidden rounded-xl border border-border/50 bg-muted/15 text-[13px]">
-                    <div className="flex items-baseline justify-between gap-4 px-3.5 py-3 sm:px-4">
-                      <dt className="shrink-0 text-muted-foreground">Precio venta</dt>
-                      <dd className="text-right text-base font-semibold tabular-nums tracking-tight text-primary">
-                        {formatPrecio(Number(detalleProducto.precioVenta))}
-                      </dd>
-                    </div>
-                    {!detalleProducto.enConsignacion && detalleProducto.precioCompra != null && (
-                      <div className="flex items-baseline justify-between gap-4 px-3.5 py-3 sm:px-4">
-                        <dt className="shrink-0 text-muted-foreground">Precio compra</dt>
-                        <dd className="text-right tabular-nums text-foreground/90">
-                          {formatPrecio(Number(detalleProducto.precioCompra))}
-                        </dd>
-                      </div>
-                    )}
-                    {detalleProducto.enConsignacion && detalleProducto.comisionConsignacion != null && (
-                      <div className="flex items-baseline justify-between gap-4 px-3.5 py-3 sm:px-4">
-                        <dt className="shrink-0 text-muted-foreground">Comisión shop</dt>
-                        <dd className="tabular-nums text-right text-foreground/90">
-                          {Number(detalleProducto.comisionConsignacion).toFixed(1)}%
-                        </dd>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between gap-4 px-3.5 py-3 sm:px-4">
-                      <dt className="shrink-0 text-muted-foreground">Stock</dt>
-                      <dd className="flex shrink-0 justify-end">
-                        <Badge
-                          variant={stockLabel(detalleProducto).variant}
-                          className="border-0 font-medium tabular-nums shadow-none"
-                        >
-                          {stockLabel(detalleProducto).text} · {detalleProducto.stockActual} u.
-                        </Badge>
-                      </dd>
-                    </div>
-                    {detalleProducto.categoria?.nombre && (
-                      <div className="flex items-start justify-between gap-4 px-3.5 py-3 sm:px-4">
-                        <dt className="shrink-0 pt-px text-muted-foreground">Categoría</dt>
-                        <dd className="min-w-0 max-w-[68%] text-right text-[13px] leading-snug text-foreground/90">
-                          {detalleProducto.categoria.nombre}
-                        </dd>
-                      </div>
-                    )}
-                    {detalleProducto.proveedor?.nombre && (
-                      <div className="flex items-start justify-between gap-4 px-3.5 py-3 sm:px-4">
-                        <dt className="shrink-0 pt-px text-muted-foreground">Proveedor</dt>
-                        <dd className="min-w-0 max-w-[68%] text-right text-[13px] leading-snug break-words text-foreground/90">
-                          {detalleProducto.proveedor.nombre}
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
-              </div>
+                </DialogDescription>
+              </DialogHeader>
 
-              <DialogFooter className="shrink-0 gap-2 border-t border-border/50 bg-muted/20 px-4 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-10 w-full border-border/60 sm:w-auto sm:min-w-[100px]"
-                  onClick={() => setDetalleProducto(null)}
-                >
-                  Cerrar
-                </Button>
-                <Button
-                  type="button"
-                  className="h-10 w-full font-medium sm:w-auto sm:min-w-[160px]"
-                  disabled={detalleProducto.stockActual <= 0}
-                  onClick={() => {
-                    handleAgregar(detalleProducto);
-                    setDetalleProducto(null);
-                  }}
-                >
-                  Agregar al carrito
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+                {producto.descripcion?.trim() || "Sin descripción."}
+              </p>
+
+              <dl className="mt-4 divide-y divide-border border-y border-border text-[13px]">
+                <FilaDato label="Precio de venta">
+                  <span className="font-mono text-sm font-semibold tabular-nums">
+                    {formatARS(Number(producto.precioVenta))}
+                  </span>
+                </FilaDato>
+                {!producto.enConsignacion && producto.precioCompra != null && (
+                  <FilaDato label="Precio de compra">
+                    <span className="font-mono tabular-nums">
+                      {formatARS(Number(producto.precioCompra))}
+                    </span>
+                  </FilaDato>
+                )}
+                {producto.enConsignacion && producto.comisionConsignacion != null && (
+                  <FilaDato label="Comisión shop">
+                    <span className="font-mono tabular-nums">
+                      {Number(producto.comisionConsignacion).toFixed(1)}%
+                    </span>
+                  </FilaDato>
+                )}
+                <FilaDato label="Stock">
+                  <span className="text-muted-foreground">{TEXTO_STOCK[estado]} · </span>
+                  <span className={cn("font-mono tabular-nums", TONO_STOCK[estado])}>
+                    {producto.stockActual} u.
+                  </span>
+                </FilaDato>
+                {producto.categoria?.nombre && (
+                  <FilaDato label="Categoría">{producto.categoria.nombre}</FilaDato>
+                )}
+                {producto.proveedor?.nombre && (
+                  <FilaDato label="Proveedor">
+                    <span className="break-words">{producto.proveedor.nombre}</span>
+                  </FilaDato>
+                )}
+              </dl>
+            </div>
+
+            <DialogFooter className="shrink-0 gap-2 border-t border-border px-4 py-3 sm:flex-row sm:justify-end sm:px-5">
+              <Button type="button" variant="outline" className="h-10" onClick={onCerrar}>
+                Cerrar
+              </Button>
+              <Button
+                type="button"
+                className="h-10"
+                disabled={estado === "sin"}
+                onClick={() => onAgregar(producto)}
+              >
+                Agregar a la venta
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

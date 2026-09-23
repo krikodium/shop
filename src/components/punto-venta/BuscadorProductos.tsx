@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import type { ProductoConProveedor } from "@/types";
+import { formatARS } from "@/lib/formatCurrency";
 import { calcularCostosItemVenta } from "@/lib/calculadores/ventasCalculator";
 import type { ItemVentaInput } from "@/types";
 
@@ -81,7 +82,7 @@ export function BuscadorProductos({ onAgregar }: BuscadorProductosProps) {
   return (
     <div ref={containerRef} className="relative">
       <Input
-        placeholder="Buscar por nombre o SKU..."
+        placeholder="Buscar por nombre o SKU…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => query.length >= 2 && setAbierto(true)}
@@ -90,7 +91,7 @@ export function BuscadorProductos({ onAgregar }: BuscadorProductosProps) {
       />
       {loading && (
         <p className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-          Buscando...
+          Buscando…
         </p>
       )}
       {abierto && productos.length > 0 && (
@@ -104,10 +105,10 @@ export function BuscadorProductos({ onAgregar }: BuscadorProductosProps) {
               >
                 <div>
                   <span className="font-medium">{p.nombre}</span>
-                  <span className="ml-2 text-muted-foreground">({p.sku})</span>
+                  <span className="ml-2 font-mono text-xs text-muted-foreground">{p.sku}</span>
                 </div>
                 <div className="text-right">
-                  <span className="font-medium">${Number(p.precioVenta).toFixed(2)}</span>
+                  <span className="font-mono font-medium tabular-nums">{formatARS(Number(p.precioVenta))}</span>
                   <span className="ml-2 text-xs text-muted-foreground">
                     Stock: {p.stockActual}
                   </span>

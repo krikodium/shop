@@ -18,8 +18,6 @@ const EXCLUIDOS = ["src/components/pdf", "src/app/api"];
  * La tarea final exige que este array quede vacío.
  */
 export const PENDIENTES: string[] = [
-  "src/components/punto-venta/CarritoVenta.tsx",
-  "src/components/punto-venta/ProductosGridPaginado.tsx",
 ];
 
 const PROHIBIDOS: Array<{ nombre: string; patron: RegExp; motivo: string }> = [
