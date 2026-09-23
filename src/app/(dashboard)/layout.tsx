@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { Button } from "@/components/ui/button";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserMenu } from "@/components/layout/UserMenu";
@@ -24,12 +25,9 @@ export default async function DashboardLayout({
         <Link href="/" className="font-semibold text-lg tracking-tight">
           Shop
         </Link>
-        <Link
-          href="/ventas/nueva"
-          className="rounded-md bg-action px-3 py-2 text-sm font-medium text-action-foreground transition-colors hover:bg-action/90"
-        >
-          + Venta
-        </Link>
+        <Button asChild size="sm">
+          <Link href="/ventas/nueva">+ Venta</Link>
+        </Button>
       </header>
 
       {/* Sidebar desktop */}

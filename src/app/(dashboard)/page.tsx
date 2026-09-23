@@ -151,7 +151,7 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          overline="Panel"
+          overline="Operación"
           title="Inicio"
           description="Resumen del mes, actividad reciente y alertas de stock."
         />
@@ -192,7 +192,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        overline="Panel"
+        overline="Operación"
         title="Inicio"
         description="Resumen del mes, actividad reciente y alertas de stock."
       >

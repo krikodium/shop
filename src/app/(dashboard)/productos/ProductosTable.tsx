@@ -32,9 +32,6 @@ interface ProductosTableProps {
   filtros?: ReactNode;
 }
 
-const claseLinkFila =
-  "rounded-sm text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
 export function ProductosTable({ queryParams = "", filtros }: ProductosTableProps) {
   const [productos, setProductos] = useState<ProductoConRelaciones[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,9 +153,9 @@ export function ProductosTable({ queryParams = "", filtros }: ProductosTableProp
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Link href={`/productos/${p.id}/editar`} className={claseLinkFila}>
-                      Editar
-                    </Link>
+                    <Button asChild variant="ghost" size="sm">
+                      <Link href={`/productos/${p.id}/editar`}>Editar</Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               );

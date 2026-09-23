@@ -402,11 +402,6 @@ export default function CajaChicaPage() {
                 />
               </div>
             </div>
-            {error && (
-              <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">
-                {error}
-              </p>
-            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setAbrirModal(false)}>
                 Cancelar
@@ -461,12 +456,6 @@ export default function CajaChicaPage() {
               </div>
             )}
           </dl>
-
-          {error && (
-            <p className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">
-              {error}
-            </p>
-          )}
 
           <AlertDialogFooter>
             <Button

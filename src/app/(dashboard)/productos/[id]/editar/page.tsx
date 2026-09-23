@@ -120,7 +120,7 @@ export default function EditarProductoPage() {
 
   if (!producto) {
     return (
-      <div className="max-w-3xl space-y-6">
+      <div className="space-y-6">
         <VolverAProductos />
         <EmptyState
           icono={Package}

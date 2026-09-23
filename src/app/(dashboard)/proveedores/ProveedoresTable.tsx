@@ -21,9 +21,6 @@ interface ProveedorConCount extends Proveedor {
   _count: { productos: number };
 }
 
-const claseLinkFila =
-  "rounded-sm text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
 export function ProveedoresTable() {
   const [proveedores, setProveedores] = useState<ProveedorConCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,9 +97,9 @@ export function ProveedoresTable() {
                   {p._count.productos}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Link href={`/proveedores/${p.id}`} className={claseLinkFila}>
-                    Ver / Editar
-                  </Link>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href={`/proveedores/${p.id}`}>Ver</Link>
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

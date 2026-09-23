@@ -27,9 +27,6 @@ import { cn } from "@/lib/utils";
 import type { ProveedorFormValues } from "@/lib/validaciones/proveedorSchema";
 import type { Proveedor } from "@prisma/client";
 
-const claseLinkFila =
-  "rounded-sm text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
 function VolverAProveedores() {
   return (
     <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
@@ -265,7 +262,7 @@ export default function ProveedorDetallePage() {
       )}
 
       {!a ? (
-        <p className="text-sm text-muted-foreground">No se pudieron cargar las estadísticas.</p>
+        <EmptyState titulo="No se pudieron cargar las estadísticas" descripcion="Reintentá en unos segundos o revisá la conexión con la base." />
       ) : (
         <>
           <Resumen items={resumenItems} />
@@ -281,9 +278,7 @@ export default function ProveedorDetallePage() {
               }
             />
             {a.productos.lista.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
-                No hay productos asignados a este proveedor.
-              </p>
+              <EmptyState className="m-4 sm:m-5" titulo="Sin productos asignados" descripcion="Todavía no hay productos vinculados a este proveedor." />
             ) : (
               <Table>
                 <TableHeader>
@@ -340,9 +335,9 @@ export default function ProveedorDetallePage() {
                           {formatARS(p.precioVenta * p.stockActual)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Link href={`/productos/${p.id}/editar`} className={claseLinkFila}>
-                            Editar
-                          </Link>
+                          <Button asChild variant="ghost" size="sm">
+                            <Link href={`/productos/${p.id}/editar`}>Editar</Link>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -364,9 +359,7 @@ export default function ProveedorDetallePage() {
                 }
               />
               {a.ventasRecientes.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
-                  Sin ventas registradas.
-                </p>
+                <EmptyState className="m-4 sm:m-5" titulo="Sin ventas registradas" />
               ) : (
                 <DataList className="rounded-none border-0">
                   {a.ventasRecientes.map((v) => (
@@ -396,9 +389,7 @@ export default function ProveedorDetallePage() {
                   }
                 />
                 {a.consignacion.rendiciones.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
-                    Sin rendiciones.
-                  </p>
+                  <EmptyState className="m-4 sm:m-5" titulo="Sin rendiciones" />
                 ) : (
                   <DataList className="rounded-none border-0">
                     {a.consignacion.rendiciones.map((r) => (
@@ -426,9 +417,7 @@ export default function ProveedorDetallePage() {
                   }
                 />
                 {a.compras.ultimas.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
-                    Sin órdenes de compra.
-                  </p>
+                  <EmptyState className="m-4 sm:m-5" titulo="Sin órdenes de compra" />
                 ) : (
                   <DataList className="rounded-none border-0">
                     {a.compras.ultimas.map((o) => (
