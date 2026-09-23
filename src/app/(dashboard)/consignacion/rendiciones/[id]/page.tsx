@@ -403,6 +403,15 @@ export default function RendicionDetallePage() {
           title="Detalle de ventas"
           acciones={<Badge variant="outline">{items.length} movimientos</Badge>}
         />
+        {items.length === 0 ? (
+          <div className="px-4 py-3 sm:px-5">
+            <EmptyState
+              className="py-6"
+              titulo="Esta rendición no tiene movimientos"
+              descripcion="No se registraron ventas del proveedor dentro del período liquidado."
+            />
+          </div>
+        ) : (
         <Table>
           <TableHeader>
             <TableRow>
@@ -436,6 +445,7 @@ export default function RendicionDetallePage() {
             ))}
           </TableBody>
         </Table>
+        )}
         <p className="border-t border-border px-4 py-3 text-xs leading-relaxed text-muted-foreground sm:px-5">
           Comprobante de liquidación interna: resumen de las ventas realizadas por cuenta y orden
           de terceros. Los montos expresados son finales y ya incluyen las comisiones

@@ -34,18 +34,15 @@ import { formatARS } from "@/lib/formatCurrency";
 import {
   COLORES_GRAFICO,
   ejeGrafico,
+  formatoEjeMonto,
   grillaGrafico,
   tooltipGrafico,
 } from "@/lib/chart-theme";
 import { cn } from "@/lib/utils";
 import { EstadisticasVendedoresSkeleton } from "./EstadisticasVendedoresSkeleton";
 
-/** Eje Y compacto: 1,2 M, 350 mil… */
-const formatoCompacto = (x: unknown) =>
-  new Intl.NumberFormat("es-AR", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(Number(x));
+/** Eje Y de importes: `$ 260 mil` en vez de `260000`. */
+const ejeMonto = (x: unknown) => formatoEjeMonto(Number(x));
 
 const METODO_PAGO_LABEL: Record<string, string> = {
   EFECTIVO: "Efectivo",
@@ -415,13 +412,17 @@ export default function EstadisticasVendedoresPage() {
                           nameKey="name"
                           cx="50%"
                           cy="50%"
-                          outerRadius={88}
-                          innerRadius={48}
+                          outerRadius="70%"
+                          innerRadius="40%"
                           paddingAngle={2}
                           stroke="var(--card)"
                           strokeWidth={2}
+                          /* Solo se rotula la porción que tiene lugar; el resto
+                             se lee en la leyenda y en el tooltip. */
                           label={({ name, percent }) =>
-                            `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                            (percent ?? 0) >= 0.08
+                              ? `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                              : ""
                           }
                           labelLine={false}
                           fontSize={11}
@@ -474,7 +475,7 @@ export default function EstadisticasVendedoresPage() {
                       >
                         <CartesianGrid {...grillaGrafico} />
                         <XAxis dataKey="label" {...ejeGrafico} />
-                        <YAxis tickFormatter={formatoCompacto} width={48} {...ejeGrafico} />
+                        <YAxis tickFormatter={ejeMonto} width={68} {...ejeGrafico} />
                         <Tooltip
                           {...tooltipGrafico}
                           formatter={(value: unknown) => [
@@ -525,7 +526,7 @@ export default function EstadisticasVendedoresPage() {
                         minTickGap={24}
                         {...ejeGrafico}
                       />
-                      <YAxis tickFormatter={formatoCompacto} width={52} {...ejeGrafico} />
+                      <YAxis tickFormatter={ejeMonto} width={68} {...ejeGrafico} />
                       <Tooltip
                         {...tooltipGrafico}
                         cursor={{ stroke: "var(--border)" }}

@@ -240,6 +240,12 @@ function NuevaRendicionContent() {
         bloqueado={restriccion ? !restriccion.permitido : false}
       />
 
+      {loadingRestriccion && !restriccion && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Verificando si el proveedor admite una rendición este mes…
+        </p>
+      )}
+
       {restriccion && !restriccion.permitido && (
         <div role="status" className="space-y-1 rounded-lg border border-border px-4 py-3">
           <p className="text-sm font-medium">Rendición no disponible</p>

@@ -130,7 +130,9 @@ export function RendicionesTable() {
                 )}
               </TableCell>
               <TableCell>
-                <Badge variant="outline">{ESTADO_LABEL[r.estado] ?? r.estado}</Badge>
+                <Badge variant={r.estado === "PAGADO" ? "default" : "outline"}>
+                  {ESTADO_LABEL[r.estado] ?? r.estado}
+                </Badge>
               </TableCell>
               <TableCell className="text-right">
                 <Button asChild variant="ghost" size="sm">

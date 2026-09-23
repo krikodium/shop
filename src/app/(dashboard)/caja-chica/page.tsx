@@ -375,7 +375,14 @@ export default function CajaChicaPage() {
         </div>
       )}
 
-      <Dialog open={abrirModal} onOpenChange={setAbrirModal}>
+      <Dialog
+        open={abrirModal}
+        onOpenChange={(abierto) => {
+          if (abrir.loading) return;
+          setAbrirModal(abierto);
+          if (!abierto) setError(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Abrir caja</DialogTitle>
@@ -402,8 +409,18 @@ export default function CajaChicaPage() {
                 />
               </div>
             </div>
+            {error && (
+              <p role="alert" className="text-sm font-medium text-destructive">
+                {error}
+              </p>
+            )}
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setAbrirModal(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={abrir.loading}
+                onClick={() => setAbrirModal(false)}
+              >
                 Cancelar
               </Button>
               <Button type="submit" loading={abrir.loading} loadingText="Abriendo…">
@@ -418,7 +435,9 @@ export default function CajaChicaPage() {
         open={cierreModal}
         onOpenChange={(abierto) => {
           // Mientras el cierre está en vuelo el diálogo no se puede descartar.
-          if (!cerrar.loading) setCierreModal(abierto);
+          if (cerrar.loading) return;
+          setCierreModal(abierto);
+          if (!abierto) setError(null);
         }}
       >
         <AlertDialogContent className="sm:max-w-md">
@@ -456,6 +475,12 @@ export default function CajaChicaPage() {
               </div>
             )}
           </dl>
+
+          {error && (
+            <p role="alert" className="text-sm font-medium text-destructive">
+              {error}
+            </p>
+          )}
 
           <AlertDialogFooter>
             <Button
