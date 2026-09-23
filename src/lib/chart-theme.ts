@@ -25,10 +25,26 @@ export const tooltipGrafico = {
     border: "1px solid var(--border)",
     borderRadius: "0.5rem",
     fontSize: "12px",
-    color: "var(--popover-foreground)",
+    padding: "0.5rem 0.625rem",
+    boxShadow: "none",
+  },
+  /** Recharts pinta cada item con el color de su serie: en gris sobre gris no
+   *  se lee. Se fuerza el color de texto del popover. */
+  itemStyle: { color: "var(--popover-foreground)", padding: 0 },
+  labelStyle: {
+    color: "var(--muted-foreground)",
+    marginBottom: "0.25rem",
+    fontSize: "11px",
   },
   cursor: { fill: "var(--accent)" },
 } as const;
+
+/** Eje de importes: 260.000 en vez de 260000, y 1,2 M cuando crece. */
+export const formatoEjeMonto = (valor: number) =>
+  `$ ${new Intl.NumberFormat("es-AR", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(valor)}`;
 
 /** Grilla de fondo: solo horizontales, en el color de borde del tema. */
 export const grillaGrafico = {

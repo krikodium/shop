@@ -22,16 +22,21 @@ function useMontado() {
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const montado = useMontado();
+  // `oscuro` solo se usa DESPUÉS de montar. Todo lo que se renderiza (ícono y
+  // aria-label) tiene que salir de `oscuroVisible`: si alguna parte del DOM
+  // usara `oscuro` a secas, el servidor y el primer render del cliente
+  // diferirían y React tiraría un error de hidratación.
   const oscuro = resolvedTheme === "dark";
+  const oscuroVisible = montado && oscuro;
 
   return (
     <Button
       variant="ghost"
       size="icon-sm"
-      aria-label={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+      aria-label={oscuroVisible ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       onClick={() => setTheme(oscuro ? "light" : "dark")}
     >
-      {montado && oscuro ? (
+      {oscuroVisible ? (
         <Sun className="size-4" aria-hidden="true" />
       ) : (
         <Moon className="size-4" aria-hidden="true" />

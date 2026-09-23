@@ -38,6 +38,7 @@ import { formatARS, formatUSD } from "@/lib/formatCurrency";
 import {
   COLORES_GRAFICO,
   ejeGrafico,
+  formatoEjeMonto,
   grillaGrafico,
   tooltipGrafico,
 } from "@/lib/chart-theme";
@@ -272,7 +273,7 @@ export default function DashboardPage() {
                     <CartesianGrid {...grillaGrafico} />
                     <XAxis dataKey="label" {...ejeGrafico} />
                     <YAxis
-                      tickFormatter={(v) => `$${v}`}
+                      tickFormatter={formatoEjeMonto}
                       width={56}
                       {...ejeGrafico}
                     />

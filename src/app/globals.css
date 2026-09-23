@@ -147,11 +147,11 @@
 
   --destructive: oklch(0.7 0.17 27);
 
-  --chart-1: oklch(0.95 0 0);
-  --chart-2: oklch(0.78 0 0);
-  --chart-3: oklch(0.62 0 0);
-  --chart-4: oklch(0.47 0 0);
-  --chart-5: oklch(0.35 0 0);
+  --chart-1: oklch(0.74 0 0);
+  --chart-2: oklch(0.60 0 0);
+  --chart-3: oklch(0.48 0 0);
+  --chart-4: oklch(0.38 0 0);
+  --chart-5: oklch(0.30 0 0);
 
   --sidebar: oklch(0.17 0 0);
   --sidebar-foreground: oklch(0.97 0 0);
