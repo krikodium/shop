@@ -375,7 +375,7 @@ export function ProductoForm({
                             >
                               <Link
                                 href="/proveedores/nuevo"
-                                className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+                                className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
                               >
                                 <Plus className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                                 Nuevo proveedor
@@ -617,7 +617,7 @@ export function ProductoForm({
                                 >
                                   <Link
                                     href="/proveedores/nuevo"
-                                    className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+                                    className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
                                   >
                                     <Plus className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                                     Nuevo proveedor

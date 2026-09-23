@@ -54,7 +54,27 @@ function ProveedorDetalleSkeleton() {
           </div>
         ))}
       </div>
-      <div className="h-64 animate-skeleton-shimmer rounded-lg" />
+      {/* Forma del panel de productos: encabezado + 6 filas de 6 columnas. */}
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="border-b border-border px-4 py-3.5 sm:px-5">
+          <div className="h-4 w-44 animate-skeleton-shimmer rounded" />
+        </div>
+        <div className="divide-y divide-border">
+          {Array.from({ length: 6 }).map((_, fila) => (
+            <div key={fila} className="flex items-center gap-4 px-4 py-3 sm:px-3">
+              {Array.from({ length: 6 }).map((_, col) => (
+                <div
+                  key={col}
+                  className={cn(
+                    "h-4 animate-skeleton-shimmer rounded",
+                    col === 0 ? "flex-1" : "w-16 shrink-0"
+                  )}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

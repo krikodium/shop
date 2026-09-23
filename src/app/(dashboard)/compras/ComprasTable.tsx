@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { PackageSearch, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Panel, PanelHeader } from "@/components/ui/panel";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Resumen } from "@/components/ui/resumen";
 import { formatARS } from "@/lib/formatCurrency";
 import { cn } from "@/lib/utils";
@@ -214,7 +215,23 @@ export function ComprasTable() {
     setPage(1);
   };
 
-  if (loading && !hasLoaded) return <TableSkeleton rows={6} cols={7} />;
+  if (loading && !hasLoaded) {
+    return (
+      <div className="space-y-6" aria-busy="true" aria-label="Cargando compras">
+        {/* Misma geometría que la banda `Resumen` que aparece después. */}
+        <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-card px-4 py-3.5">
+              <div className="h-3 w-24 animate-skeleton-shimmer rounded" />
+              <div className="mt-2 h-6 w-28 animate-skeleton-shimmer rounded" />
+              <div className="mt-1.5 h-3 w-20 animate-skeleton-shimmer rounded" />
+            </div>
+          ))}
+        </div>
+        <TableSkeleton rows={6} cols={7} />
+      </div>
+    );
+  }
 
   const isRefreshing = loading && hasLoaded;
   const from = meta.total === 0 ? 0 : (meta.page - 1) * meta.pageSize + 1;
@@ -247,7 +264,7 @@ export function ComprasTable() {
 
   const filtros = (
     <div className="flex flex-wrap items-end gap-2 border-b border-border px-4 py-3 sm:px-5">
-      <div className="relative">
+      <div className="relative basis-full sm:basis-auto">
         <Search
           className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden="true"
@@ -258,10 +275,10 @@ export function ComprasTable() {
           placeholder="Nº de orden o proveedor"
           value={filtroBusqueda}
           onChange={(e) => setFiltroBusqueda(e.target.value)}
-          className="h-9 w-48 pl-9 sm:w-56"
+          className="h-9 w-full pl-9 sm:w-56"
         />
       </div>
-      <div>
+      <div className="min-w-0 flex-1 basis-[calc(50%-0.25rem)] sm:flex-none sm:basis-auto">
         <Label htmlFor="filtro-compra-estado" className="sr-only">
           Estado
         </Label>
@@ -272,7 +289,7 @@ export function ComprasTable() {
             resetToFirstPage();
           }}
         >
-          <SelectTrigger id="filtro-compra-estado" className="h-9 w-[9.5rem]">
+          <SelectTrigger id="filtro-compra-estado" className="h-9 w-full sm:w-[9.5rem]">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
@@ -284,7 +301,7 @@ export function ComprasTable() {
           </SelectContent>
         </Select>
       </div>
-      <div>
+      <div className="min-w-0 flex-1 basis-[calc(50%-0.25rem)] sm:flex-none sm:basis-auto">
         <Label htmlFor="filtro-compra-proveedor" className="sr-only">
           Proveedor
         </Label>
@@ -295,7 +312,7 @@ export function ComprasTable() {
             resetToFirstPage();
           }}
         >
-          <SelectTrigger id="filtro-compra-proveedor" className="h-9 w-[11rem]">
+          <SelectTrigger id="filtro-compra-proveedor" className="h-9 w-full sm:w-[11rem]">
             <SelectValue placeholder="Proveedor" />
           </SelectTrigger>
           <SelectContent>
@@ -308,8 +325,8 @@ export function ComprasTable() {
           </SelectContent>
         </Select>
       </div>
-      <div className="flex items-end gap-1.5">
-        <div className="space-y-1">
+      <div className="flex w-full items-end gap-1.5 sm:w-auto">
+        <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
           <Label htmlFor="filtro-compra-fecha-desde" className={claseLabel}>
             Desde
           </Label>
@@ -321,10 +338,10 @@ export function ComprasTable() {
               setFechaDesde(e.target.value);
               resetToFirstPage();
             }}
-            className="h-9 w-[9.5rem]"
+            className="h-9 w-full sm:w-[9.5rem]"
           />
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
           <Label htmlFor="filtro-compra-fecha-hasta" className={claseLabel}>
             Hasta
           </Label>
@@ -336,12 +353,12 @@ export function ComprasTable() {
               setFechaHasta(e.target.value);
               resetToFirstPage();
             }}
-            className="h-9 w-[9.5rem]"
+            className="h-9 w-full sm:w-[9.5rem]"
           />
         </div>
       </div>
-      <div className="flex items-end gap-1.5">
-        <div className="space-y-1">
+      <div className="flex w-full items-end gap-1.5 sm:w-auto">
+        <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
           <Label htmlFor="filtro-compra-monto-min" className={claseLabel}>
             Monto mín.
           </Label>
@@ -356,10 +373,10 @@ export function ComprasTable() {
               resetToFirstPage();
             }}
             placeholder="0.00"
-            className="h-9 w-28 font-mono tabular-nums"
+            className="h-9 w-full font-mono tabular-nums sm:w-28"
           />
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
           <Label htmlFor="filtro-compra-monto-max" className={claseLabel}>
             Monto máx.
           </Label>
@@ -402,6 +419,19 @@ export function ComprasTable() {
             <p role="alert" className="px-4 py-6 text-sm text-destructive sm:px-5">
               {error}
             </p>
+          ) : ordenes.length === 0 ? (
+            <PanelBody>
+              <EmptyState
+                icono={PackageSearch}
+                titulo="No hay órdenes que coincidan"
+                descripcion="Ajustá los filtros, o cargá una orden de compra nueva."
+                accion={
+                  <Button asChild size="sm">
+                    <Link href="/compras/nueva">Nueva orden</Link>
+                  </Button>
+                }
+              />
+            </PanelBody>
           ) : (
             <Table>
               <TableHeader>
@@ -418,42 +448,34 @@ export function ComprasTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ordenes.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                      No hay órdenes que coincidan con los filtros actuales.
+                {ordenes.map((o) => (
+                  <TableRow
+                    key={o.id}
+                    className={cn(o.estado === "CANCELADO" && "text-muted-foreground")}
+                  >
+                    <TableCell className="font-mono text-xs tabular-nums">
+                      {o.numeroOrden}
+                    </TableCell>
+                    <TableCell className="font-medium">{o.proveedor?.nombre || "—"}</TableCell>
+                    <TableCell className="font-mono text-xs tabular-nums">
+                      {new Date(o.fecha).toLocaleDateString("es-AR")}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {o.itemsCount}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-semibold tabular-nums">
+                      {formatARS(o.total)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{ESTADO_LABEL[o.estado] ?? o.estado}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/compras/${o.id}`}>Ver</Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  ordenes.map((o) => (
-                    <TableRow
-                      key={o.id}
-                      className={cn(o.estado === "CANCELADO" && "text-muted-foreground")}
-                    >
-                      <TableCell className="font-mono text-xs tabular-nums">
-                        {o.numeroOrden}
-                      </TableCell>
-                      <TableCell className="font-medium">{o.proveedor?.nombre || "—"}</TableCell>
-                      <TableCell className="font-mono text-xs tabular-nums">
-                        {new Date(o.fecha).toLocaleDateString("es-AR")}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">
-                        {o.itemsCount}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-semibold tabular-nums">
-                        {formatARS(o.total)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{ESTADO_LABEL[o.estado] ?? o.estado}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href={`/compras/${o.id}`}>Ver</Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
           )}

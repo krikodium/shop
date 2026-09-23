@@ -310,7 +310,7 @@ export default function NuevaCompraPage() {
                 Nuevo proveedor
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[min(95vw,400px)]">
+            <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Nuevo proveedor</DialogTitle>
                 <p className="text-sm text-muted-foreground">
@@ -368,7 +368,7 @@ export default function NuevaCompraPage() {
                   Nuevo producto
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Crear producto y agregar a la orden</DialogTitle>
                 </DialogHeader>
@@ -489,7 +489,11 @@ export default function NuevaCompraPage() {
               placeholder="0"
             />
           </div>
-          <Button variant="outline" onClick={agregarItem} className="h-10">
+          <Button
+            variant="outline"
+            onClick={agregarItem}
+            className="h-10 w-full sm:w-auto"
+          >
             Agregar
           </Button>
         </PanelBody>

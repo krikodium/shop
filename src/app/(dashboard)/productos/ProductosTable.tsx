@@ -32,6 +32,68 @@ interface ProductosTableProps {
   filtros?: ReactNode;
 }
 
+/** Encabezados reales de la tabla: el esqueleto y los datos usan la misma fila. */
+const COLUMNAS = [
+  { clave: "foto", etiqueta: "Foto", soloLectores: true, className: "w-14" },
+  { clave: "sku", etiqueta: "SKU" },
+  { clave: "nombre", etiqueta: "Nombre" },
+  { clave: "categoria", etiqueta: "Categoría" },
+  { clave: "precio", etiqueta: "P. venta", className: "text-right" },
+  { clave: "stock", etiqueta: "Stock", className: "text-right" },
+  { clave: "tipo", etiqueta: "Tipo" },
+  { clave: "acciones", etiqueta: "Acciones", soloLectores: true, className: "w-[80px]" },
+] as const;
+
+function EncabezadoTabla() {
+  return (
+    <TableHeader>
+      <TableRow>
+        {COLUMNAS.map((c) => (
+          <TableHead key={c.clave} className={"className" in c ? c.className : undefined}>
+            {"soloLectores" in c && c.soloLectores ? (
+              <span className="sr-only">{c.etiqueta}</span>
+            ) : (
+              c.etiqueta
+            )}
+          </TableHead>
+        ))}
+      </TableRow>
+    </TableHeader>
+  );
+}
+
+/**
+ * Esqueleto con la forma real de la tabla: mismas columnas y alto de fila,
+ * con la miniatura en la primera celda.
+ */
+function FilasEsqueleto({ filas = 8 }: { filas?: number }) {
+  return (
+    <Table aria-busy="true" aria-label="Cargando productos">
+      <EncabezadoTabla />
+      <TableBody>
+        {Array.from({ length: filas }).map((_, i) => (
+          <TableRow key={i} className="hover:bg-transparent">
+            <TableCell>
+              <div className="size-10 animate-skeleton-shimmer rounded-md" />
+            </TableCell>
+            {COLUMNAS.slice(1).map((c) => (
+              <TableCell key={c.clave}>
+                <div
+                  className={cn(
+                    "h-4 animate-skeleton-shimmer rounded",
+                    c.clave === "nombre" ? "w-40" : "w-16",
+                    "className" in c && c.className?.includes("text-right") && "ml-auto"
+                  )}
+                />
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
 export function ProductosTable({ queryParams = "", filtros }: ProductosTableProps) {
   const [productos, setProductos] = useState<ProductoConRelaciones[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,15 +122,7 @@ export function ProductosTable({ queryParams = "", filtros }: ProductosTableProp
         <div className="border-b border-border px-4 py-3 sm:px-5">{filtros}</div>
       )}
       {loading ? (
-        <div className="divide-y divide-border" aria-busy="true" aria-label="Cargando productos">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-4 py-3 sm:px-5">
-              <div className="size-10 shrink-0 animate-skeleton-shimmer rounded-md" />
-              <div className="h-4 flex-1 animate-skeleton-shimmer rounded" />
-              <div className="h-4 w-20 animate-skeleton-shimmer rounded" />
-            </div>
-          ))}
-        </div>
+        <FilasEsqueleto />
       ) : productos.length === 0 ? (
         <PanelBody>
           <EmptyState
@@ -84,22 +138,7 @@ export function ProductosTable({ queryParams = "", filtros }: ProductosTableProp
         </PanelBody>
       ) : (
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-14">
-                <span className="sr-only">Foto</span>
-              </TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead className="text-right">P. venta</TableHead>
-              <TableHead className="text-right">Stock</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead className="w-[80px]">
-                <span className="sr-only">Acciones</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
+          <EncabezadoTabla />
           <TableBody>
             {productos.map((p) => {
               const tono = tonoStock(p.stockActual, p.stockMinimo);
@@ -109,11 +148,14 @@ export function ProductosTable({ queryParams = "", filtros }: ProductosTableProp
                     {p.imagenUrl ? (
                       <img
                         src={p.imagenUrl}
-                        alt=""
+                        alt={`Foto de ${p.nombre}`}
+                        loading="lazy"
                         className="size-10 rounded-md object-cover"
                       />
                     ) : (
                       <div
+                        role="img"
+                        aria-label="Sin foto"
                         className="flex size-10 items-center justify-center rounded-md border border-border"
                         title="Sin foto"
                       >

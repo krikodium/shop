@@ -26,6 +26,13 @@ import { useAsyncAction } from "@/hooks/use-async-action";
 import { ProductosTable } from "./ProductosTable";
 import type { Categoria, Proveedor } from "@prisma/client";
 
+/**
+ * Controles de la barra de filtros. En celular ocupan media fila (dos por
+ * renglón, sin campos de 40 px); desde `sm` vuelven a su ancho natural.
+ */
+const claseFiltro = "h-9 w-[calc(50%-0.25rem)] min-w-0 flex-1 sm:w-44 sm:flex-none";
+const claseFiltroCorto = "h-9 w-[calc(50%-0.25rem)] min-w-0 flex-1 sm:w-36 sm:flex-none";
+
 export default function ProductosPage() {
   const searchParams = useSearchParams();
   const proveedorIdFromUrl = searchParams.get("proveedorId");
@@ -115,7 +122,7 @@ export default function ProductosPage() {
 
   const filtros = (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative min-w-[12rem] flex-1">
+      <div className="relative basis-full sm:min-w-[12rem] sm:flex-1 sm:basis-auto">
         <Search
           className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden="true"
@@ -126,7 +133,7 @@ export default function ProductosPage() {
           aria-label="Buscar producto"
           value={filtroBusqueda}
           onChange={(e) => setFiltroBusqueda(e.target.value)}
-          className="h-9 pl-9"
+          className="h-9 w-full pl-9"
         />
       </div>
 
@@ -134,7 +141,7 @@ export default function ProductosPage() {
         Categoría
       </Label>
       <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-        <SelectTrigger id="filtro-categoria" className="h-9 w-full sm:w-44">
+        <SelectTrigger id="filtro-categoria" className={claseFiltro}>
           <SelectValue placeholder="Categoría" />
         </SelectTrigger>
         <SelectContent>
@@ -151,7 +158,7 @@ export default function ProductosPage() {
         Proveedor
       </Label>
       <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
-        <SelectTrigger id="filtro-proveedor" className="h-9 w-full sm:w-44">
+        <SelectTrigger id="filtro-proveedor" className={claseFiltro}>
           <SelectValue placeholder="Proveedor" />
         </SelectTrigger>
         <SelectContent>
@@ -168,7 +175,7 @@ export default function ProductosPage() {
         Tipo de producto
       </Label>
       <Select value={filtroConsignacion} onValueChange={setFiltroConsignacion}>
-        <SelectTrigger id="filtro-tipo" className="h-9 w-full sm:w-36">
+        <SelectTrigger id="filtro-tipo" className={claseFiltroCorto}>
           <SelectValue placeholder="Tipo" />
         </SelectTrigger>
         <SelectContent>
@@ -182,7 +189,7 @@ export default function ProductosPage() {
         Estado de stock
       </Label>
       <Select value={filtroStock} onValueChange={setFiltroStock}>
-        <SelectTrigger id="filtro-stock" className="h-9 w-full sm:w-36">
+        <SelectTrigger id="filtro-stock" className={claseFiltroCorto}>
           <SelectValue placeholder="Stock" />
         </SelectTrigger>
         <SelectContent>
@@ -215,7 +222,8 @@ export default function ProductosPage() {
           <DialogTrigger asChild>
             <Button variant="outline">Carga masiva Excel</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          {/* Sin `max-w-*` fijo: en 375 px un `max-w-lg` (32rem) desborda el viewport. */}
+          <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Carga masiva desde Excel</DialogTitle>
             </DialogHeader>
