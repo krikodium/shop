@@ -8,6 +8,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // El detalle expone costo y margen por producto: no puede ser público.
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
     const { id } = await params;
     const venta = await prisma.venta.findUnique({
       where: { id },

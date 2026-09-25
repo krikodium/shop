@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { productoSchema } from "@/lib/validaciones/productoSchema";
+import { construirWhereProductos } from "@/lib/filtros/productos";
 
 export async function GET(request: Request) {
   try {
@@ -30,22 +31,14 @@ export async function GET(request: Request) {
     const limit = paginado ? Math.min(50, Math.max(1, parseInt(limitParam ?? "10", 10))) : 1000;
     const skip = (page - 1) * limit;
 
-    const baseWhere = {
-      ...(categoriaId ? { categoriaId } : {}),
-      ...(proveedorId ? { proveedorId } : {}),
-      ...(enConsignacion === "true" ? { enConsignacion: true } : {}),
-      ...(enConsignacion === "false" ? { enConsignacion: false } : {}),
-      ...(activo !== "false" ? { activo: true } : {}),
-      ...(stockBajo === "sin" ? { stockActual: 0 } : {}),
-      ...(q
-        ? {
-            OR: [
-              { nombre: { contains: q, mode: "insensitive" as const } },
-              { sku: { contains: q, mode: "insensitive" as const } },
-            ],
-          }
-        : {}),
-    };
+    const baseWhere = construirWhereProductos({
+      categoriaId,
+      proveedorId,
+      enConsignacion,
+      stockBajo,
+      activo,
+      q,
+    });
 
     const takeAll = stockBajo === "bajo";
     let productos = await prisma.producto.findMany({
@@ -54,6 +47,17 @@ export async function GET(request: Request) {
       include: {
         categoria: true,
         proveedor: true,
+        // Con proveedor filtrado sumamos las partes de ESE proveedor, para que
+        // la UI pueda explicar por qué aparece un producto que no lo tiene como
+        // proveedor principal. Sin filtro, la respuesta queda igual que antes.
+        ...(proveedorId
+          ? {
+              partesProveedor: {
+                where: { proveedorId },
+                orderBy: { orden: "asc" as const },
+              },
+            }
+          : {}),
       },
       skip: takeAll ? 0 : skip,
       take: takeAll ? 10000 : limit,

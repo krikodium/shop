@@ -209,15 +209,59 @@
 }
 
 /* Sistema "libro mayor" — revelado escalonado de filas/bloques */
-@keyframes ledger-in {
+/* ── Sistema de animación ─────────────────────────────────────────────
+   Tres gestos y nada más. Todo entra, nada rebota. Cada clase tiene su
+   freno en el bloque de reduced-motion de abajo. */
+
+@keyframes anim-entrada {
   from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+  to   { opacity: 1; transform: none; }
 }
+
+@keyframes anim-entrada-lateral {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes anim-pulso-sutil {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* Aparición de un bloque o de una fila de tabla. */
+.anim-entrada {
+  animation: anim-entrada var(--dur-slow) var(--ease-salida) both;
+}
+
+/* Aparición de un ítem de lista lateral (nav, filtros). */
+.anim-entrada-lateral {
+  animation: anim-entrada-lateral var(--dur-base) var(--ease-salida) both;
+}
+
+/* Valor que se está refrescando en segundo plano. */
+.anim-pulso-sutil {
+  animation: anim-pulso-sutil 1.6s ease-in-out infinite;
+}
+
+/* Alias del sistema anterior: el código viejo sigue andando. */
 .ledger-in {
-  animation: ledger-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: anim-entrada var(--dur-slow) var(--ease-salida) both;
 }
+
 @media (prefers-reduced-motion: reduce) {
-  .ledger-in { animation: none; }
+  .anim-entrada,
+  .anim-entrada-lateral,
+  .anim-pulso-sutil,
+  .ledger-in,
+  .animate-skeleton-shimmer {
+    animation: none !important;
+  }
+  .anim-entrada,
+  .anim-entrada-lateral,
+  .ledger-in {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Textura de grilla milimetrada para bandas oscuras (estado de cuenta) */

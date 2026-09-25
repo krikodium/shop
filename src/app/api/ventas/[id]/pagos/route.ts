@@ -103,6 +103,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  // VIEWER es "solo lectura": no puede saldar una venta.
+  if (session.user.role === "VIEWER") {
+    return NextResponse.json(
+      { error: "Tu usuario es de solo lectura: no puede registrar cobros." },
+      { status: 403 }
+    );
+  }
 
   const { id } = await ctx.params;
 

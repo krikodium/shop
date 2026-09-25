@@ -6,6 +6,12 @@ import { procesarVenta } from "@/lib/procesarVenta";
 
 export async function GET(request: Request) {
   try {
+    // Sin esto el listado es público: devuelve costos, ganancia y margen de las
+    // últimas 100 ventas, o sea el esquema de costos del negocio.
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const fechaDesde = searchParams.get("fechaDesde");
     const fechaHasta = searchParams.get("fechaHasta");
@@ -42,6 +48,19 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Antes de leer el cuerpo: sin sesión, un curl podía crear una venta real,
+    // descontar stock y registrar plata cobrada sin nadie que responda por ella.
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    if (session.user.role === "VIEWER") {
+      return NextResponse.json(
+        { error: "Tu usuario es de solo lectura: no puede registrar ventas." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const data = ventaSchema.parse(body);
     const ignorarStock = body.ignorarStock === true;
@@ -71,6 +90,18 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
+      // El pago dividido dice "el total entró hoy, en dos medios". Un cobro
+      // inicial menor al total dice lo contrario. Juntos, la pantalla muestra
+      // a la vez "saldo 400.000" y "cobrado 500.000".
+      if (data.cobroInicial && Number(data.cobroInicial.montoArs) !== totalVenta) {
+        return NextResponse.json(
+          {
+            error:
+              "El pago dividido cubre el total de la venta: no puede combinarse con un cobro parcial. Registrá la seña sin pago dividido y cobrá el saldo después.",
+          },
+          { status: 400 }
+        );
+      }
       const hayUsd =
         (data.usdPago1 != null && data.usdPago1 > 0) ||
         (data.usdPago2 != null && data.usdPago2 > 0);
@@ -82,7 +113,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const session = await auth();
     const venta = await procesarVenta({
       clienteId: data.clienteId ?? null,
       clienteNombre: data.clienteNombre,
@@ -90,7 +120,7 @@ export async function POST(request: Request) {
       descuento: data.descuento,
       metodoPago: data.metodoPago,
       notas: data.notas,
-      usuarioId: session?.user?.id ?? null,
+      usuarioId: session.user.id,
       ignorarStock,
       metodoPagoSecundario: data.metodoPagoSecundario ?? null,
       montoPago1Ars: data.montoPago1Ars ?? null,

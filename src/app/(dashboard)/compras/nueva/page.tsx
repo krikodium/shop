@@ -34,7 +34,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { Proveedor, Producto } from "@prisma/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  SelectorProductoProveedor,
+  type ProductoProveedor,
+} from "@/components/compras/SelectorProductoProveedor";
+import { Reveal } from "@/components/ui/reveal";
+import type { Proveedor } from "@prisma/client";
 
 const claseLabel = "font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground";
 
@@ -50,14 +65,16 @@ interface LineaItem {
 export default function NuevaCompraPage() {
   const router = useRouter();
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [productos, setProductos] = useState<Producto[]>([]);
   const [proveedorId, setProveedorId] = useState("");
   const [items, setItems] = useState<LineaItem[]>([]);
-  const [productoSeleccionado, setProductoSeleccionado] = useState("");
+  const [productoElegido, setProductoElegido] = useState<ProductoProveedor | null>(null);
   const [cantidad, setCantidad] = useState(1);
   const [precioUnitario, setPrecioUnitario] = useState(0);
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  /** Cambio de proveedor con ítems ya cargados: se confirma, nunca se borra solo. */
+  const [proveedorPendiente, setProveedorPendiente] = useState<string | null>(null);
 
   const [modalNuevoProveedorOpen, setModalNuevoProveedorOpen] = useState(false);
   const [nuevoProveedorNombre, setNuevoProveedorNombre] = useState("");
@@ -70,11 +87,8 @@ export default function NuevaCompraPage() {
   const [nuevoPrecioCompra, setNuevoPrecioCompra] = useState(0);
   const [nuevoPrecioVenta, setNuevoPrecioVenta] = useState(0);
   const [nuevaCantidad, setNuevaCantidad] = useState(1);
-
-  const loadProductos = () =>
-    fetch("/api/productos")
-      .then((r) => r.json())
-      .then((prods) => setProductos(Array.isArray(prods) ? prods : prods?.productos ?? []));
+  /** Fuerza al selector a recargar la lista del proveedor tras crear un producto. */
+  const [versionProductos, setVersionProductos] = useState(0);
 
   const loadProveedores = () =>
     fetch("/api/proveedores")
@@ -104,7 +118,9 @@ export default function NuevaCompraPage() {
       }
       const proveedor = await res.json();
       await loadProveedores();
+      // Un proveedor recién creado no tiene ítems previos que pisar.
       setProveedorId(proveedor.id);
+      setProductoElegido(null);
       notificar.ok("Proveedor creado y asignado");
       setModalNuevoProveedorOpen(false);
       setNuevoProveedorNombre("");
@@ -117,18 +133,45 @@ export default function NuevaCompraPage() {
   });
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/proveedores").then((r) => r.json()),
-      fetch("/api/productos").then((r) => r.json()),
-    ]).then(([provs, prods]) => {
-      setProveedores(Array.isArray(provs) ? provs : []);
-      setProductos(Array.isArray(prods) ? prods : prods?.productos ?? []);
-    });
+    fetch("/api/proveedores")
+      .then((r) => r.json())
+      .then((provs) => setProveedores(Array.isArray(provs) ? provs : []))
+      .catch(() => setProveedores([]));
   }, []);
 
+  const proveedorNombre = proveedores.find((p) => p.id === proveedorId)?.nombre;
+  const proveedorPendienteNombre = proveedores.find((p) => p.id === proveedorPendiente)?.nombre;
+
+  const pedirCambioDeProveedor = (nuevoId: string) => {
+    if (nuevoId === proveedorId) return;
+    if (items.length > 0) {
+      setProveedorPendiente(nuevoId);
+      return;
+    }
+    setProveedorId(nuevoId);
+    setProductoElegido(null);
+    setPrecioUnitario(0);
+    setCantidad(1);
+  };
+
+  const confirmarCambioDeProveedor = () => {
+    if (!proveedorPendiente) return;
+    setProveedorId(proveedorPendiente);
+    setItems([]);
+    setProductoElegido(null);
+    setPrecioUnitario(0);
+    setCantidad(1);
+    setProveedorPendiente(null);
+    notificar.info("Orden vaciada: los ítems eran de otro proveedor");
+  };
+
+  const elegirProducto = (producto: ProductoProveedor) => {
+    setProductoElegido(producto);
+    setPrecioUnitario(Number(producto.precioCompra ?? 0));
+  };
+
   const agregarItem = () => {
-    if (!productoSeleccionado) return;
-    const p = productos.find((x) => x.id === productoSeleccionado);
+    const p = productoElegido;
     if (!p) return;
     const precio = precioUnitario > 0 ? precioUnitario : Number(p.precioCompra ?? 0);
     const cant = cantidad > 0 ? cantidad : 1;
@@ -161,7 +204,7 @@ export default function NuevaCompraPage() {
         },
       ]);
     }
-    setProductoSeleccionado("");
+    setProductoElegido(null);
     setCantidad(1);
     setPrecioUnitario(0);
   };
@@ -173,6 +216,10 @@ export default function NuevaCompraPage() {
   const { run: crearYAgregarProducto, loading: guardandoNuevo } = useAsyncAction(async () => {
     const sku = nuevoSku.trim();
     const nombre = nuevoNombre.trim();
+    if (!proveedorId) {
+      notificar.error("Elegí primero el proveedor");
+      return;
+    }
     if (!sku || !nombre) {
       notificar.error("SKU y nombre son obligatorios");
       return;
@@ -185,12 +232,21 @@ export default function NuevaCompraPage() {
       notificar.error("El precio de venta es obligatorio");
       return;
     }
-    const existeSku = productos.some((p) => p.sku.toLowerCase() === sku.toLowerCase());
-    if (existeSku) {
-      notificar.error("Ya existe un producto con ese SKU");
-      return;
-    }
     try {
+      // El SKU es único a nivel catálogo, no por proveedor: se consulta sin
+      // filtrar por proveedor para avisar antes de que falle el alta.
+      const existentes = await fetch(`/api/productos?q=${encodeURIComponent(sku)}&limit=50`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      const lista = Array.isArray(existentes) ? existentes : (existentes?.productos ?? []);
+      if (
+        Array.isArray(lista) &&
+        lista.some((p: { sku?: string }) => (p.sku ?? "").toLowerCase() === sku.toLowerCase())
+      ) {
+        notificar.error("Ya existe un producto con ese SKU");
+        return;
+      }
+
       const res = await fetch("/api/productos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -210,7 +266,7 @@ export default function NuevaCompraPage() {
         throw new Error(err.error ?? "Error al crear producto");
       }
       const producto = await res.json();
-      await loadProductos();
+      setVersionProductos((v) => v + 1);
       const precio = nuevoPrecioCompra;
       const cant = nuevaCantidad > 0 ? nuevaCantidad : 1;
       const sub = cant * precio;
@@ -284,9 +340,12 @@ export default function NuevaCompraPage() {
       />
 
       <Panel>
-        <PanelHeader title="Proveedor" />
+        <PanelHeader
+          title="Proveedor"
+          descripcion="Define qué productos se pueden cargar en esta orden."
+        />
         <PanelBody className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Select value={proveedorId} onValueChange={setProveedorId}>
+          <Select value={proveedorId} onValueChange={pedirCambioDeProveedor}>
             <SelectTrigger className="h-10 w-full sm:max-w-xs" aria-label="Proveedor">
               <SelectValue placeholder="Seleccionar proveedor" />
             </SelectTrigger>
@@ -358,13 +417,43 @@ export default function NuevaCompraPage() {
         </PanelBody>
       </Panel>
 
+      <AlertDialog
+        open={proveedorPendiente !== null}
+        onOpenChange={(open) => {
+          if (!open) setProveedorPendiente(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cambiar de proveedor?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La orden ya tiene {items.length} {items.length === 1 ? "ítem" : "ítems"} de{" "}
+              {proveedorNombre ?? "el proveedor actual"}. Una orden de compra es de un solo
+              proveedor, así que pasar a {proveedorPendienteNombre ?? "otro proveedor"} implica
+              vaciarla.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Conservar {proveedorNombre ?? "el actual"}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmarCambioDeProveedor();
+              }}
+            >
+              Vaciar y cambiar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Panel>
         <PanelHeader
           title="Agregar producto"
           acciones={
             <Dialog open={modalNuevoProductoOpen} onOpenChange={setModalNuevoProductoOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" disabled={!proveedorId}>
                   Nuevo producto
                 </Button>
               </DialogTrigger>
@@ -423,9 +512,9 @@ export default function NuevaCompraPage() {
                       className="font-mono tabular-nums"
                     />
                   </div>
-                  {proveedorId && (
+                  {proveedorNombre && (
                     <p className="text-sm text-muted-foreground">
-                      Se asignará al proveedor seleccionado en la orden.
+                      Se asignará a {proveedorNombre}, el proveedor de esta orden.
                     </p>
                   )}
                   <Button
@@ -440,62 +529,51 @@ export default function NuevaCompraPage() {
             </Dialog>
           }
         />
-        <PanelBody className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[200px] flex-1 space-y-1.5">
-            <Label htmlFor="compra-producto" className={claseLabel}>
-              Producto
-            </Label>
-            <Select
-              value={productoSeleccionado}
-              onValueChange={(v) => {
-                setProductoSeleccionado(v);
-                const p = productos.find((x) => x.id === v);
-                if (p) setPrecioUnitario(Number(p.precioCompra ?? 0));
-              }}
-            >
-              <SelectTrigger id="compra-producto" className="h-10 w-full">
-                <SelectValue placeholder="Seleccionar" />
-              </SelectTrigger>
-              <SelectContent>
-                {productos.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nombre} ({p.sku})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-24 space-y-1.5">
-            <Label htmlFor="compra-cantidad" className={claseLabel}>
-              Cantidad
-            </Label>
-            <Input
-              id="compra-cantidad"
-              type="number"
-              min={1}
-              value={cantidad}
-              onChange={(e) => setCantidad(parseInt(e.target.value, 10) || 1)}
-              className="h-10 font-mono tabular-nums"
-            />
-          </div>
-          <div className="w-36 space-y-1.5">
-            <Label htmlFor="compra-precio" className={claseLabel}>
-              P. unitario
-            </Label>
-            <CurrencyInput
-              id="compra-precio"
-              value={precioUnitario}
-              onChange={(v) => setPrecioUnitario(v ?? 0)}
-              placeholder="0"
-            />
-          </div>
-          <Button
-            variant="outline"
-            onClick={agregarItem}
-            className="h-10 w-full sm:w-auto"
-          >
-            Agregar
-          </Button>
+        <PanelBody className="space-y-4">
+          <SelectorProductoProveedor
+            key={`${proveedorId}-${versionProductos}`}
+            proveedorId={proveedorId}
+            proveedorNombre={proveedorNombre}
+            productoSeleccionadoId={productoElegido?.id ?? ""}
+            onElegir={elegirProducto}
+          />
+
+          {productoElegido && (
+            <Reveal className="flex flex-wrap items-end gap-3 border-t border-border pt-4">
+              <div className="min-w-[180px] flex-1 space-y-1.5">
+                <span className={claseLabel}>Elegido</span>
+                <p className="truncate text-sm font-medium">{productoElegido.nombre}</p>
+                <p className="font-mono text-xs text-muted-foreground">{productoElegido.sku}</p>
+              </div>
+              <div className="w-24 space-y-1.5">
+                <Label htmlFor="compra-cantidad" className={claseLabel}>
+                  Cantidad
+                </Label>
+                <Input
+                  id="compra-cantidad"
+                  type="number"
+                  min={1}
+                  value={cantidad}
+                  onChange={(e) => setCantidad(parseInt(e.target.value, 10) || 1)}
+                  className="h-10 font-mono tabular-nums"
+                />
+              </div>
+              <div className="w-36 space-y-1.5">
+                <Label htmlFor="compra-precio" className={claseLabel}>
+                  P. unitario
+                </Label>
+                <CurrencyInput
+                  id="compra-precio"
+                  value={precioUnitario}
+                  onChange={(v) => setPrecioUnitario(v ?? 0)}
+                  placeholder="0"
+                />
+              </div>
+              <Button variant="outline" onClick={agregarItem} className="h-10 w-full sm:w-auto">
+                Agregar a la orden
+              </Button>
+            </Reveal>
+          )}
         </PanelBody>
       </Panel>
 
@@ -515,8 +593,8 @@ export default function NuevaCompraPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((i) => (
-                <TableRow key={i.productoId}>
+              {items.map((i, indice) => (
+                <Reveal as={TableRow} key={i.productoId} indice={indice}>
                   <TableCell>
                     <p className="font-medium">{i.productoNombre}</p>
                     <p className="font-mono text-xs text-muted-foreground">{i.productoSku}</p>
@@ -538,7 +616,7 @@ export default function NuevaCompraPage() {
                       Quitar
                     </Button>
                   </TableCell>
-                </TableRow>
+                </Reveal>
               ))}
             </TableBody>
           </Table>
