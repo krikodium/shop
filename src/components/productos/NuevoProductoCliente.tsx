@@ -74,7 +74,7 @@ export function NuevoProductoCliente({
   const busy = submitPhase !== "idle";
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
         <Link href="/productos">← Productos</Link>
       </Button>

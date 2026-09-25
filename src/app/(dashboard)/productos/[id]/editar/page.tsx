@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
-import { Panel } from "@/components/ui/panel";
 import { Resumen } from "@/components/ui/resumen";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -16,6 +15,7 @@ import {
   productoToFormValues,
 } from "@/components/forms/ProductoForm";
 import { claseTonoCifra, tonoStock } from "@/components/productos/stock";
+import { ProductoFormSkeleton } from "@/components/productos/ProductoFormSkeleton";
 import { formatARS } from "@/lib/formatCurrency";
 import { notificar } from "@/lib/notificar";
 import type { ProductoFormValues } from "@/lib/validaciones/productoSchema";
@@ -42,7 +42,7 @@ function VolverAProductos() {
 
 function ProductoEditSkeleton() {
   return (
-    <div className="max-w-3xl space-y-6" aria-busy="true">
+    <div className="space-y-6" aria-busy="true">
       <Skeleton className="h-8 w-28 rounded-md animate-skeleton-shimmer" />
       <div className="space-y-2 border-b pb-5">
         <Skeleton className="h-3 w-40 animate-skeleton-shimmer" />
@@ -57,21 +57,7 @@ function ProductoEditSkeleton() {
           </div>
         ))}
       </div>
-      {[1, 2].map((i) => (
-        <Panel key={i}>
-          <div className="border-b border-border px-4 py-3.5 sm:px-5">
-            <Skeleton className="h-4 w-32 animate-skeleton-shimmer" />
-          </div>
-          <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
-            {[1, 2].map((j) => (
-              <div key={j} className="space-y-2">
-                <Skeleton className="h-4 w-20 animate-skeleton-shimmer" />
-                <Skeleton className="h-9 w-full animate-skeleton-shimmer" />
-              </div>
-            ))}
-          </div>
-        </Panel>
-      ))}
+      <ProductoFormSkeleton />
     </div>
   );
 }
@@ -143,7 +129,7 @@ export default function EditarProductoPage() {
   const proveedoresEnDesglose = new Set(partes.map((p) => p.proveedorId)).size;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <VolverAProductos />
 
       <PageHeader
