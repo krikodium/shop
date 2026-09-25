@@ -25,6 +25,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GuardarDatosCliente } from "@/components/ventas/GuardarDatosCliente";
 import { TicketVenta } from "@/components/ventas/TicketVenta";
+import { HistorialPagos } from "@/components/ventas/HistorialPagos";
+import {
+  ESTADO_PAGO_LABEL,
+  haySaldo,
+  usePagosVenta,
+} from "@/components/ventas/usePagosVenta";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { notificar } from "@/lib/notificar";
 import { METODO_PAGO_LABEL } from "@/lib/constants";
@@ -69,6 +75,9 @@ export default function VentaDetallePage() {
   const [venta, setVenta] = useState<VentaDetalle | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogAnularOpen, setDialogAnularOpen] = useState(false);
+  // Cobros de la venta: total, cobrado, saldo y estado los calcula el servidor.
+  const historialPagos = usePagosVenta(id);
+  const pagos = historialPagos.datos;
 
   useEffect(() => {
     fetch(`/api/ventas/${id}`)
@@ -170,7 +179,47 @@ export default function VentaDetallePage() {
     venta.montoPago1Ars != null &&
     venta.montoPago2Ars != null;
 
+  // Banda de cifras: la historia de la plata de esta venta. Cobrado y saldo
+  // salen tal cual del servidor (strings); acá solo se formatean.
+  const conSaldo = haySaldo(pagos?.saldoPendiente);
   const resumenItems: ItemResumen[] = [
+    {
+      label: "Total",
+      valor: formatARS(venta.total),
+      hint:
+        venta.descuento > 0
+          ? `Sub. ${formatARS(venta.subtotal)} · Desc. ${formatARS(venta.descuento)}`
+          : undefined,
+    },
+    {
+      label: "Cobrado",
+      valor: pagos ? formatARS(Number(pagos.totalPagado)) : "—",
+      hint: pagos
+        ? `${pagos.pagos.length} ${pagos.pagos.length === 1 ? "cobro" : "cobros"}`
+        : "Sin datos de cobros",
+    },
+    {
+      label: "Saldo",
+      // El tono de la cifra: "alerta" mientras quede saldo, neutro cuando está
+      // en cero. `Resumen` no expone `tono`, así que se aplica la misma clase
+      // que usa `tono="alerta"` en `Figure`.
+      valor: pagos ? (
+        <span className={conSaldo ? "text-num-warning" : undefined}>
+          {formatARS(Number(pagos.saldoPendiente))}
+        </span>
+      ) : (
+        "—"
+      ),
+      hint: pagos ? (ESTADO_PAGO_LABEL[pagos.estadoPago] ?? pagos.estadoPago) : "Sin datos de cobros",
+    },
+  ];
+
+  const cifrasComerciales: Array<{
+    label: string;
+    valor: string;
+    hint?: string;
+    tono?: "neutro" | "positivo" | "negativo" | "alerta";
+  }> = [
     {
       label: "Pago",
       valor: METODO_PAGO_LABEL[venta.metodoPago] ?? venta.metodoPago,
@@ -182,24 +231,17 @@ export default function VentaDetallePage() {
       label: "Ganancia",
       valor: formatARS(venta.gananciaBruta),
       hint: `Costo ${formatARS(venta.costoTotal)} · Margen ${venta.margenPorcentaje.toFixed(1)}%`,
+      tono: venta.gananciaBruta >= 0 ? "positivo" : "negativo",
     },
   ];
   if (venta.deudaConsignacion > 0) {
-    resumenItems.push({
+    cifrasComerciales.push({
       label: "Consignación",
       valor: formatARS(venta.deudaConsignacion),
       hint: "Deuda a proveedores",
+      tono: "alerta",
     });
   }
-  // El total cierra el bloque: la jerarquía la da el orden, no un fondo lleno.
-  resumenItems.push({
-    label: "Total",
-    valor: formatARS(venta.total),
-    hint:
-      venta.descuento > 0
-        ? `Sub. ${formatARS(venta.subtotal)} · Desc. ${formatARS(venta.descuento)}`
-        : undefined,
-  });
 
   return (
     <div className="space-y-6">
@@ -213,6 +255,11 @@ export default function VentaDetallePage() {
           <span className="flex flex-wrap items-center gap-2">
             {clienteNombre}
             {venta.anulada && <Badge variant="outline">Anulada</Badge>}
+            {pagos && !venta.anulada && (
+              <Badge variant="outline">
+                {ESTADO_PAGO_LABEL[pagos.estadoPago] ?? pagos.estadoPago}
+              </Badge>
+            )}
           </span>
         }
         description={new Date(venta.fecha).toLocaleString("es-AR")}
@@ -269,6 +316,14 @@ export default function VentaDetallePage() {
       </PageHeader>
 
       <Resumen items={resumenItems} />
+
+      <FigureGrid columnas={cifrasComerciales.length >= 3 ? 3 : 2}>
+        {cifrasComerciales.map((c) => (
+          <Figure key={c.label} label={c.label} valor={c.valor} hint={c.hint} tono={c.tono} />
+        ))}
+      </FigureGrid>
+
+      <HistorialPagos ventaId={id} historial={historialPagos} />
 
       {pagoDividido && (
         <Panel>
