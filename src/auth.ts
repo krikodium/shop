@@ -28,6 +28,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
+          debeCambiarPassword: user.passwordChangedAt === null,
         };
       },
     }),
@@ -39,6 +40,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = user.role;
         // Sello de emisión: cualquier cambio de contraseña posterior lo invalida.
         token.emitidoEn = Date.now();
+        token.debeCambiarPassword = user.debeCambiarPassword;
         return token;
       }
       // En cada request: si la contraseña cambió después de emitido el token,
@@ -53,6 +55,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const emitidoEn = Number(token.emitidoEn ?? 0);
         if (cambiadaEn > emitidoEn) return null;
         token.role = actual.role;
+        token.debeCambiarPassword = actual.passwordChangedAt === null;
       }
       return token;
     },
@@ -60,6 +63,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.debeCambiarPassword = Boolean(token.debeCambiarPassword);
       }
       return session;
     },

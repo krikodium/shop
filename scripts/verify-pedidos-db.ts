@@ -26,7 +26,7 @@ async function main() {
     process.env.DATABASE_URL = url.toString();
     process.env.NODE_ENV = "test";
     const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.toString() }, { schema }) });
-    const admin = await db.user.create({ data: { email: "verificacion@shop.local", name: "Verificación", role: "ADMIN", password: await bcrypt.hash("Verificar-shop-2026!", 10) } });
+    const admin = await db.user.create({ data: { email: "verificacion@shop.local", name: "Verificación", role: "ADMIN", password: await bcrypt.hash(process.env.TEST_VERIFY_PWD || "ShopTest_2026_Mock", 10) } });
     const viewer = await db.user.create({ data: { email: "lectura@shop.local", name: "Lectura", role: "VIEWER" } });
     const clienta = await db.cliente.create({ data: { nombre: "Clienta de prueba", telefono: "1100000000" } });
     const producto = await db.producto.create({ data: { sku: "PRUEBA-1", nombre: "Producto prueba", precioVenta: "333.25", precioCompra: "100.10", stockActual: 5 } });

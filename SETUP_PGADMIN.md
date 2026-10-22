@@ -55,7 +55,7 @@ DATABASE_URL="postgresql://postgres:TU_PASSWORD@localhost:5432/shop"
 
 **Ejemplo real:**
 ```env
-DATABASE_URL="postgresql://postgres:mipassword123@localhost:5432/shop"
+DATABASE_URL="postgresql://postgres:TU_PASSWORD@localhost:5432/shop"
 ```
 
 **Si no pusiste password** (poco común pero posible):

@@ -4,6 +4,7 @@ declare module "next-auth" {
   interface User {
     id?: string;
     role?: string;
+    debeCambiarPassword?: boolean;
   }
 
   interface Session {
@@ -13,6 +14,7 @@ declare module "next-auth" {
       name?: string | null;
       image?: string | null;
       role: string;
+      debeCambiarPassword?: boolean;
     };
   }
 }
@@ -23,5 +25,6 @@ declare module "next-auth/jwt" {
     role?: string;
     /** Epoch ms en que se emitió el token (para invalidar al cambiar contraseña) */
     emitidoEn?: number;
+    debeCambiarPassword?: boolean;
   }
 }

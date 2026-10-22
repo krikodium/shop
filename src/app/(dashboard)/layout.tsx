@@ -7,6 +7,7 @@ import { SidebarNav } from "@/components/layout/SidebarNav";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { ForzarCambioPasswordDialog } from "@/components/layout/ForzarCambioPasswordDialog";
 
 export default async function DashboardLayout({
   children,
@@ -20,6 +21,14 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden flex-col bg-background lg:flex-row">
+      {/* Forzar cambio de clave si el usuario ingresa por primera vez o con clave default */}
+      {session.user.debeCambiarPassword && (
+        <ForzarCambioPasswordDialog
+          open={true}
+          userEmail={session.user.email}
+        />
+      )}
+
       {/* Header móvil: no scrollea, no tapa el contenido (el main es el que scrollea). */}
       <header className="flex shrink-0 items-center gap-2.5 border-b border-border bg-card px-3.5 py-2.5 lg:hidden">
         <MobileNav />

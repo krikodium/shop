@@ -8,11 +8,11 @@ describe("reset seguro", () => {
     expect(() => maintenanceOptions(["--backup", "--apply"])).toThrow();
   });
   it("nunca muestra credenciales ni parámetros", () => {
-    expect(databaseTarget("postgres://user:secret@db:5432/shop?token=secret")).toBe("db:5432/shop");
+    expect(databaseTarget("postgres://usuario:clave@db:5432/shop?token=token")).toBe("db:5432/shop");
   });
   it("rechaza un schema de prueba antes de conectarse a public", () => {
-    expect(() => databaseTarget("postgres://user:secret@db/shop?schema=shop_test")).toThrow("schema=public");
-    expect(databaseTarget("postgres://user:secret@db/shop?schema=public")).toBe("db:5432/shop");
+    expect(() => databaseTarget("postgres://usuario:clave@db/shop?schema=shop_test")).toThrow("schema=public");
+    expect(databaseTarget("postgres://usuario:clave@db/shop?schema=public")).toBe("db:5432/shop");
   });
   it("preserva accesos y contempla relaciones de productos y pagos", () => {
     expect(BUSINESS_TABLES).not.toContain("User");

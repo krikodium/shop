@@ -1,7 +1,6 @@
 /**
  * Seed: crea usuario admin inicial.
  * Uso: npx tsx scripts/seed-admin.ts
- * Email: admin@shop.com / Password: admin123
  */
 
 import "dotenv/config";
@@ -19,8 +18,8 @@ const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const email = "admin@shop.com";
-  const password = "admin123";
+  const email = process.env.INITIAL_ADMIN_EMAIL || "admin@shop.com";
+  const password = process.env.INITIAL_ADMIN_PASSWORD || "InitAdminPass_2026!";
   const hash = await bcrypt.hash(password, 10);
 
   const admin = await prisma.user.upsert({
@@ -35,7 +34,6 @@ async function main() {
   });
 
   console.log("Admin creado:", admin.email);
-  console.log("Contraseña: admin123");
 }
 
 main()

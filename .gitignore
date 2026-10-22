@@ -49,3 +49,5 @@ next-env.d.ts
 # Datos personales y hashes de autenticación.
 /backups/
 /data/
+
+.vercel
