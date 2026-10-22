@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
-  itemsDeudaPendiente,
-  validarCreacionRendicion,
+  itemsDeudaPendientePorProveedor,
+  validarCreacionRendicionLote,
 } from "@/lib/consignacionHelpers";
 
 export interface RestriccionRendicion {
@@ -43,14 +43,24 @@ export async function GET() {
       },
     });
 
+    const proveedorIds = proveedores.map((p) => p.id);
+    const [itemsPorProveedor, validacionesPorProveedor] = await Promise.all([
+      itemsDeudaPendientePorProveedor(proveedorIds),
+      validarCreacionRendicionLote(proveedorIds),
+    ]);
+
     const deudas: DeudaProveedor[] = [];
 
     for (const prov of proveedores) {
       const ultimaRendicion = prov.rendiciones[0] ?? null;
-      const [items, validacion] = await Promise.all([
-        itemsDeudaPendiente(prov.id),
-        validarCreacionRendicion(prov.id),
-      ]);
+      const items = itemsPorProveedor.get(prov.id) ?? [];
+      const validacion = validacionesPorProveedor.get(prov.id) ?? {
+        permitido: true,
+        motivo: null,
+        esUltimaSemana: false,
+        diasParaUltimaSemana: 0,
+        rendicionExistenteEnMes: null,
+      };
 
       const deudaPendiente = items.reduce(
         (sum, i) => sum + Number(i.deudaProveedor ?? 0),

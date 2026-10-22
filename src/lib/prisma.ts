@@ -16,7 +16,11 @@ function createPrismaClient() {
     adapter,
     log:
       process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
+        ? // Las consultas SQL solo se muestran si se pide explícitamente
+          // (PRISMA_LOG_QUERIES=1 en .env), para no inundar la consola.
+          process.env.PRISMA_LOG_QUERIES === "1"
+          ? ["query", "error", "warn"]
+          : ["error", "warn"]
         : ["error"],
   });
 }

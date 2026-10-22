@@ -147,19 +147,149 @@ export async function itemsNoRendidos(
 }
 
 /** Total de deuda pendiente de consignación (suma de todos los proveedores).
- * Solo incluye items que NO fueron rendidos en ninguna rendición previa. */
+ * Solo incluye items que NO fueron rendidos en ninguna rendición previa.
+ * La deuda histórica se determina por ítem, aunque cambie el tipo del proveedor. */
 export async function totalDeudaConsignacionPendiente(): Promise<string> {
-  const proveedores = await prisma.proveedor.findMany({
-    // La deuda histórica se determina por ítem, aunque cambie el tipo del proveedor.
-    select: { id: true },
-  });
+  // Dos consultas en total, sin importar cuántos proveedores haya.
+  const porProveedor = await itemsDeudaPendientePorProveedor();
 
   let total = new Prisma.Decimal(0);
-  for (const prov of proveedores) {
-    const items = await itemsDeudaPendiente(prov.id);
+  for (const items of porProveedor.values()) {
     total = total.plus(items.reduce((s, i) => s.plus(i.deudaProveedor ?? 0), new Prisma.Decimal(0)));
   }
   return total.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toFixed(2);
+}
+
+type ItemDeudaPendiente = {
+  deudaProveedor: Prisma.Decimal | null;
+  subtotal: Prisma.Decimal;
+  venta: { fecha: Date };
+};
+
+/**
+ * Versión en lote de `itemsDeudaPendiente`: resuelve todos los proveedores con
+ * dos consultas (ítems + rendiciones) y agrupa en memoria. Misma regla: un ítem
+ * queda excluido si la fecha de su venta cae dentro de alguna rendición previa
+ * de SU proveedor.
+ *
+ * @param proveedorIds Si se indica, limita a esos proveedores. Si no, incluye
+ *   todos los que tengan ítems de consignación.
+ */
+export async function itemsDeudaPendientePorProveedor(
+  proveedorIds?: string[]
+): Promise<Map<string, ItemDeudaPendiente[]>> {
+  const filtroProveedor = proveedorIds ? { in: proveedorIds } : { not: null };
+
+  const [items, rendiciones] = await Promise.all([
+    prisma.itemVenta.findMany({
+      where: {
+        esConsignacion: true,
+        proveedorId: filtroProveedor,
+        venta: { anulada: false },
+      },
+      select: {
+        proveedorId: true,
+        deudaProveedor: true,
+        subtotal: true,
+        venta: { select: { fecha: true } },
+      },
+    }),
+    prisma.rendicion.findMany({
+      where: proveedorIds ? { proveedorId: { in: proveedorIds } } : {},
+      select: { proveedorId: true, fechaDesde: true, fechaHasta: true },
+    }),
+  ]);
+
+  const rangosPorProveedor = new Map<string, { fechaDesde: Date; fechaHasta: Date }[]>();
+  for (const r of rendiciones) {
+    const lista = rangosPorProveedor.get(r.proveedorId) ?? [];
+    lista.push(r);
+    rangosPorProveedor.set(r.proveedorId, lista);
+  }
+
+  const resultado = new Map<string, ItemDeudaPendiente[]>();
+  for (const id of proveedorIds ?? []) resultado.set(id, []);
+
+  for (const { proveedorId, ...item } of items) {
+    if (!proveedorId) continue;
+    const fecha = item.venta.fecha;
+    const rangos = rangosPorProveedor.get(proveedorId) ?? [];
+    if (rangos.some((r) => fecha >= r.fechaDesde && fecha <= r.fechaHasta)) continue;
+    const lista = resultado.get(proveedorId) ?? [];
+    lista.push(item);
+    resultado.set(proveedorId, lista);
+  }
+
+  return resultado;
+}
+
+/**
+ * Versión en lote de `validarCreacionRendicion`: una sola consulta para todos
+ * los proveedores. Devuelve el mismo resultado que llamar a la función
+ * individual por cada uno.
+ */
+export async function validarCreacionRendicionLote(
+  proveedorIds: string[]
+): Promise<Map<string, ValidacionRendicion>> {
+  const ahora = new Date();
+  const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1, 0, 0, 0, 0);
+  const finMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  const rendicionesMes = proveedorIds.length
+    ? await prisma.rendicion.findMany({
+        where: {
+          proveedorId: { in: proveedorIds },
+          fechaRendicion: { gte: inicioMes, lte: finMes },
+        },
+        orderBy: { fechaRendicion: "desc" },
+        select: { id: true, proveedorId: true, numeroRendicion: true, fechaRendicion: true },
+      })
+    : [];
+
+  // Ordenadas desc: la primera de cada proveedor es la más reciente del mes.
+  const masRecientePorProveedor = new Map<string, (typeof rendicionesMes)[number]>();
+  for (const r of rendicionesMes) {
+    if (!masRecientePorProveedor.has(r.proveedorId)) masRecientePorProveedor.set(r.proveedorId, r);
+  }
+
+  const ultimaSemana = esUltimaSemanaDelMes(ahora);
+  const diasRestantes = diasHastaUltimaSemana(ahora);
+  const mesNombre = ahora.toLocaleDateString("es-AR", { month: "long" });
+
+  const resultado = new Map<string, ValidacionRendicion>();
+  for (const id of proveedorIds) {
+    const r = masRecientePorProveedor.get(id);
+    const rendicionEnMes = r
+      ? { id: r.id, numeroRendicion: r.numeroRendicion, fechaRendicion: r.fechaRendicion }
+      : null;
+
+    if (!rendicionEnMes) {
+      resultado.set(id, {
+        permitido: true,
+        motivo: null,
+        rendicionExistenteEnMes: null,
+        esUltimaSemana: ultimaSemana,
+        diasParaUltimaSemana: diasRestantes,
+      });
+    } else if (ultimaSemana) {
+      resultado.set(id, {
+        permitido: true,
+        motivo: null,
+        rendicionExistenteEnMes: rendicionEnMes,
+        esUltimaSemana: true,
+        diasParaUltimaSemana: 0,
+      });
+    } else {
+      resultado.set(id, {
+        permitido: false,
+        motivo: `Ya existe una rendición este mes (${rendicionEnMes.numeroRendicion}, generada el ${rendicionEnMes.fechaRendicion.toLocaleDateString("es-AR")}). Podés generar otra a partir de la última semana de ${mesNombre} (faltan ${diasRestantes} días).`,
+        rendicionExistenteEnMes: rendicionEnMes,
+        esUltimaSemana: false,
+        diasParaUltimaSemana: diasRestantes,
+      });
+    }
+  }
+  return resultado;
 }
 
 /** Items de consignación que aún no fueron incluidos en ninguna rendición (para deuda pendiente) */
