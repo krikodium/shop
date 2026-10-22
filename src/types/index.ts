@@ -36,11 +36,11 @@ export type OpcionesProcesarVenta = {
   clienteId?: string | null;
   clienteNombre?: string;
   metodoPagoSecundario?: string | null;
-  montoPago1Ars?: number;
-  montoPago2Ars?: number;
-  usdPago1?: number | null;
-  usdPago2?: number | null;
-  cotizacionUsd?: number | null;
+  montoPago1Ars?: string;
+  montoPago2Ars?: string;
+  usdPago1?: string | null;
+  usdPago2?: string | null;
+  cotizacionUsd?: string | null;
 };
 
 // Totales de una venta

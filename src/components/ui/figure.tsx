@@ -32,18 +32,20 @@ export function Figure({
   return (
     <div
       className={cn(
-        "bg-card px-4 py-3.5",
+        "flex flex-col justify-between bg-card px-4 py-4 sm:px-5",
         alineacion === "derecha" && "text-right",
         className
       )}
     >
-      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-        {label}
-      </p>
-      <p className={cn("mt-1.5 font-mono text-lg font-semibold tabular-nums", claseTono[tono])}>
-        {valor}
-      </p>
-      {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
+      <div>
+        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          {label}
+        </p>
+        <p className={cn("mt-1.5 font-mono text-xl font-semibold tracking-tight tabular-nums sm:text-2xl", claseTono[tono])}>
+          {valor}
+        </p>
+      </div>
+      {hint && <div className="mt-2 text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
 }
@@ -76,7 +78,7 @@ export function FigureGrid({
   return (
     <div
       className={cn(
-        "grid gap-px overflow-hidden rounded-lg border border-border bg-border",
+        "grid gap-px overflow-hidden rounded-xl border border-border bg-border",
         claseColumnas[columnas],
         className
       )}

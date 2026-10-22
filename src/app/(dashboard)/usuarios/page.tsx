@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Plus, UserCog } from "lucide-react";
 import { notificar } from "@/lib/notificar";
+import { Resumen } from "@/components/ui/resumen";
 import type { Usuario } from "./types";
 import { UsuariosSkeleton } from "./UsuariosSkeleton";
 import { UsuariosList } from "./UsuariosList";
@@ -55,6 +56,14 @@ export default function UsuariosPage() {
     });
   }, [usuarios, searchQuery, roleFilter]);
 
+  const metricas = useMemo(() => {
+    const total = usuarios.length;
+    const admins = usuarios.filter((u) => u.role === "ADMIN").length;
+    const vendedores = usuarios.filter((u) => u.role === "VENDEDOR").length;
+    const activos = usuarios.filter((u) => u.tienePassword !== false).length;
+    return { total, admins, vendedores, activos };
+  }, [usuarios]);
+
   const openNew = useCallback(() => {
     setUserToEdit(null);
     setDialogOpen(true);
@@ -96,7 +105,7 @@ export default function UsuariosPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        overline="Administración · Usuarios"
+        overline="Administración · Equipo"
         title="Usuarios"
         description="Equipo del sistema: roles, horarios y acceso"
       >
@@ -120,16 +129,42 @@ export default function UsuariosPage() {
           }
         />
       ) : (
-        <UsuariosList
-          usuarios={filteredUsuarios}
-          searchQuery={searchQuery}
-          onSearchQueryChange={setSearchQuery}
-          roleFilter={roleFilter}
-          onRoleFilterChange={setRoleFilter}
-          totalBeforeFilter={usuarios.length}
-          onEdit={openEdit}
-          onResend={handleResend}
-        />
+        <>
+          <Resumen
+            items={[
+              {
+                label: "Equipo total",
+                valor: metricas.total,
+                hint: "Cuentas registradas en el sistema",
+              },
+              {
+                label: "Administradores",
+                valor: metricas.admins,
+                hint: "Acceso completo a gestión y reportes",
+              },
+              {
+                label: "Vendedores",
+                valor: metricas.vendedores,
+                hint: "Operación en salón, caja y pedidos",
+              },
+              {
+                label: "Acceso activo",
+                valor: `${metricas.activos}/${metricas.total}`,
+                hint: "Con contraseña configurada",
+              },
+            ]}
+          />
+          <UsuariosList
+            usuarios={filteredUsuarios}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            roleFilter={roleFilter}
+            onRoleFilterChange={setRoleFilter}
+            totalBeforeFilter={usuarios.length}
+            onEdit={openEdit}
+            onResend={handleResend}
+          />
+        </>
       )}
 
       <UsuarioFormDialog

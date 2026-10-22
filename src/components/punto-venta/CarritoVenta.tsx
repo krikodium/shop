@@ -29,6 +29,7 @@ import { formatARS } from "@/lib/formatCurrency";
 import { notificar } from "@/lib/notificar";
 import type { ItemVentaInput } from "@/types";
 import type { TotalesVenta, OpcionesProcesarVenta } from "@/types";
+import { escala, importe, convertirUsd } from "./dinero-venta";
 
 /**
  * Avisos por el canal único (`notificar`). Se expone con la forma de `toast`
@@ -40,6 +41,8 @@ const toast = { error: (mensaje: string) => notificar.error(mensaje) };
 interface ClienteOption {
   id: string;
   nombre: string;
+  telefono?: string | null;
+  email?: string | null;
 }
 
 interface CarritoVentaProps {
@@ -68,7 +71,10 @@ function SeccionCarrito({
   className?: string;
 }) {
   return (
-    <section aria-labelledby={id} className={cn("border-t border-border px-4 py-3.5 sm:px-5", className)}>
+    <section
+      aria-labelledby={id}
+      className={cn("border-t border-border px-4 py-3.5 sm:px-5", className)}
+    >
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <h3
           id={id}
@@ -95,7 +101,9 @@ function SummaryRow({
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className={cn("font-mono tabular-nums text-foreground", valueClassName)}>
+      <span
+        className={cn("font-mono tabular-nums text-foreground", valueClassName)}
+      >
         {value}
       </span>
     </div>
@@ -113,7 +121,11 @@ function SelectorMoneda({
   etiqueta: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={etiqueta} className="inline-flex rounded-md border border-border p-0.5">
+    <div
+      role="radiogroup"
+      aria-label={etiqueta}
+      className="inline-flex rounded-md border border-border p-0.5"
+    >
       {(["ARS", "USD"] as const).map((m) => (
         <button
           key={m}
@@ -125,7 +137,7 @@ function SelectorMoneda({
             "h-7 rounded-[5px] px-2.5 font-mono text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60",
             valor === m
               ? "bg-action text-action-foreground"
-              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground",
           )}
         >
           {m}
@@ -156,6 +168,7 @@ export function CarritoVenta({
   const [cotizacionUsd, setCotizacionUsd] = useState("");
   const [clienteId, setClienteId] = useState<string>("__none__");
   const [clienteNombre, setClienteNombre] = useState<string>("");
+  const [sugerenciasAbiertas, setSugerenciasAbiertas] = useState(false);
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [modalClienteOpen, setModalClienteOpen] = useState(false);
   const [formNombre, setFormNombre] = useState("");
@@ -193,7 +206,7 @@ export function CarritoVenta({
       const nuevo = await res.json();
       loadClientes();
       setClienteId(nuevo.id);
-      setClienteNombre("");
+      setClienteNombre(nuevo.nombre ?? "");
       setFormNombre("");
       setFormEmail("");
       setFormTelefono("");
@@ -206,7 +219,11 @@ export function CarritoVenta({
   });
 
   const handleCargarDatosCliente = () => {
-    const tiene = (formNombre?.trim() || formEmail?.trim() || formTelefono?.trim() || formDni?.trim());
+    const tiene =
+      formNombre?.trim() ||
+      formEmail?.trim() ||
+      formTelefono?.trim() ||
+      formDni?.trim();
     if (!tiene) {
       notificar.error("Agregá al menos un dato del cliente");
       return;
@@ -214,14 +231,17 @@ export function CarritoVenta({
     void guardarCliente.run();
   };
 
-  const parseNum = (s: string) => {
-    const n = parseFloat(String(s).replace(",", "."));
-    return Number.isFinite(n) ? n : 0;
-  };
+  function tramo(valor: string, moneda: "ARS" | "USD") {
+    return moneda === "USD"
+      ? convertirUsd(valor, cotizacionUsd)
+      : escala(valor);
+  }
 
   const handleConfirmar = async () => {
     const cid = clienteId === "__none__" ? null : clienteId;
-    const cnom = cid ? (clientes.find((c) => c.id === cid)?.nombre ?? "") : clienteNombre;
+    const cnom = cid
+      ? (clientes.find((c) => c.id === cid)?.nombre ?? "")
+      : clienteNombre;
     const base: OpcionesProcesarVenta = {
       metodoPago,
       clienteId: cid,
@@ -229,22 +249,26 @@ export function CarritoVenta({
     };
 
     if (pagoDividido) {
-      const cot = parseNum(cotizacionUsd);
-      const v1 = parseNum(montoLeg1);
-      const v2 = parseNum(montoLeg2);
-      const ars1 = moneda1 === "USD" ? v1 * cot : v1;
-      const ars2 = moneda2 === "USD" ? v2 * cot : v2;
-      if ((moneda1 === "USD" || moneda2 === "USD") && cot <= 0) {
-        toast.error("Ingresá una cotización USD válida (ARS por 1 USD)");
-        return;
-      }
-      if (Math.abs(ars1 + ars2 - totales.total) > 0.05) {
+      let ars1: bigint;
+      let ars2: bigint;
+      try {
+        ars1 = tramo(montoLeg1, moneda1);
+        ars2 = tramo(montoLeg2, moneda2);
+      } catch (error) {
         toast.error(
-          `Los montos deben sumar el total (${totales.total.toFixed(2)} ARS). Suma: ${(ars1 + ars2).toFixed(2)}`
+          error instanceof Error
+            ? error.message
+            : "Revisá los importes y la cotización.",
         );
         return;
       }
-      if (ars1 <= 0 || ars2 <= 0) {
+      if (ars1 + ars2 !== escala(totales.total)) {
+        toast.error(
+          `Los montos deben sumar el total (${importe(escala(totales.total))} ARS). Suma: ${importe(ars1 + ars2)}`,
+        );
+        return;
+      }
+      if (ars1 <= BigInt(0) || ars2 <= BigInt(0)) {
         toast.error("Indicá un monto mayor a 0 en cada pago");
         return;
       }
@@ -252,11 +276,14 @@ export function CarritoVenta({
         ...base,
         metodoPago: metodoPago1,
         metodoPagoSecundario: metodoPago2,
-        montoPago1Ars: ars1,
-        montoPago2Ars: ars2,
-        usdPago1: moneda1 === "USD" ? v1 : null,
-        usdPago2: moneda2 === "USD" ? v2 : null,
-        cotizacionUsd: moneda1 === "USD" || moneda2 === "USD" ? cot : null,
+        montoPago1Ars: importe(ars1),
+        montoPago2Ars: importe(ars2),
+        usdPago1: moneda1 === "USD" ? importe(escala(montoLeg1)) : null,
+        usdPago2: moneda2 === "USD" ? importe(escala(montoLeg2)) : null,
+        cotizacionUsd:
+          moneda1 === "USD" || moneda2 === "USD"
+            ? cotizacionUsd.trim().replace(",", ".")
+            : null,
       });
       return;
     }
@@ -271,29 +298,34 @@ export function CarritoVenta({
       setMoneda1("ARS");
       setMoneda2("ARS");
       setCotizacionUsd("");
-      const half = totales.total > 0 ? (totales.total / 2).toFixed(2) : "";
-      const halfNum = parseFloat(half || "0");
-      setMontoLeg1(half);
-      setMontoLeg2(totales.total > 0 ? (totales.total - halfNum).toFixed(2) : "");
+      const total = escala(totales.total);
+      const mitad = (total + BigInt(1)) / BigInt(2);
+      setMontoLeg1(total > BigInt(0) ? importe(mitad) : "");
+      setMontoLeg2(total > BigInt(0) ? importe(total - mitad) : "");
     } else {
       setMetodoPago(metodoPago1);
     }
     setPagoDividido(checked);
   };
 
-  const cotNum = parseNum(cotizacionUsd);
-  const ars1Preview = pagoDividido
-    ? moneda1 === "USD"
-      ? parseNum(montoLeg1) * cotNum
-      : parseNum(montoLeg1)
-    : 0;
-  const ars2Preview = pagoDividido
-    ? moneda2 === "USD"
-      ? parseNum(montoLeg2) * cotNum
-      : parseNum(montoLeg2)
-    : 0;
-  const sumaPreview = ars1Preview + ars2Preview;
-  const diffPreview = pagoDividido ? totales.total - sumaPreview : 0;
+  let tramo1 = BigInt(0),
+    tramo2 = BigInt(0);
+  let tramosValidos = true;
+  if (pagoDividido) {
+    try {
+      tramo1 = tramo(montoLeg1, moneda1);
+      tramo2 = tramo(montoLeg2, moneda2);
+    } catch {
+      tramosValidos = false;
+    }
+  }
+  const ars1Preview = importe(tramo1);
+  const ars2Preview = importe(tramo2);
+  const sumaPreview = importe(tramo1 + tramo2);
+  const diferencia = pagoDividido
+    ? escala(totales.total) - tramo1 - tramo2
+    : BigInt(0);
+  const diffPreview = Number(importe(diferencia)); // Solo presentación.
 
   if (items.length === 0) {
     return (
@@ -330,7 +362,9 @@ export function CarritoVenta({
                 </p>
                 <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                   {item.productoSku}
-                  {item.esConsignacion && <span className="font-sans"> · Consignación</span>}
+                  {item.esConsignacion && (
+                    <span className="font-sans"> · Consignación</span>
+                  )}
                 </p>
               </div>
               <Button
@@ -345,7 +379,11 @@ export function CarritoVenta({
             </div>
 
             <div className="mt-2 flex items-center justify-between gap-3">
-              <div className="flex items-center" role="group" aria-label={`Cantidad de ${item.productoNombre}`}>
+              <div
+                className="flex items-center"
+                role="group"
+                aria-label={`Cantidad de ${item.productoNombre}`}
+              >
                 <Button
                   type="button"
                   variant="outline"
@@ -390,39 +428,99 @@ export function CarritoVenta({
         ))}
       </ul>
 
-      <SeccionCarrito titulo="Cliente" id="pv-cliente">
-        <div className="flex gap-2">
-          <Select
-            value={clienteId}
-            onValueChange={(v) => {
-              setClienteId(v);
-              if (v !== "__none__") setClienteNombre("");
+      <SeccionCarrito titulo="Clienta" id="pv-cliente">
+        <div className="relative flex gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Input
+              aria-label="Clienta"
+              placeholder="Escribí un nombre o Consumidor final…"
+              value={clienteNombre}
+              onFocus={() => setSugerenciasAbiertas(true)}
+              onBlur={() =>
+                setTimeout(() => setSugerenciasAbiertas(false), 160)
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setClienteNombre(v);
+                setSugerenciasAbiertas(true);
+                const coincidencia = clientes.find(
+                  (c) =>
+                    c.nombre.trim().toLowerCase() === v.trim().toLowerCase(),
+                );
+                setClienteId(coincidencia ? coincidencia.id : "__none__");
+              }}
+              className="h-10 pr-8 text-sm"
+            />
+            {clienteNombre && (
+              <button
+                type="button"
+                aria-label="Limpiar clienta"
+                onClick={() => {
+                  setClienteNombre("");
+                  setClienteId("__none__");
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            )}
+            {sugerenciasAbiertas && clientes.length > 0 && (
+              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 max-h-48 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md">
+                {clientes
+                  .filter((c) => {
+                    const q = clienteNombre.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      c.nombre.toLowerCase().includes(q) ||
+                      (c.telefono ?? "").toLowerCase().includes(q)
+                    );
+                  })
+                  .slice(0, 8)
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setClienteId(c.id);
+                        setClienteNombre(c.nombre);
+                        setSugerenciasAbiertas(false);
+                      }}
+                      className="flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+                    >
+                      <span className="truncate font-medium text-foreground">
+                        {c.nombre}
+                      </span>
+                      {c.telefono && (
+                        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                          {c.telefono}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+          <Dialog
+            open={modalClienteOpen}
+            onOpenChange={(open) => {
+              if (open && clienteNombre.trim() && !formNombre.trim()) {
+                setFormNombre(clienteNombre.trim());
+              }
+              setModalClienteOpen(open);
             }}
           >
-            <SelectTrigger className="h-10 min-w-0 flex-1" aria-label="Cliente">
-              <SelectValue placeholder="Consumidor final" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Consumidor final (sin cliente)</SelectItem>
-              {clientes.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Dialog open={modalClienteOpen} onOpenChange={setModalClienteOpen}>
             <DialogTrigger asChild>
               <Button type="button" variant="outline" className="h-10">
                 <Plus aria-hidden="true" />
-                Nuevo
+                Ficha
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-[min(95vw,400px)]">
               <DialogHeader>
-                <DialogTitle>Cliente rápido</DialogTitle>
+                <DialogTitle>Guardar ficha de clienta</DialogTitle>
                 <p className="text-sm text-muted-foreground">
-                  Con nombre o teléfono alcanza. Queda asignado a esta venta.
+                  Si querés agendar su teléfono o DNI en la base de clientas.
                 </p>
               </DialogHeader>
               <div className="grid gap-4 pt-2">
@@ -479,7 +577,7 @@ export function CarritoVenta({
                 <Button
                   onClick={handleCargarDatosCliente}
                   loading={guardarCliente.loading}
-                  loadingText="Guardando cliente…"
+                  loadingText="Guardando clienta…"
                   className="h-10 w-full"
                 >
                   Guardar y asignar
@@ -488,15 +586,13 @@ export function CarritoVenta({
             </DialogContent>
           </Dialog>
         </div>
-        {clienteId === "__none__" && (
-          <Input
-            aria-label="Nombre para la venta (opcional)"
-            placeholder="Nombre para la venta (opcional)"
-            value={clienteNombre}
-            onChange={(e) => setClienteNombre(e.target.value)}
-            className="mt-2 h-9 text-sm"
-          />
-        )}
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          {clienteId !== "__none__"
+            ? "Clienta vinculada de tu base."
+            : clienteNombre.trim()
+              ? `Se registrará a nombre de "${clienteNombre.trim()}".`
+              : "Dejalo vacío para Consumidor final o escribí cualquier nombre."}
+        </p>
       </SeccionCarrito>
 
       <SeccionCarrito titulo="Forma de pago" id="pv-cobro">
@@ -509,7 +605,10 @@ export function CarritoVenta({
           />
           <span>
             Dividir en dos pagos
-            <span className="text-muted-foreground"> · efectivo, tarjeta, transferencia o USD</span>
+            <span className="text-muted-foreground">
+              {" "}
+              · efectivo, tarjeta, transferencia o USD
+            </span>
           </span>
         </label>
 
@@ -532,7 +631,7 @@ export function CarritoVenta({
                     "min-h-10 rounded-md border px-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 touch-manipulation",
                     activo
                       ? "border-foreground bg-accent text-foreground"
-                      : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                      : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
                   {m.label}
@@ -542,9 +641,14 @@ export function CarritoVenta({
           </div>
         ) : (
           <div className="space-y-3">
-            <SummaryRow label="Total a cobrar" value={formatARS(totales.total)} valueClassName="font-semibold" />
+            <SummaryRow
+              label="Total a cobrar"
+              value={formatARS(totales.total)}
+              valueClassName="font-semibold"
+            />
             <p className="text-xs leading-snug text-muted-foreground">
-              Los dos importes, en pesos (o USD × cotización), tienen que sumar este total.
+              Los dos importes, en pesos (o USD × cotización), tienen que sumar
+              este total.
             </p>
 
             {(moneda1 === "USD" || moneda2 === "USD") && (
@@ -567,11 +671,18 @@ export function CarritoVenta({
               <div className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium">Pago 1</span>
-                  <SelectorMoneda valor={moneda1} onCambiar={setMoneda1} etiqueta="Moneda del pago 1" />
+                  <SelectorMoneda
+                    valor={moneda1}
+                    onCambiar={setMoneda1}
+                    etiqueta="Moneda del pago 1"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Select value={metodoPago1} onValueChange={setMetodoPago1}>
-                    <SelectTrigger className="h-9 w-full text-sm" aria-label="Medio del pago 1">
+                    <SelectTrigger
+                      className="h-9 w-full text-sm"
+                      aria-label="Medio del pago 1"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -593,18 +704,27 @@ export function CarritoVenta({
                 </div>
                 <p className="flex justify-between text-xs text-muted-foreground">
                   <span>Equivale en pesos</span>
-                  <span className="font-mono tabular-nums text-foreground">{formatARS(ars1Preview)}</span>
+                  <span className="font-mono tabular-nums text-foreground">
+                    {formatARS(ars1Preview)}
+                  </span>
                 </p>
               </div>
 
               <div className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium">Pago 2</span>
-                  <SelectorMoneda valor={moneda2} onCambiar={setMoneda2} etiqueta="Moneda del pago 2" />
+                  <SelectorMoneda
+                    valor={moneda2}
+                    onCambiar={setMoneda2}
+                    etiqueta="Moneda del pago 2"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Select value={metodoPago2} onValueChange={setMetodoPago2}>
-                    <SelectTrigger className="h-9 w-full text-sm" aria-label="Medio del pago 2">
+                    <SelectTrigger
+                      className="h-9 w-full text-sm"
+                      aria-label="Medio del pago 2"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -626,21 +746,30 @@ export function CarritoVenta({
                 </div>
                 <p className="flex justify-between text-xs text-muted-foreground">
                   <span>Equivale en pesos</span>
-                  <span className="font-mono tabular-nums text-foreground">{formatARS(ars2Preview)}</span>
+                  <span className="font-mono tabular-nums text-foreground">
+                    {formatARS(ars2Preview)}
+                  </span>
                 </p>
               </div>
             </div>
 
             <div className="space-y-1.5" aria-live="polite">
-              <SummaryRow label="Suma de los pagos" value={formatARS(sumaPreview)} />
-              {Math.abs(diffPreview) > 0.05 ? (
+              <SummaryRow
+                label="Suma de los pagos"
+                value={formatARS(sumaPreview)}
+              />
+              {diferencia !== BigInt(0) || !tramosValidos ? (
                 <SummaryRow
                   label={diffPreview > 0 ? "Faltan" : "Sobran"}
                   value={formatARS(Math.abs(diffPreview))}
                   valueClassName="font-semibold text-num-negative"
                 />
               ) : (
-                <SummaryRow label="Diferencia" value="Cierra con el total" valueClassName="font-sans text-muted-foreground" />
+                <SummaryRow
+                  label="Diferencia"
+                  value="Cierra con el total"
+                  valueClassName="font-sans text-muted-foreground"
+                />
               )}
             </div>
           </div>
@@ -650,7 +779,10 @@ export function CarritoVenta({
       <SeccionCarrito titulo="Resumen" id="pv-resumen">
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <label htmlFor="descuento-venta" className="text-sm text-muted-foreground">
+            <label
+              htmlFor="descuento-venta"
+              className="text-sm text-muted-foreground"
+            >
               Descuento sobre el subtotal
             </label>
             <div className="flex items-center gap-1.5">
@@ -663,7 +795,9 @@ export function CarritoVenta({
                 placeholder="0"
                 value={descuento === 0 ? "" : descuento}
                 onChange={(e) =>
-                  onDescuentoChange(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))
+                  onDescuentoChange(
+                    Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)),
+                  )
                 }
                 className="h-9 w-20 rounded-md border border-input bg-background px-2 text-right font-mono text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               />
@@ -694,7 +828,7 @@ export function CarritoVenta({
                 className={cn(
                   "font-mono tabular-nums",
                   totales.gananciaBruta > 0 && "text-num-positive",
-                  totales.gananciaBruta < 0 && "text-num-negative"
+                  totales.gananciaBruta < 0 && "text-num-negative",
                 )}
               >
                 {formatARS(totales.gananciaBruta)}
@@ -725,11 +859,11 @@ export function CarritoVenta({
           loading={isLoading}
           loadingText="Registrando venta…"
           disabled={
-            (pagoDividido &&
-              (((moneda1 === "USD" || moneda2 === "USD") && cotNum <= 0) ||
-                Math.abs(diffPreview) > 0.05 ||
-                ars1Preview <= 0 ||
-                ars2Preview <= 0))
+            pagoDividido &&
+            (!tramosValidos ||
+              diferencia !== BigInt(0) ||
+              tramo1 <= BigInt(0) ||
+              tramo2 <= BigInt(0))
           }
         >
           Confirmar venta · {formatARS(totales.total)}

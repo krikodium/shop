@@ -16,7 +16,7 @@ import {
 } from "@/components/forms/ProductoForm";
 import { claseTonoCifra, tonoStock } from "@/components/productos/stock";
 import { ProductoFormSkeleton } from "@/components/productos/ProductoFormSkeleton";
-import { formatARS } from "@/lib/formatCurrency";
+import { formatARS, formatUSD } from "@/lib/formatCurrency";
 import { notificar } from "@/lib/notificar";
 import type { ProductoFormValues } from "@/lib/validaciones/productoSchema";
 import type {
@@ -152,10 +152,10 @@ export default function EditarProductoPage() {
 
       <Resumen
         items={[
-          { label: "P. venta", valor: formatARS(precioVenta) },
+          { label: "P. venta", valor: producto.precioVentaUsd != null ? formatUSD(producto.precioVentaUsd.toString()) : formatARS(precioVenta) },
           {
             label: "P. compra",
-            valor: precioCompra != null ? formatARS(precioCompra) : "—",
+            valor: producto.precioCompraUsd != null ? formatUSD(producto.precioCompraUsd.toString()) : precioCompra != null ? formatARS(precioCompra) : "—",
           },
           {
             label: "Stock",

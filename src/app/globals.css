@@ -58,31 +58,31 @@
   --radius: 0.5rem;
 
   /* Superficies y texto — escala neutra pura (croma 0) */
-  --background: oklch(0.99 0 0);
-  --foreground: oklch(0.16 0 0);
-  --surface: oklch(0.975 0 0);
+  --background: oklch(0.982 0 0);
+  --foreground: oklch(0.14 0 0);
+  --surface: oklch(0.965 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0 0);
+  --card-foreground: oklch(0.14 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0 0);
+  --popover-foreground: oklch(0.14 0 0);
 
   /* Acción principal: negro sobre blanco */
-  --primary: oklch(0.16 0 0);
+  --primary: oklch(0.14 0 0);
   --primary-foreground: oklch(0.99 0 0);
   /* Acción principal. Separada de --primary porque en tema oscuro un botón
      blanco pleno es una plancha; los enlaces sí siguen usando --primary. */
   --action: oklch(0.16 0 0);
   --action-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0.22 0 0);
-  --muted: oklch(0.965 0 0);
-  --muted-foreground: oklch(0.52 0 0);
-  --accent: oklch(0.955 0 0);
-  --accent-foreground: oklch(0.2 0 0);
+  --secondary: oklch(0.955 0 0);
+  --secondary-foreground: oklch(0.2 0 0);
+  --muted: oklch(0.955 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.945 0 0);
+  --accent-foreground: oklch(0.16 0 0);
 
-  --border: oklch(0.9 0 0);
-  --border-strong: oklch(0.78 0 0);
-  --input: oklch(0.9 0 0);
+  --border: oklch(0.895 0 0);
+  --border-strong: oklch(0.76 0 0);
+  --input: oklch(0.895 0 0);
   --ring: oklch(0.16 0 0);
 
   /* Cifras informativas — ÚNICO lugar de la interfaz con color */
@@ -104,13 +104,13 @@
   --chart-4: oklch(0.56 0.13 20);
   --chart-5: oklch(0.55 0.11 310);
 
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.16 0 0);
-  --sidebar-primary: oklch(0.16 0 0);
+  --sidebar: oklch(0.995 0 0);
+  --sidebar-foreground: oklch(0.14 0 0);
+  --sidebar-primary: oklch(0.14 0 0);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.955 0 0);
-  --sidebar-accent-foreground: oklch(0.2 0 0);
-  --sidebar-border: oklch(0.9 0 0);
+  --sidebar-accent: oklch(0.95 0 0);
+  --sidebar-accent-foreground: oklch(0.14 0 0);
+  --sidebar-border: oklch(0.895 0 0);
   --sidebar-ring: oklch(0.16 0 0);
 
   /* Movimiento */
@@ -121,28 +121,28 @@
 }
 
 .dark {
-  --background: oklch(0.15 0 0);
-  --foreground: oklch(0.97 0 0);
-  --surface: oklch(0.19 0 0);
-  --card: oklch(0.19 0 0);
-  --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.21 0 0);
-  --popover-foreground: oklch(0.97 0 0);
+  --background: oklch(0.13 0 0);
+  --foreground: oklch(0.96 0 0);
+  --surface: oklch(0.165 0 0);
+  --card: oklch(0.175 0 0);
+  --card-foreground: oklch(0.96 0 0);
+  --popover: oklch(0.2 0 0);
+  --popover-foreground: oklch(0.96 0 0);
 
-  --primary: oklch(0.97 0 0);
-  --primary-foreground: oklch(0.16 0 0);
-  --action: oklch(0.32 0 0);
-  --action-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.26 0 0);
-  --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.25 0 0);
-  --muted-foreground: oklch(0.68 0 0);
-  --accent: oklch(0.27 0 0);
+  --primary: oklch(0.96 0 0);
+  --primary-foreground: oklch(0.14 0 0);
+  --action: oklch(0.94 0 0);
+  --action-foreground: oklch(0.14 0 0);
+  --secondary: oklch(0.23 0 0);
+  --secondary-foreground: oklch(0.96 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.66 0 0);
+  --accent: oklch(0.24 0 0);
   --accent-foreground: oklch(0.97 0 0);
 
-  --border: oklch(0.3 0 0);
-  --border-strong: oklch(0.44 0 0);
-  --input: oklch(0.32 0 0);
+  --border: oklch(0.255 0 0);
+  --border-strong: oklch(0.38 0 0);
+  --input: oklch(0.27 0 0);
   --ring: oklch(0.8 0 0);
 
   --num-positive: oklch(0.75 0.15 155);
@@ -159,13 +159,13 @@
   --chart-4: oklch(0.69 0.12 20);
   --chart-5: oklch(0.70 0.10 310);
 
-  --sidebar: oklch(0.17 0 0);
-  --sidebar-foreground: oklch(0.97 0 0);
-  --sidebar-primary: oklch(0.97 0 0);
-  --sidebar-primary-foreground: oklch(0.16 0 0);
-  --sidebar-accent: oklch(0.25 0 0);
+  --sidebar: oklch(0.15 0 0);
+  --sidebar-foreground: oklch(0.96 0 0);
+  --sidebar-primary: oklch(0.96 0 0);
+  --sidebar-primary-foreground: oklch(0.14 0 0);
+  --sidebar-accent: oklch(0.23 0 0);
   --sidebar-accent-foreground: oklch(0.97 0 0);
-  --sidebar-border: oklch(0.3 0 0);
+  --sidebar-border: oklch(0.24 0 0);
   --sidebar-ring: oklch(0.8 0 0);
 }
 
@@ -174,7 +174,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased selection:bg-foreground selection:text-background;
   }
   /* Mejoras touch para mobile */
   @media (hover: none) and (pointer: coarse) {
@@ -248,19 +248,256 @@
   animation: anim-entrada var(--dur-slow) var(--ease-salida) both;
 }
 
+/* ── Agenda Gledys: animaciones dinámicas y tarjetas tipo nota grande ── */
+@keyframes agenda-nota-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes agenda-check-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.28) rotate(-6deg); }
+  75%  { transform: scale(0.94) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes agenda-pin-wiggle {
+  0%   { transform: rotate(0deg) scale(1); }
+  35%  { transform: rotate(-14deg) scale(1.15); }
+  70%  { transform: rotate(8deg) scale(1.06); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes agenda-tachado-linea {
+  0% {
+    background-size: 0% 2px;
+  }
+  100% {
+    background-size: 100% 2px;
+  }
+}
+
+@keyframes agenda-envio-completadas {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  42% {
+    opacity: 0.94;
+    transform: translateY(-2px) scale(0.992);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px) translateX(18px) scale(0.92);
+  }
+}
+
+@keyframes agenda-tab-recibido {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.anim-agenda-nota {
+  animation: agenda-nota-entrada 340ms var(--ease-salida) both;
+}
+
+.anim-agenda-check {
+  animation: agenda-check-pop 340ms var(--ease-salida) both;
+}
+
+.anim-agenda-pin {
+  animation: agenda-pin-wiggle 320ms var(--ease-salida) both;
+}
+
+.anim-agenda-envio {
+  animation: agenda-envio-completadas 640ms var(--ease-salida) forwards;
+  pointer-events: none;
+}
+
+.anim-agenda-tachado {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 54%;
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  animation: agenda-tachado-linea 320ms var(--ease-salida) both;
+}
+
+.anim-agenda-tab-bump {
+  animation: agenda-tab-recibido 360ms var(--ease-salida) both;
+}
+
+.agenda-nota-card {
+  background-color: var(--nota-bg, var(--card));
+  border-color: var(--nota-borde, var(--border));
+  transition:
+    transform 220ms var(--ease-salida),
+    box-shadow 220ms var(--ease-salida),
+    background-color 260ms var(--ease-salida),
+    border-color 260ms var(--ease-salida),
+    opacity 220ms var(--ease-salida);
+}
+
+.agenda-nota-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 28px -10px oklch(0.14 0 0 / 0.1),
+    0 4px 10px -4px oklch(0.14 0 0 / 0.05);
+}
+
+.dark .agenda-nota-card:hover {
+  box-shadow:
+    0 14px 30px -10px oklch(0 0 0 / 0.45),
+    0 4px 12px -4px oklch(0 0 0 / 0.3);
+}
+
+.agenda-nota-header {
+  background-color: var(--nota-header, var(--surface));
+  border-bottom-color: var(--nota-borde, var(--border));
+  transition: background-color 260ms var(--ease-salida), border-color 260ms var(--ease-salida);
+}
+
+.agenda-nota-chip {
+  background-color: var(--nota-chip, var(--muted));
+  border-color: var(--nota-borde, var(--border));
+  color: var(--nota-acento, var(--foreground));
+}
+
+.agenda-nota-acento {
+  color: var(--nota-acento, var(--foreground));
+}
+
+.agenda-nota-barra {
+  background-color: var(--nota-acento, var(--foreground));
+}
+
+/* Paleta de notas grandes (6 tonos papel en claro y oscuro) */
+.nota-tema-ambar {
+  --nota-bg: oklch(0.978 0.032 86);
+  --nota-header: oklch(0.952 0.052 84);
+  --nota-borde: oklch(0.875 0.072 82);
+  --nota-chip: oklch(0.935 0.058 84);
+  --nota-acento: oklch(0.45 0.12 68);
+}
+.dark .nota-tema-ambar {
+  --nota-bg: oklch(0.205 0.028 82);
+  --nota-header: oklch(0.245 0.042 80);
+  --nota-borde: oklch(0.33 0.058 78);
+  --nota-chip: oklch(0.265 0.045 80);
+  --nota-acento: oklch(0.82 0.11 82);
+}
+
+.nota-tema-salvia {
+  --nota-bg: oklch(0.976 0.026 155);
+  --nota-header: oklch(0.948 0.042 154);
+  --nota-borde: oklch(0.87 0.058 152);
+  --nota-chip: oklch(0.93 0.046 154);
+  --nota-acento: oklch(0.43 0.11 155);
+}
+.dark .nota-tema-salvia {
+  --nota-bg: oklch(0.202 0.026 155);
+  --nota-header: oklch(0.24 0.038 154);
+  --nota-borde: oklch(0.325 0.052 152);
+  --nota-chip: oklch(0.26 0.04 154);
+  --nota-acento: oklch(0.8 0.1 155);
+}
+
+.nota-tema-cielo {
+  --nota-bg: oklch(0.976 0.024 235);
+  --nota-header: oklch(0.948 0.04 234);
+  --nota-borde: oklch(0.872 0.056 232);
+  --nota-chip: oklch(0.932 0.045 234);
+  --nota-acento: oklch(0.44 0.115 238);
+}
+.dark .nota-tema-cielo {
+  --nota-bg: oklch(0.202 0.026 238);
+  --nota-header: oklch(0.24 0.038 236);
+  --nota-borde: oklch(0.325 0.052 235);
+  --nota-chip: oklch(0.26 0.042 236);
+  --nota-acento: oklch(0.8 0.1 235);
+}
+
+.nota-tema-rosa {
+  --nota-bg: oklch(0.976 0.026 18);
+  --nota-header: oklch(0.948 0.044 17);
+  --nota-borde: oklch(0.872 0.062 16);
+  --nota-chip: oklch(0.932 0.048 17);
+  --nota-acento: oklch(0.46 0.13 18);
+}
+.dark .nota-tema-rosa {
+  --nota-bg: oklch(0.205 0.028 18);
+  --nota-header: oklch(0.242 0.042 17);
+  --nota-borde: oklch(0.33 0.058 16);
+  --nota-chip: oklch(0.265 0.045 17);
+  --nota-acento: oklch(0.81 0.11 18);
+}
+
+.nota-tema-lavanda {
+  --nota-bg: oklch(0.976 0.024 300);
+  --nota-header: oklch(0.948 0.04 298);
+  --nota-borde: oklch(0.872 0.056 296);
+  --nota-chip: oklch(0.932 0.044 298);
+  --nota-acento: oklch(0.45 0.12 300);
+}
+.dark .nota-tema-lavanda {
+  --nota-bg: oklch(0.204 0.026 300);
+  --nota-header: oklch(0.242 0.04 298);
+  --nota-borde: oklch(0.328 0.055 296);
+  --nota-chip: oklch(0.262 0.042 298);
+  --nota-acento: oklch(0.81 0.1 300);
+}
+
+.nota-tema-arena {
+  --nota-bg: oklch(0.974 0.014 75);
+  --nota-header: oklch(0.946 0.022 74);
+  --nota-borde: oklch(0.865 0.03 72);
+  --nota-chip: oklch(0.928 0.024 74);
+  --nota-acento: oklch(0.38 0.04 70);
+}
+.dark .nota-tema-arena {
+  --nota-bg: oklch(0.2 0.012 75);
+  --nota-header: oklch(0.236 0.018 74);
+  --nota-borde: oklch(0.315 0.024 72);
+  --nota-chip: oklch(0.255 0.02 74);
+  --nota-acento: oklch(0.82 0.03 75);
+}
+
+/* Swatches redondos para elegir color rápido en menús y barra de alta */
+.nota-swatch-ambar   { background-color: oklch(0.86 0.12 84); border-color: oklch(0.68 0.13 76); }
+.nota-swatch-salvia  { background-color: oklch(0.84 0.1 154); border-color: oklch(0.64 0.11 154); }
+.nota-swatch-cielo   { background-color: oklch(0.84 0.095 234); border-color: oklch(0.64 0.11 236); }
+.nota-swatch-rosa    { background-color: oklch(0.84 0.105 18); border-color: oklch(0.64 0.13 18); }
+.nota-swatch-lavanda { background-color: oklch(0.84 0.095 298); border-color: oklch(0.64 0.11 300); }
+.nota-swatch-arena   { background-color: oklch(0.86 0.035 75); border-color: oklch(0.64 0.045 72); }
+
 @media (prefers-reduced-motion: reduce) {
   .anim-entrada,
   .anim-entrada-lateral,
   .anim-pulso-sutil,
   .ledger-in,
-  .animate-skeleton-shimmer {
+  .animate-skeleton-shimmer,
+  .anim-agenda-nota,
+  .anim-agenda-check,
+  .anim-agenda-pin {
     animation: none !important;
   }
   .anim-entrada,
   .anim-entrada-lateral,
-  .ledger-in {
+  .ledger-in,
+  .anim-agenda-nota {
     opacity: 1;
     transform: none;
+  }
+  .agenda-nota-card,
+  .agenda-nota-card:hover {
+    transition: none !important;
+    transform: none !important;
   }
 }
 

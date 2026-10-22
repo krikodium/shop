@@ -55,6 +55,9 @@ model Producto {
   // PRICING - CRÍTICO
   precioCompra Decimal? @db.Decimal(10, 2) // Para productos regulares
   precioVenta  Decimal  @db.Decimal(10, 2)
+  // Cotización de catálogo en USD; no se convierte a ARS sin tipo de cambio explícito.
+  precioVentaUsd  Decimal? @db.Decimal(10, 2)
+  precioCompraUsd Decimal? @db.Decimal(10, 2)
 
   // CONSIGNACIÓN - CRÍTICO
   enConsignacion       Boolean  @default(false)
@@ -155,6 +158,9 @@ model Venta {
   items ItemVenta[]
   /// Cobros imputados a esta venta. El saldo sale de acá, no de un campo suelto.
   pagos PagoVenta[]
+  pedido Pedido?
+  claveIdempotencia String? @unique
+  huellaSolicitud String?
 
   // METADATA
   notas     String?
@@ -197,6 +203,13 @@ model ItemVenta {
   deudaProveedor Decimal? @db.Decimal(10, 2) // Cuánto se le debe al proveedor por este item
   proveedorId    String? // Para tracking de consignación
 
+  modalidad String @default("INMEDIATA")
+  seguimientoEstado String @default("ENTREGADO")
+  especificaciones String?
+  fechaEstimada DateTime?
+  cantidadRecibida Int @default(0)
+  cantidadEntregada Int @default(0)
+  eventosPedido EventoPedido[]
   createdAt DateTime @default(now())
 
   @@index([ventaId])
@@ -212,8 +225,10 @@ model ItemVenta {
 model PagoVenta {
   id String @id @default(cuid())
 
-  venta   Venta  @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  venta   Venta  @relation(fields: [ventaId], references: [id], onDelete: Restrict)
   ventaId String
+  claveIdempotencia String? @unique
+  huellaSolicitud String?
 
   fecha DateTime @default(now())
 
@@ -532,4 +547,32 @@ enum EstadoCaja {
 enum TipoMovimientoCaja {
   INGRESO
   EGRESO
+}
+
+// Los encargos comparten el documento comercial; no duplican dinero.
+model Pedido {
+  id String @id @default(cuid())
+  ventaId String @unique
+  venta Venta @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  fechaPrometida DateTime?
+  responsable String?
+  notas String?
+  eventos EventoPedido[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model EventoPedido {
+  id String @id @default(cuid())
+  pedidoId String
+  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Restrict)
+  itemId String?
+  item ItemVenta? @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  tipo String
+  cantidad Int?
+  notas String?
+  usuarioId String
+  claveIdempotencia String @unique
+  huellaSolicitud String
+  createdAt DateTime @default(now())
+  @@index([pedidoId, createdAt])
 }

@@ -1,177 +1,56 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { validarCatalogo } from "@/lib/importarCatalogo";
 import * as XLSX from "xlsx";
 
-/**
- * Celda vacía → null (usa % default del proveedor en ventas). Texto inválido o fuera de 0–100 → rechazado.
- */
-function parsePorcentajePropio(raw: string): { ok: true; value: number | null } | { ok: false } {
-  const s = raw.trim();
-  if (s === "") return { ok: true, value: null };
-  const normalized = s.replace(/%/g, "").replace(",", ".").trim();
-  const n = parseFloat(normalized);
-  if (Number.isNaN(n) || n < 0 || n > 100) return { ok: false };
-  return { ok: true, value: n };
-}
-
-/**
- * POST: Carga masiva de productos desde Excel.
- * Formato esperado (encabezados): SKU, Nombre, Descripción, Categoría, Precio compra,
- * Precio venta, Stock, Stock mínimo, Proveedor, Consignación (S/N),
- * Porcentaje consignación (propio) — % que se queda el local; el resto va al proveedor —
- * Imagen URL.
- * La primera fila debe ser encabezados.
- */
 export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Iniciá sesión" }, { status: 401 });
+  if (session.user.role !== "ADMIN") return NextResponse.json({ error: "Solo administradores pueden importar el catálogo" }, { status: 403 });
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) {
-      return NextResponse.json(
-        { error: "No se envió ningún archivo" },
-        { status: 400 }
-      );
-    }
-
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array" });
+    const form = await request.formData();
+    const file = form.get("file");
+    if (!(file instanceof File) || !/\.(xlsx|xls|csv)$/i.test(file.name) || file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "Seleccioná un Excel o CSV de hasta 5 MB" }, { status: 400 });
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", sheetRows: 5002 });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as string[][];
-
-    if (rows.length < 2) {
-      return NextResponse.json(
-        { error: "El archivo debe tener al menos encabezados y una fila de datos" },
-        { status: 400 }
-      );
-    }
-
-    const headers = rows[0].map((h) => String(h ?? "").trim().toLowerCase());
-    const getCol = (names: string[]) => {
-      for (const n of names) {
-        const idx = headers.indexOf(n.toLowerCase());
-        if (idx >= 0) return idx;
-      }
-      return -1;
-    };
-
-    const colSku = getCol(["sku", "codigo", "código", "codigo"]);
-    const colNombre = getCol(["nombre", "producto"]);
-    const colDesc = getCol(["descripcion", "descripción"]);
-    const colCategoria = getCol(["categoria", "categoría"]);
-    const colPrecioCompra = getCol(["precio compra", "precio_compra", "costo", "preciocompra"]);
-    const colPrecioVenta = getCol(["precio venta", "precio_venta", "precio", "precioventa"]);
-    const colStock = getCol(["stock", "stock_actual", "cantidad"]);
-    const colStockMin = getCol(["stock mínimo", "stock_minimo", "stock minimo"]);
-    const colProveedor = getCol(["proveedor", "proveedor_id"]);
-    const colConsignacion = getCol(["consignacion", "consignación", "en consignacion"]);
-    const colPorcentajePropio = getCol([
-      "porcentaje consignación (propio)",
-      "porcentaje consignacion (propio)",
-      "porcentaje consignación",
-      "porcentaje consignacion",
-      "% consignacion",
-      "% consignación",
-      "comision consignacion",
-      "comisión consignacion",
-      "comision shop",
-      "comisión shop",
-    ]);
-    const colImagen = getCol(["imagen", "imagen_url", "foto", "url imagen", "imagen url"]);
-
-    if (colSku < 0 || colNombre < 0) {
-      return NextResponse.json(
-        { error: "El Excel debe tener columnas SKU y Nombre" },
-        { status: 400 }
-      );
-    }
-
-    const categorias = await prisma.categoria.findMany();
-    const proveedores = await prisma.proveedor.findMany();
-
-    const categoriasMap = new Map(categorias.map((c) => [c.nombre.toLowerCase(), c.id]));
-    const proveedoresMap = new Map(proveedores.map((p) => [p.nombre.toLowerCase(), p.id]));
-
-    const creados: string[] = [];
-    const errores: string[] = [];
-    const skusExistentes = new Set(
-      (await prisma.producto.findMany({ select: { sku: true } })).map((p) => p.sku)
-    );
-
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i] ?? [];
-      const get = (col: number) => (col >= 0 && row[col] != null ? String(row[col]).trim() : "");
-
-      const sku = get(colSku);
-      const nombre = get(colNombre);
-      if (!sku || !nombre) continue;
-
-      if (skusExistentes.has(sku)) {
-        errores.push(`Fila ${i + 1}: SKU "${sku}" ya existe`);
-        continue;
-      }
-
-      const precioVenta = parseFloat(get(colPrecioVenta)) || 0;
-      if (precioVenta <= 0) {
-        errores.push(`Fila ${i + 1}: Precio venta inválido para ${sku}`);
-        continue;
-      }
-
-      const catNombre = get(colCategoria);
-      const provNombre = get(colProveedor);
-      const categoriaId = catNombre ? categoriasMap.get(catNombre.toLowerCase()) ?? null : null;
-      const proveedorId = provNombre ? proveedoresMap.get(provNombre.toLowerCase()) ?? null : null;
-
-      const consignacionCell = get(colConsignacion).toLowerCase();
-      const enConsignacion = ["s", "si", "yes", "1", "true"].includes(consignacionCell);
-
-      let comisionConsignacion: number | null = null;
-      if (enConsignacion) {
-        const rawPct = colPorcentajePropio >= 0 ? get(colPorcentajePropio) : "";
-        const parsed = parsePorcentajePropio(rawPct);
-        if (!parsed.ok) {
-          errores.push(
-            `Fila ${i + 1}: Porcentaje consignación (propio) inválido para ${sku} (usar número entre 0 y 100, o vacío)`
-          );
-          continue;
+    if (!sheet) return NextResponse.json({ error: "El archivo no tiene hojas" }, { status: 400 });
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true });
+    if (rows.length > 5001) return NextResponse.json({ error: "Máximo 5000 productos por archivo" }, { status: 400 });
+    const existentes = await prisma.producto.findMany({ select: { sku: true } });
+    const { productos, errores } = validarCatalogo(rows, new Set(existentes.map((p) => p.sku)));
+    const proveedores = await prisma.proveedor.findMany({ select: { nombre: true, comisionPorDefecto: true, tipoProveedor: true } });
+    const categorias = await prisma.categoria.findMany({ select: { nombre: true } });
+    const normalize = (name: string) => name.trim().toLocaleLowerCase("es");
+    const provMap = new Map(proveedores.map((p) => [normalize(p.nombre), p]));
+    for (const p of productos) if (p.enConsignacion && provMap.get(normalize(p.proveedor))?.tipoProveedor === "REGULAR") errores.push(`Fila ${p.fila}: el proveedor existente es regular; corregí su tipo antes de importar un producto consignado`);
+    for (const p of productos) if (p.enConsignacion && p.comisionConsignacion === null && !provMap.get(normalize(p.proveedor))?.comisionPorDefecto) errores.push(`Fila ${p.fila}: indicá el porcentaje propio; el proveedor no tiene comisión por defecto`);
+    const nuevasCategorias = [...new Set(productos.map((p) => p.categoria).filter((name) => name && !categorias.some((c) => normalize(c.nombre) === normalize(name))))];
+    const nuevosProveedores = [...new Set(productos.map((p) => p.proveedor).filter((name) => name && !provMap.has(normalize(name))))];
+    const resumen = { creados: 0, errores: errores.length, mensajesError: errores, validos: productos.length, nuevasCategorias, nuevosProveedores, vistaPrevia: productos.slice(0, 10) };
+    // Revisar es el modo predeterminado: ninguna escritura hasta importar explícitamente.
+    if (form.get("modo") !== "importar") return NextResponse.json({ ...resumen, modo: "preview" });
+    if (errores.length) return NextResponse.json({ ...resumen, error: "Corregí todas las filas antes de importar" }, { status: 400 });
+    await prisma.$transaction(async (tx) => {
+      const categoriaIds = new Map((await tx.categoria.findMany()).map((c) => [normalize(c.nombre), c.id]));
+      const proveedoresActuales = await tx.proveedor.findMany();
+      for (const p of productos) if (p.enConsignacion && proveedoresActuales.some(prov => normalize(prov.nombre) === normalize(p.proveedor) && prov.tipoProveedor === "REGULAR")) throw new Error("El proveedor cambió: volvé a validar");
+      const proveedorIds = new Map(proveedoresActuales.map((p) => [normalize(p.nombre), p.id]));
+      for (const p of productos) {
+        if (p.categoria && !categoriaIds.has(normalize(p.categoria))) {
+          const created = await tx.categoria.create({ data: { nombre: p.categoria } });
+          categoriaIds.set(normalize(p.categoria), created.id);
         }
-        comisionConsignacion = parsed.value;
+        if (p.proveedor && !proveedorIds.has(normalize(p.proveedor))) {
+          const created = await tx.proveedor.create({ data: { nombre: p.proveedor, tipoProveedor: productos.some((item) => normalize(item.proveedor) === normalize(p.proveedor) && item.enConsignacion) ? "CONSIGNACION" : "REGULAR" } });
+          proveedorIds.set(normalize(p.proveedor), created.id);
+        }
+        const producto = await tx.producto.create({ data: { sku: p.sku, nombre: p.nombre, descripcion: p.descripcion, categoriaId: categoriaIds.get(normalize(p.categoria)) ?? null, proveedorId: proveedorIds.get(normalize(p.proveedor)) ?? null, precioCompra: p.precioCompra, precioVenta: p.precioVenta, stockActual: p.stockActual, stockMinimo: p.stockMinimo, enConsignacion: p.enConsignacion, comisionConsignacion: p.comisionConsignacion, imagenUrl: p.imagenUrl } });
+        if (p.stockActual > 0) await tx.movimientoStock.create({ data: { productoId: producto.id, tipo: "ENTRADA_AJUSTE", cantidad: p.stockActual, stockAnterior: 0, stockNuevo: p.stockActual, motivo: "Carga inicial de catálogo", usuario: session.user.id, referencia: "IMPORTACION_CATALOGO" } });
       }
-
-      try {
-        await prisma.producto.create({
-          data: {
-            sku,
-            nombre,
-            descripcion: colDesc >= 0 ? get(colDesc) || null : null,
-            categoriaId,
-            precioCompra: colPrecioCompra >= 0 ? parseFloat(get(colPrecioCompra)) || null : null,
-            precioVenta,
-            enConsignacion,
-            comisionConsignacion,
-            stockActual: colStock >= 0 ? Math.max(0, parseInt(get(colStock), 10) || 0) : 0,
-            stockMinimo: colStockMin >= 0 ? Math.max(0, parseInt(get(colStockMin), 10) || 5) : 5,
-            proveedorId,
-            imagenUrl: colImagen >= 0 && get(colImagen) ? get(colImagen) : null,
-          },
-        });
-        creados.push(sku);
-        skusExistentes.add(sku);
-      } catch (err) {
-        errores.push(`Fila ${i + 1}: ${err instanceof Error ? err.message : "Error"}`);
-      }
-    }
-
-    return NextResponse.json({
-      creados: creados.length,
-      errores: errores.length,
-      skus: creados,
-      mensajesError: errores,
-    });
-  } catch (error) {
-    console.error("Error carga masiva:", error);
-    return NextResponse.json(
-      { error: "Error al procesar el archivo" },
-      { status: 500 }
-    );
+    }, { timeout: 120000 });
+    return NextResponse.json({ ...resumen, modo: "importado", creados: productos.length });
+  } catch {
+    return NextResponse.json({ error: "No se importó ningún producto. Revisá el archivo y volvé a validarlo; un SKU pudo cargarse simultáneamente." }, { status: 400 });
   }
 }

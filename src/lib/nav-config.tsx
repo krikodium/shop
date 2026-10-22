@@ -15,6 +15,7 @@ import {
   UserCog,
   TrendingUp,
   ClipboardList,
+  CalendarClock,
 } from "lucide-react";
 
 export type NavItem = {
@@ -25,9 +26,10 @@ export type NavItem = {
 
 export const navBase: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/agenda", label: "Agenda Gledys", icon: CalendarClock },
   { href: "/ventas/nueva", label: "Nueva venta", icon: ShoppingCart },
   { href: "/ventas", label: "Ventas", icon: Receipt },
-  { href: "/muestra-pedidos/nueva-venta", label: "Muestra pedidos", icon: ClipboardList },
+  { href: "/pedidos", label: "Pedidos", icon: ClipboardList },
   { href: "/productos", label: "Productos", icon: Package },
   { href: "/proveedores", label: "Proveedores", icon: Truck },
   { href: "/consignacion", label: "Consignación", icon: FileStack },
@@ -41,15 +43,24 @@ export const navBase: NavItem[] = [
 
 export const navAdmin: NavItem[] = [
   { href: "/usuarios", label: "Usuarios", icon: UserCog },
-  { href: "/estadisticas-vendedores", label: "Estadísticas vendedores", icon: TrendingUp },
+  {
+    href: "/estadisticas-vendedores",
+    label: "Estadísticas vendedores",
+    icon: TrendingUp,
+  },
 ];
 
-export function isActive(pathname: string, href: string, allNav: { href: string }[]) {
+export function isActive(
+  pathname: string,
+  href: string,
+  allNav: { href: string }[],
+) {
   if (href === "/") return pathname === "/";
   if (pathname === href) return true;
   if (!pathname.startsWith(href + "/")) return false;
   const hayMasEspecifico = allNav.some(
-    (n) => n.href !== href && n.href.startsWith(href) && pathname.startsWith(n.href)
+    (n) =>
+      n.href !== href && n.href.startsWith(href) && pathname.startsWith(n.href),
   );
   return !hayMasEspecifico;
 }
@@ -72,9 +83,10 @@ export function gruposNav(esAdmin: boolean): GrupoNav[] {
       titulo: "Operación",
       items: [
         buscar("/"),
+        buscar("/agenda"),
         buscar("/ventas/nueva"),
         buscar("/ventas"),
-        buscar("/muestra-pedidos/nueva-venta"),
+        buscar("/pedidos"),
         buscar("/clientes"),
       ],
     },
@@ -93,7 +105,9 @@ export function gruposNav(esAdmin: boolean): GrupoNav[] {
       items: [
         buscar("/caja-chica"),
         buscar("/reportes"),
-        ...(esAdmin ? [buscar("/usuarios"), buscar("/estadisticas-vendedores")] : []),
+        ...(esAdmin
+          ? [buscar("/usuarios"), buscar("/estadisticas-vendedores")]
+          : []),
         buscar("/ayuda"),
       ],
     },

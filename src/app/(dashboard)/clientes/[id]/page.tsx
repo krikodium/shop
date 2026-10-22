@@ -26,7 +26,8 @@ import type { ClienteFormValues } from "@/lib/validaciones/clienteSchema";
 import type { Cliente, Venta } from "@prisma/client";
 
 interface ClienteConVentas extends Cliente {
-  ventas: Venta[];
+  ventas: (Venta & { pedido: { id: string } | null; resumen: { totalCobradoVentas: string; saldoPendiente: string } })[];
+  resumen: { totalVentas: string; totalCobradoVentas: string; saldoPendiente: string };
 }
 
 const formatFecha = (d: string | Date) =>
@@ -134,6 +135,12 @@ export default function ClienteDetallePage() {
         ]}
       />
 
+      <Resumen items={[
+        { label: "Vendido · ARS", valor: formatARS(cliente.resumen.totalVentas) },
+        { label: "Cobrado · ARS", valor: formatARS(cliente.resumen.totalCobradoVentas) },
+        { label: "Saldo pendiente · ARS", valor: formatARS(cliente.resumen.saldoPendiente) },
+      ]} />
+
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="min-w-0 lg:col-span-2">
           <ClienteForm
@@ -163,6 +170,7 @@ export default function ClienteDetallePage() {
                   <TableHead>Venta</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Saldo ARS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -171,7 +179,7 @@ export default function ClienteDetallePage() {
                     <TableCell>
                       <span className="flex items-center gap-2">
                         <Link
-                          href={`/ventas/${v.id}`}
+                          href={v.pedido ? `/pedidos/${v.pedido.id}` : `/ventas/${v.id}`}
                           className={cn(
                             "rounded-sm font-mono font-medium tabular-nums underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                             v.anulada && "line-through"
@@ -188,6 +196,7 @@ export default function ClienteDetallePage() {
                     >
                       {formatARS(Number(v.total))}
                     </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">{v.anulada ? "—" : formatARS(v.resumen.saldoPendiente)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

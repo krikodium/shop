@@ -13,7 +13,7 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("overflow-hidden rounded-lg border border-border bg-card", className)}>
+    <div className={cn("overflow-hidden rounded-xl border border-border bg-card", className)}>
       {children}
     </div>
   );
@@ -33,17 +33,17 @@ export function PanelHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 border-b border-border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5",
+        "flex flex-col gap-3 border-b border-border bg-surface/40 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5",
         className
       )}
     >
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
         {descripcion && (
           <p className="mt-0.5 text-xs text-muted-foreground">{descripcion}</p>
         )}
       </div>
-      {acciones && <div className="flex shrink-0 flex-wrap gap-2">{acciones}</div>}
+      {acciones && <div className="flex shrink-0 flex-wrap items-center gap-2">{acciones}</div>}
     </div>
   );
 }

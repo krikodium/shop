@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { serializable, dinero } from "@/lib/calculadores/finanzasServidor";
+import { z } from "zod";
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     // El detalle expone costo y margen por producto: no puede ser público.
@@ -20,12 +22,13 @@ export async function GET(
       include: {
         items: true,
         cliente: true,
+        pedido: { select: { id: true } },
       },
     });
     if (!venta) {
       return NextResponse.json(
         { error: "Venta no encontrada" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     return NextResponse.json(venta);
@@ -33,14 +36,14 @@ export async function GET(
     console.error("Error obteniendo venta:", error);
     return NextResponse.json(
       { error: "Error al obtener venta" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth();
@@ -48,39 +51,47 @@ export async function PATCH(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     if (session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Solo administradores pueden anular ventas" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Solo administradores pueden anular ventas" },
+        { status: 403 },
+      );
     }
 
     const { id } = await params;
-    const body = await request.json();
-    const accion = body.accion as string;
+    const body = z
+      .object({
+        accion: z.literal("anular"),
+        motivo: z.string().trim().min(5).max(1000),
+      })
+      .parse(await request.json());
+    const accion = body.accion;
 
     if (accion !== "anular") {
       return NextResponse.json({ error: "Acción inválida" }, { status: 400 });
     }
 
-    const venta = await prisma.venta.findUnique({
-      where: { id },
-      include: { items: true, cliente: true },
-    });
-    if (!venta) {
-      return NextResponse.json(
-        { error: "Venta no encontrada" },
-        { status: 404 }
-      );
-    }
-    if (venta.anulada) {
-      return NextResponse.json(
-        { error: "La venta ya está anulada" },
-        { status: 400 }
-      );
-    }
-
-    await prisma.$transaction(async (tx) => {
+    await serializable(async (tx) => {
+      const venta = await tx.venta.findUnique({
+        where: { id },
+        include: { items: true, cliente: true, pagos: true, pedido: true },
+      });
+      if (!venta) throw new Error("Venta no encontrada");
+      if (venta.anulada) throw new Error("La venta ya está anulada");
+      if (venta.pedido)
+        throw new Error(
+          "Los pedidos requieren cancelación por ítem y devolución trazable; no pueden anularse como venta inmediata",
+        );
+      if (venta.pagos.length)
+        throw new Error(
+          "No se puede anular una venta cobrada sin registrar antes su devolución",
+        );
       // 1. Marcar venta como anulada
       await tx.venta.update({
         where: { id },
-        data: { anulada: true },
+        data: {
+          anulada: true,
+          notas: `${venta.notas ?? ""}\nAnulada por ${session.user.id}: ${body.motivo}`,
+        },
       });
 
       // 2. Devolver stock y crear movimientos
@@ -112,17 +123,26 @@ export async function PATCH(
 
       // 3. Revertir estadísticas del cliente
       if (venta.clienteId) {
-        const cliente = await tx.cliente.findUnique({ where: { id: venta.clienteId } });
+        const cliente = await tx.cliente.findUnique({
+          where: { id: venta.clienteId },
+        });
         if (cliente) {
-          const total = Number(venta.total);
-          const nuevoTotal = Math.max(0, Number(cliente.totalCompras) - total);
+          const nuevoTotal = Prisma.Decimal.max(
+            0,
+            cliente.totalCompras.minus(venta.total),
+          );
           const nuevaCantidad = Math.max(0, cliente.cantidadCompras - 1);
-          const nuevoTicketProm = nuevaCantidad > 0 ? nuevoTotal / nuevaCantidad : 0;
+          const nuevoTicketProm =
+            nuevaCantidad > 0
+              ? dinero(nuevoTotal.div(nuevaCantidad))
+              : dinero(0);
 
           let ultimaCompra: Date | null = cliente.ultimaCompra;
           if (cliente.ultimaCompra && venta.fecha) {
             const fechaVenta = new Date(venta.fecha);
-            if (fechaVenta.getTime() >= new Date(cliente.ultimaCompra).getTime()) {
+            if (
+              fechaVenta.getTime() >= new Date(cliente.ultimaCompra).getTime()
+            ) {
               const otrasVentas = await tx.venta.findMany({
                 where: {
                   clienteId: venta.clienteId,
@@ -150,12 +170,17 @@ export async function PATCH(
       }
     });
 
-    return NextResponse.json({ ok: true, mensaje: "Venta anulada correctamente" });
+    return NextResponse.json({
+      ok: true,
+      mensaje: "Venta anulada correctamente",
+    });
   } catch (error) {
+    if (error instanceof Error && !("code" in error))
+      return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("Error anulando venta:", error);
     return NextResponse.json(
       { error: "Error al anular la venta" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

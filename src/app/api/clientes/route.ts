@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { clienteSchema } from "@/lib/validaciones/clienteSchema";
+import { auth } from "@/auth";
 
 export async function GET(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   try {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim();
@@ -31,6 +34,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (session.user.role === "VIEWER") return NextResponse.json({ error: "Usuario de solo lectura" }, { status: 403 });
   try {
     const body = await request.json();
     const data = clienteSchema.parse(body);

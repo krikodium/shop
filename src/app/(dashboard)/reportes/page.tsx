@@ -31,14 +31,14 @@ import { Button } from "@/components/ui/button";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { notificar } from "@/lib/notificar";
 import { cn } from "@/lib/utils";
+import { fechaNegocio, siguienteDia } from "@/lib/fechasNegocio";
 import { ArrowDownRight, ArrowUpRight, Download, GitCompareArrows } from "lucide-react";
 
 function getDefaultDates() {
-  const hoy = new Date();
-  const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const hoy = fechaNegocio();
   return {
-    desde: inicio.toISOString().slice(0, 10),
-    hasta: hoy.toISOString().slice(0, 10),
+    desde: `${hoy.slice(0, 7)}-01`,
+    hasta: hoy,
   };
 }
 
@@ -53,25 +53,20 @@ const PRESETS: Array<{ id: Preset; label: string }> = [
 
 /** Rango de fechas de cada atajo (misma lógica que antes, solo extraída). */
 function rangoPreset(preset: Preset): { desde: string; hasta: string } {
-  const hoy = new Date();
+  const hoy = fechaNegocio();
   if (preset === "hoy") {
-    const d = hoy.toISOString().slice(0, 10);
-    return { desde: d, hasta: d };
+    return { desde: hoy, hasta: hoy };
   }
   if (preset === "ultimos7") {
-    const desde7 = new Date(hoy);
-    desde7.setDate(hoy.getDate() - 6);
-    return { desde: desde7.toISOString().slice(0, 10), hasta: hoy.toISOString().slice(0, 10) };
+    return { desde: siguienteDia(hoy, -6), hasta: hoy };
   }
   if (preset === "mesActual") {
-    const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    return { desde: inicio.toISOString().slice(0, 10), hasta: hoy.toISOString().slice(0, 10) };
+    return { desde: `${hoy.slice(0, 7)}-01`, hasta: hoy };
   }
-  const inicioMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
-  const finMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+  const finMesAnterior = siguienteDia(`${hoy.slice(0, 7)}-01`, -1);
   return {
-    desde: inicioMesAnterior.toISOString().slice(0, 10),
-    hasta: finMesAnterior.toISOString().slice(0, 10),
+    desde: `${finMesAnterior.slice(0, 7)}-01`,
+    hasta: finMesAnterior,
   };
 }
 
@@ -340,10 +335,16 @@ export default function ReportesPage() {
 
         {/* ── TAB: VENTAS ────────────────────────────────────────── */}
         <TabsContent value="ventas" className="mt-4">
+          {(proveedorId !== "__all__" || categoriaId !== "__all__") && <p className="mb-4 text-sm text-muted-foreground">Se muestran ventas completas que contienen productos del proveedor o categoría elegidos. Los totales, cobros y rankings incluyen todos los productos de esas ventas; el descuento corresponde a la operación completa.</p>}
           {loading === "ventas" ? (
             <LoadingSkeleton />
           ) : ventas ? (
             <div className="space-y-6">
+              <FigureGrid columnas={3}>
+                <Figure label="Cobrado en el período · ARS" valor={formatARS(String(ventas.totalCobradoPeriodo ?? "0.00"))} hint="Pagos por fecha efectiva, incluidas ventas anteriores" />
+                <Figure label="Cobrado de estas ventas · ARS" valor={formatARS(String(ventas.totalCobradoVentas ?? "0.00"))} hint="Todos los cobros imputados a las ventas del período" />
+                <Figure label="Saldo de estas ventas · ARS" valor={formatARS(String(ventas.saldoPendiente ?? "0.00"))} hint="Vendido menos cobros imputados" />
+              </FigureGrid>
               <FigureGrid columnas={4}>
                 <Figure
                   label="Total ventas"
@@ -378,25 +379,25 @@ export default function ReportesPage() {
                 const u = ventas.usd as
                   | { totalUsdRecibido: number; ventasConUsd: number; equivalenteArsDesdeUsd: number }
                   | undefined;
-                if (!u || u.totalUsdRecibido === 0) return null;
+                if (!u || Number(u.totalUsdRecibido) === 0) return null;
                 return (
                   <Panel>
-                    <PanelHeader title="Dólares en ventas (POS)" />
+                    <PanelHeader title="Cobros en dólares del período" />
                     <FigureGrid columnas={3} className="rounded-none border-0">
                       <Figure
                         label="USD cobrados"
                         valor={formatUSD(u.totalUsdRecibido ?? 0)}
-                        hint="Suma de tramos en USD"
+                        hint="Dólares efectivamente recibidos"
                       />
                       <Figure
-                        label="Ventas con USD"
+                        label="Cobros con USD"
                         valor={u.ventasConUsd ?? 0}
-                        hint="Al menos un tramo en dólares"
+                        hint="Pagos registrados en el período"
                       />
                       <Figure
                         label="Equivalente ARS"
                         valor={formatARS(u.equivalenteArsDesdeUsd ?? 0)}
-                        hint="USD × cotización de cada venta"
+                        hint="Importe ARS imputado con la cotización de cada cobro"
                       />
                     </FigureGrid>
                   </Panel>
@@ -409,7 +410,7 @@ export default function ReportesPage() {
                 );
                 return (
                   <Panel>
-                    <PanelHeader title="Por método de pago" />
+                    <PanelHeader title="Cobros por método de pago" />
                     {porMetodo.length === 0 ? (
                       <PanelBody>
                         <EmptyState className="py-6" titulo="Sin cobros en el período" />
@@ -594,6 +595,7 @@ export default function ReportesPage() {
 
         {/* ── TAB: RENTABILIDAD ──────────────────────────────────── */}
         <TabsContent value="rentabilidad" className="mt-4">
+          {(proveedorId !== "__all__" || categoriaId !== "__all__") && <p className="mb-4 text-sm text-muted-foreground">Rentabilidad de ventas completas que contienen los productos filtrados, incluidos los demás productos de cada venta.</p>}
           {loading === "rentabilidad" ? (
             <LoadingSkeleton />
           ) : rentabilidad ? (

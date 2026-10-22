@@ -213,17 +213,28 @@ export default function CajaChicaPage() {
   const saving = abrir.loading || cerrar.loading;
 
   const calcularSaldos = () => {
-    if (!cajaActual) return { ars: 0, usd: 0 };
+    if (!cajaActual) return { ars: 0, usd: 0, ingresosArs: 0, egresosArs: 0, movsCount: 0 };
     const initArs = Number(cajaActual.montoInicial ?? 0);
     const initUsd = Number(cajaActual.montoInicialUsd ?? 0);
     const movs = cajaActual.movimientos ?? [];
-    const ars = movs
-      .filter((m) => (m.moneda ?? "ARS") === "ARS")
-      .reduce((s, m) => s + (m.tipo === "INGRESO" ? Number(m.monto) : -Number(m.monto)), 0);
+    const movsArs = movs.filter((m) => (m.moneda ?? "ARS") === "ARS");
+    const ingresosArs = movsArs
+      .filter((m) => m.tipo === "INGRESO")
+      .reduce((s, m) => s + Number(m.monto), 0);
+    const egresosArs = movsArs
+      .filter((m) => m.tipo === "EGRESO")
+      .reduce((s, m) => s + Number(m.monto), 0);
+    const ars = ingresosArs - egresosArs;
     const usd = movs
       .filter((m) => (m.moneda ?? "ARS") === "USD")
       .reduce((s, m) => s + (m.tipo === "INGRESO" ? Number(m.monto) : -Number(m.monto)), 0);
-    return { ars: initArs + ars, usd: initUsd + usd };
+    return {
+      ars: initArs + ars,
+      usd: initUsd + usd,
+      ingresosArs,
+      egresosArs,
+      movsCount: movs.length,
+    };
   };
 
   const saldos = calcularSaldos();
@@ -350,7 +361,13 @@ export default function CajaChicaPage() {
                     </div>
                   </div>
 
-                  <BalanceCards ars={saldos.ars} usd={saldos.usd} />
+                  <BalanceCards
+                    ars={saldos.ars}
+                    usd={saldos.usd}
+                    ingresosArs={saldos.ingresosArs}
+                    egresosArs={saldos.egresosArs}
+                    movimientosCount={saldos.movsCount}
+                  />
 
                   {esMiCaja && cajaActual.estado === "ABIERTA" && (
                     <TransactionForm cajaId={cajaActual.id} onSuccess={mergeCajaEnEstado} saving={saving} />

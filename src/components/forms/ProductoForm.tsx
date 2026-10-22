@@ -32,7 +32,7 @@ import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { notificar } from "@/lib/notificar";
-import { formatARS } from "@/lib/formatCurrency";
+import { formatARS, formatUSD } from "@/lib/formatCurrency";
 import { cn } from "@/lib/utils";
 import { Reveal } from "@/components/ui/reveal";
 import {
@@ -69,6 +69,8 @@ const defaultEmpty: ProductoFormValues = {
   categoriaId: null,
   precioCompra: null,
   precioVenta: 0,
+  precioCompraUsd: null,
+  precioVentaUsd: null,
   enConsignacion: false,
   comisionConsignacion: null,
   stockActual: 0,
@@ -94,6 +96,9 @@ export function productoToFormValues(
     categoriaId: p.categoriaId ?? null,
     precioCompra: p.precioCompra != null ? Number(p.precioCompra) : null,
     precioVenta: Number(p.precioVenta),
+    precioCompraUsd:
+      p.precioCompraUsd != null ? Number(p.precioCompraUsd) : null,
+    precioVentaUsd: p.precioVentaUsd != null ? Number(p.precioVentaUsd) : null,
     enConsignacion: p.enConsignacion,
     comisionConsignacion:
       p.comisionConsignacion != null ? Number(p.comisionConsignacion) : null,
@@ -283,13 +288,25 @@ export function ProductoForm({
   const sku = form.watch("sku");
   const precioCompra = form.watch("precioCompra");
   const precioVenta = form.watch("precioVenta");
+  const precioCompraUsd = form.watch("precioCompraUsd");
+  const precioVentaUsd = form.watch("precioVentaUsd");
   const stockActual = form.watch("stockActual");
   const stockMinimo = form.watch("stockMinimo");
+
+  const [monedaPrecio, setMonedaPrecio] = useState<"ARS" | "USD">(
+    (defaultValues?.precioVentaUsd ?? 0) > 0 &&
+      (defaultValues?.precioVenta ?? 0) === 0
+      ? "USD"
+      : "ARS"
+  );
 
   const estadoSku = useSkuDisponible(sku ?? "", defaultValues?.sku ?? "");
 
   // 🔴 Dato derivado, solo para mostrar: no se guarda ni se envía.
-  const margen = calcularMargen(precioCompra, precioVenta);
+  const margen =
+    monedaPrecio === "USD"
+      ? calcularMargen(precioCompraUsd ?? null, precioVentaUsd ?? 0)
+      : calcularMargen(precioCompra, precioVenta);
 
   const proveedoresConsignacion = proveedores.filter(
     (p) => p.tipoProveedor === "CONSIGNACION"
@@ -581,66 +598,167 @@ export function ProductoForm({
             <Panel>
               <PanelHeader
                 title="Precios"
-                descripcion="El de venta es obligatorio; el de compra habilita el margen."
+                descripcion="Podés expresar el precio en pesos (ARS) o en dólares (USD)."
+                acciones={
+                  <div
+                    role="group"
+                    aria-label="Moneda del producto"
+                    className="inline-flex gap-1 rounded-md border border-border p-1"
+                  >
+                    {(
+                      [
+                        ["ARS", "Pesos (ARS)"],
+                        ["USD", "Dólares (USD)"],
+                      ] as const
+                    ).map(([m, label]) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        aria-pressed={monedaPrecio === m}
+                        onClick={() => {
+                          setMonedaPrecio(m);
+                          if (m === "ARS") {
+                            form.setValue("precioVentaUsd", null, {
+                              shouldDirty: true,
+                            });
+                            form.setValue("precioCompraUsd", null, {
+                              shouldDirty: true,
+                            });
+                          } else {
+                            form.setValue("precioVenta", 0, {
+                              shouldDirty: true,
+                            });
+                          }
+                        }}
+                        className={cn(
+                          "border-transparent bg-transparent shadow-none dark:bg-transparent",
+                          monedaPrecio === m &&
+                            "border-foreground bg-accent text-accent-foreground"
+                        )}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                }
               />
               <PanelBody className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="precioCompra"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Precio de compra</FormLabel>
-                        <FormControl>
-                          <CurrencyInput
-                            value={field.value ?? null}
-                            onChange={field.onChange}
-                            nullable
-                            placeholder="0"
-                            className="font-mono tabular-nums"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="precioVenta"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Precio de venta *</FormLabel>
-                        <FormControl>
-                          <CurrencyInput
-                            value={field.value ?? 0}
-                            onChange={field.onChange}
-                            placeholder="0"
-                            className="font-mono tabular-nums"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                {monedaPrecio === "ARS" ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="precioCompra"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Costo / Precio de compra (ARS)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput
+                              value={field.value ?? null}
+                              onChange={field.onChange}
+                              nullable
+                              placeholder="0"
+                              className="font-mono tabular-nums"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="precioVenta"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Precio de venta (ARS) *</FormLabel>
+                          <FormControl>
+                            <CurrencyInput
+                              value={field.value ?? 0}
+                              onChange={field.onChange}
+                              placeholder="0"
+                              className="font-mono tabular-nums"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="precioCompraUsd"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Costo / Precio de compra (USD)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput
+                              value={field.value ?? null}
+                              onChange={field.onChange}
+                              nullable
+                              placeholder="0"
+                              className="font-mono tabular-nums"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="precioVentaUsd"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Precio de venta (USD) *</FormLabel>
+                          <FormControl>
+                            <CurrencyInput
+                              value={field.value ?? null}
+                              onChange={field.onChange}
+                              nullable
+                              placeholder="0"
+                              className="font-mono tabular-nums"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
 
                 <FigureGrid columnas={2}>
                   <Figure
-                    label="Ganancia por unidad"
-                    valor={margen ? formatARS(margen.ganancia) : "—"}
+                    label={`Ganancia por unidad (${monedaPrecio})`}
+                    valor={
+                      margen
+                        ? monedaPrecio === "USD"
+                          ? formatUSD(margen.ganancia)
+                          : formatARS(margen.ganancia)
+                        : "—"
+                    }
                     tono={
-                      margen ? (margen.ganancia >= 0 ? "positivo" : "negativo") : "neutro"
+                      margen
+                        ? margen.ganancia >= 0
+                          ? "positivo"
+                          : "negativo"
+                        : "neutro"
                     }
                   />
                   <Figure
                     label="Margen s/ venta"
                     valor={margen ? `${margen.porcentaje.toFixed(1)}%` : "—"}
                     tono={
-                      margen ? (margen.porcentaje >= 0 ? "positivo" : "negativo") : "neutro"
+                      margen
+                        ? margen.porcentaje >= 0
+                          ? "positivo"
+                          : "negativo"
+                        : "neutro"
                     }
                     hint={
                       margen
-                        ? "Informativo: se calcula para mostrar, no se guarda."
+                        ? "Informativo: se calcula sobre costo y venta."
                         : "Cargá precio de compra y de venta para verlo."
                     }
                   />

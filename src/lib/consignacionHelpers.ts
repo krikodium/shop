@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 // ─── Validación de frecuencia de rendiciones ─────────────────────────
 
@@ -147,18 +148,18 @@ export async function itemsNoRendidos(
 
 /** Total de deuda pendiente de consignación (suma de todos los proveedores).
  * Solo incluye items que NO fueron rendidos en ninguna rendición previa. */
-export async function totalDeudaConsignacionPendiente(): Promise<number> {
+export async function totalDeudaConsignacionPendiente(): Promise<string> {
   const proveedores = await prisma.proveedor.findMany({
-    where: { tipoProveedor: "CONSIGNACION" },
+    // La deuda histórica se determina por ítem, aunque cambie el tipo del proveedor.
     select: { id: true },
   });
 
-  let total = 0;
+  let total = new Prisma.Decimal(0);
   for (const prov of proveedores) {
     const items = await itemsDeudaPendiente(prov.id);
-    total += items.reduce((s, i) => s + Number(i.deudaProveedor ?? 0), 0);
+    total = total.plus(items.reduce((s, i) => s.plus(i.deudaProveedor ?? 0), new Prisma.Decimal(0)));
   }
-  return total;
+  return total.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toFixed(2);
 }
 
 /** Items de consignación que aún no fueron incluidos en ninguna rendición (para deuda pendiente) */

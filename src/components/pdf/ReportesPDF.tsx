@@ -26,6 +26,8 @@ type ReportesPDFProps = {
     totalVentas: number;
     cantidadVentas: number;
     totalGanancia: number;
+    totalCobradoPeriodo: number;
+    saldoPendiente: number;
     margenPromedio: number;
     topPorVenta: TopProducto[];
     topPorGanancia: TopProducto[];
@@ -185,6 +187,7 @@ export function ReportesPDF({
           <Text style={styles.subtitle}>
             Período: {periodo.desde} al {periodo.hasta}
           </Text>
+          {(filtros.proveedor || filtros.categoria) && <Text style={styles.subtitle}>Ventas y rentabilidad: operaciones completas que contienen productos filtrados; incluyen todos sus productos y cobros. Inventario: solo productos filtrados.</Text>}
           <View style={styles.filterRow}>
             <Text style={styles.filterChip}>
               Método de pago: {filtros.metodoPago ?? "Todos"}
@@ -202,7 +205,7 @@ export function ReportesPDF({
           <Text style={styles.sectionTitle}>Ventas</Text>
           <View style={styles.kpiGrid}>
             <View style={styles.kpiCard}>
-              <Text style={styles.kpiLabel}>Total ventas</Text>
+              <Text style={styles.kpiLabel}>Total vendido ARS</Text>
               <Text style={styles.kpiValue}>{ars(ventas.totalVentas)}</Text>
             </View>
             <View style={styles.kpiCard}>
@@ -217,6 +220,10 @@ export function ReportesPDF({
               <Text style={styles.kpiLabel}>Margen promedio</Text>
               <Text style={styles.kpiValue}>{ventas.margenPromedio.toFixed(1)}%</Text>
             </View>
+          </View>
+          <View style={styles.kpiGrid}>
+            <View style={styles.kpiCard}><Text style={styles.kpiLabel}>Cobrado en el período ARS</Text><Text style={styles.kpiValue}>{ars(ventas.totalCobradoPeriodo)}</Text></View>
+            <View style={styles.kpiCard}><Text style={styles.kpiLabel}>Saldo de estas ventas ARS</Text><Text style={styles.kpiValue}>{ars(ventas.saldoPendiente)}</Text></View>
           </View>
         </View>
 

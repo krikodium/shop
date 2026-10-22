@@ -46,12 +46,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token.id) {
         const actual = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { passwordChangedAt: true },
+          select: { passwordChangedAt: true, role: true },
         });
         if (!actual) return null;
         const cambiadaEn = actual.passwordChangedAt?.getTime() ?? 0;
         const emitidoEn = Number(token.emitidoEn ?? 0);
         if (cambiadaEn > emitidoEn) return null;
+        token.role = actual.role;
       }
       return token;
     },

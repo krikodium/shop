@@ -1,283 +1,313 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { METODO_PAGO_LABEL } from "@/lib/constants";
 import { totalDeudaConsignacionPendiente } from "@/lib/consignacionHelpers";
-import { ventaFindManySafe } from "@/lib/ventaFindManySafe";
-
-function getInicioMes() {
-  const hoy = new Date();
-  return new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-}
-
-function getInicioDia() {
-  const hoy = new Date();
-  return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0);
-}
-
-function getFinDia() {
-  const hoy = new Date();
-  return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
-}
+import { fechaNegocio, inicioDiaNegocio, siguienteDia } from "@/lib/fechasNegocio";
+import { dinero, resumenCobros, resumenVentas, sumarImportes } from "@/lib/resumenFinanciero";
+import { saldoPendiente as calcularSaldoVenta } from "@/lib/calculadores/pagosVenta";
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   try {
-    const inicioMes = getInicioMes();
-    const inicioDia = getInicioDia();
-    const finDia = getFinDia();
+    const hoy = fechaNegocio();
+    const inicioMes = inicioDiaNegocio(`${hoy.slice(0, 7)}-01`);
+    const inicioHoy = inicioDiaNegocio(hoy);
+    const finHoy = inicioDiaNegocio(siguienteDia(hoy));
+    const inicioGrafico = inicioDiaNegocio(siguienteDia(hoy, -13));
 
-    type VentaMesFila = {
-      total: unknown;
-      gananciaBruta: unknown;
-      metodoPago: string;
-      metodoPagoSecundario: string | null;
-      montoPago1Ars: unknown;
-      montoPago2Ars: unknown;
-      usdPago1: unknown;
-      usdPago2: unknown;
-      fecha: Date;
-    };
-    type VentaMesBasica = Pick<
-      VentaMesFila,
-      "total" | "gananciaBruta" | "metodoPago" | "fecha"
-    >;
+    const [
+      ventasMes,
+      cobrosMes,
+      ventasGrafico,
+      pendientes,
+      productos,
+      ultimasVentas,
+      totalProductos,
+      deuda,
+      pedidosRaw,
+      cajaAbierta,
+    ] = await Promise.all([
+      prisma.venta.findMany({
+        where: { anulada: false, fecha: { gte: inicioMes, lt: finHoy } },
+        select: {
+          fecha: true,
+          total: true,
+          gananciaBruta: true,
+          pagos: { select: { montoArs: true } },
+        },
+      }),
+      prisma.pagoVenta.findMany({
+        where: { venta: { anulada: false }, fecha: { gte: inicioMes, lt: finHoy } },
+        select: {
+          fecha: true,
+          montoArs: true,
+          montoUsd: true,
+          metodoPago: true,
+        },
+      }),
+      prisma.venta.findMany({
+        where: { anulada: false, fecha: { gte: inicioGrafico, lt: finHoy } },
+        select: { fecha: true, total: true },
+      }),
+      prisma.venta.findMany({
+        where: { anulada: false },
+        select: { total: true, gananciaBruta: true, pagos: { select: { montoArs: true } } },
+      }),
+      prisma.producto.findMany({
+        where: { activo: true },
+        select: {
+          id: true,
+          sku: true,
+          nombre: true,
+          stockActual: true,
+          stockMinimo: true,
+          precioVenta: true,
+          precioVentaUsd: true,
+          enConsignacion: true,
+          categoria: { select: { nombre: true } },
+        },
+      }),
+      prisma.venta.findMany({
+        where: { anulada: false },
+        orderBy: { fecha: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          numeroVenta: true,
+          fecha: true,
+          total: true,
+          metodoPago: true,
+          metodoPagoSecundario: true,
+          clienteNombre: true,
+          cliente: { select: { nombre: true } },
+          pedido: { select: { id: true, fechaPrometida: true } },
+          items: { select: { productoNombre: true, cantidad: true } },
+          pagos: { select: { montoUsd: true, montoArs: true } },
+        },
+      }),
+      prisma.producto.count(),
+      totalDeudaConsignacionPendiente(),
+      prisma.pedido.findMany({
+        where: { venta: { anulada: false } },
+        orderBy: { updatedAt: "desc" },
+        include: {
+          venta: {
+            select: {
+              id: true,
+              numeroVenta: true,
+              total: true,
+              clienteNombre: true,
+              cliente: { select: { nombre: true } },
+              items: {
+                select: {
+                  id: true,
+                  productoNombre: true,
+                  cantidad: true,
+                  cantidadEntregada: true,
+                  seguimientoEstado: true,
+                },
+              },
+              pagos: { select: { montoArs: true } },
+            },
+          },
+        },
+      }),
+      prisma.cajaChica.findFirst({
+        where: { estado: "ABIERTA" },
+        orderBy: { fechaApertura: "desc" },
+        include: {
+          user: { select: { name: true, email: true } },
+          movimientos: { select: { tipo: true, monto: true, moneda: true } },
+        },
+      }),
+    ]);
 
-    const ventasMes = await ventaFindManySafe<VentaMesFila, VentaMesBasica>(prisma, {
-      where: { fecha: { gte: inicioMes }, anulada: false },
-      selectFull: {
-        total: true,
-        gananciaBruta: true,
-        metodoPago: true,
-        metodoPagoSecundario: true,
-        montoPago1Ars: true,
-        montoPago2Ars: true,
-        usdPago1: true,
-        usdPago2: true,
-        fecha: true,
-      },
-      selectBasic: {
-        total: true,
-        gananciaBruta: true,
-        metodoPago: true,
-        fecha: true,
-      },
-      mapBasic: (rows) =>
-        rows.map((v) => ({
-          ...v,
-          metodoPagoSecundario: null,
-          montoPago1Ars: null,
-          montoPago2Ars: null,
-          usdPago1: null,
-          usdPago2: null,
-        })),
-    });
+    const mes = resumenVentas(ventasMes);
+    const dia = resumenVentas(ventasMes.filter((v) => v.fecha >= inicioHoy));
+    const cobros = resumenCobros(cobrosMes);
+    const cobrosHoy = resumenCobros(cobrosMes.filter((p) => p.fecha >= inicioHoy));
 
-    const totalVentasMes = ventasMes.reduce((s, v) => s + Number(v.total), 0);
-    const totalGananciaMes = ventasMes.reduce((s, v) => s + Number(v.gananciaBruta), 0);
-    const cantidadVentasMes = ventasMes.length;
+    // Lógica real del negocio:
+    // - Productos con stockActual > 0 están físicamente en salón (entrega inmediata).
+    // - Productos con stockActual === 0 están activos bajo modalidad "Por encargo / a pedido".
+    // - Alerta real de stock en salón: artículos de salón a los que les queda 1 última unidad
+    //   (o están por debajo de un mínimo explícito distinto del default 5), o sin precio definido.
+    const productosEnSalon = productos.filter((p) => p.stockActual > 0);
+    const productosPorEncargo = productos.filter((p) => p.stockActual === 0);
+    const unidadesEnSalon = productosEnSalon.reduce((acc, p) => acc + p.stockActual, 0);
 
-    const sumaUsdVenta = (v: VentaMesFila) =>
-      (v.usdPago1 != null ? Number(v.usdPago1) : 0) +
-      (v.usdPago2 != null ? Number(v.usdPago2) : 0);
+    let valorSalonArs = 0;
+    let valorSalonUsd = 0;
+    let productosEnUsd = 0;
+    let productosEnArs = 0;
+    const productosSinPrecio: Array<{ id: string; sku: string; nombre: string }> = [];
 
-    const totalUsdRecibidoMes = ventasMes.reduce((s, v) => s + sumaUsdVenta(v), 0);
-    const ventasConUsdMes = ventasMes.filter((v) => sumaUsdVenta(v) > 0).length;
-
-    // Ventas de hoy
-    const ventasHoy = ventasMes.filter(
-      (v) => v.fecha >= inicioDia && v.fecha <= finDia
-    );
-    const totalVentasHoy = ventasHoy.reduce((s, v) => s + Number(v.total), 0);
-    const cantidadVentasHoy = ventasHoy.length;
-    const totalUsdRecibidoHoy = ventasHoy.reduce((s, v) => s + sumaUsdVenta(v), 0);
-    const ventasConUsdHoy = ventasHoy.filter((v) => sumaUsdVenta(v) > 0).length;
-
-    // Ventas por día (últimos 14 días, incluyendo hoy)
-    const hoy = new Date();
-    const inicioRango = new Date(hoy);
-    inicioRango.setDate(inicioRango.getDate() - 13);
-    inicioRango.setHours(0, 0, 0, 0);
-
-    // Traer TODAS las ventas recientes (sin filtrar por fecha en query para evitar problemas de timezone)
-    const ventasParaGrafico = await prisma.venta.findMany({
-      where: { anulada: false },
-      orderBy: { fecha: "desc" },
-      take: 500,
-      select: { fecha: true, total: true },
-    });
-
-    /** Formato YYYY-MM-DD en hora local */
-    const toLocalDateKey = (d: Date) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    };
-
-    // 14 días: desde inicioRango hasta hoy (inclusive)
-    const diasMap: Record<string, { total: number; cantidad: number }> = {};
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(inicioRango);
-      d.setDate(d.getDate() + i);
-      const key = toLocalDateKey(d);
-      diasMap[key] = { total: 0, cantidad: 0 };
-    }
-
-    // Agregar ventas a cada día (usar fecha en hora local del servidor)
-    for (const v of ventasParaGrafico) {
-      const fechaVenta = new Date(v.fecha);
-      const key = toLocalDateKey(fechaVenta);
-      if (diasMap[key] !== undefined) {
-        diasMap[key].total += Number(v.total);
-        diasMap[key].cantidad += 1;
+    for (const p of productos) {
+      const pUsd = p.precioVentaUsd != null ? Number(p.precioVentaUsd) : 0;
+      const pArs = Number(p.precioVenta ?? 0);
+      if (pUsd > 0) {
+        productosEnUsd += 1;
+        if (p.stockActual > 0) valorSalonUsd += pUsd * p.stockActual;
+      } else if (pArs > 0) {
+        productosEnArs += 1;
+        if (p.stockActual > 0) valorSalonArs += pArs * p.stockActual;
+      } else {
+        productosSinPrecio.push({ id: p.id, sku: p.sku, nombre: p.nombre });
       }
     }
 
-    const ventasUltimos14Dias = Object.entries(diasMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([fecha, data]) => ({
+    // Últimas unidades en salón (1 unidad física restante en exhibición)
+    const ultimasUnidadesSalon = productosEnSalon
+      .filter((p) => p.stockActual === 1)
+      .sort((a, b) => Number(b.precioVenta) - Number(a.precioVenta));
+
+    // Pedidos activos (no entregados en su totalidad)
+    const pedidosActivos = pedidosRaw
+      .map((p) => {
+        const items = p.venta.items;
+        const todosEntregados =
+          items.length > 0 &&
+          items.every(
+            (i) => i.seguimientoEstado === "ENTREGADO" || i.cantidadEntregada >= i.cantidad
+          );
+        const listosParaEntregar =
+          !todosEntregados &&
+          items.some(
+            (i) => i.seguimientoEstado === "LISTO_ENTREGA" || i.seguimientoEstado === "DISPONIBLE"
+          );
+        const saldo = Number(calcularSaldoVenta(p.venta.total, p.venta.pagos));
+        return {
+          id: p.id,
+          ventaId: p.venta.id,
+          numeroVenta: p.venta.numeroVenta,
+          cliente: p.venta.cliente?.nombre ?? p.venta.clienteNombre ?? "Clienta",
+          resumenItems: items.map((i) => `${i.cantidad}× ${i.productoNombre}`).join(", "),
+          fechaPrometida: p.fechaPrometida,
+          total: Number(p.venta.total),
+          saldoPendiente: saldo,
+          estado: todosEntregados
+            ? "ENTREGADO"
+            : listosParaEntregar
+              ? "LISTO_ENTREGA"
+              : "EN_CURSO",
+        };
+      })
+      .filter((p) => p.estado !== "ENTREGADO");
+
+    const pedidosListosCount = pedidosActivos.filter((p) => p.estado === "LISTO_ENTREGA").length;
+
+    // Estado de caja chica abierta
+    let cajaResumen: {
+      abierta: boolean;
+      responsable: string | null;
+      saldoArs: number;
+      saldoUsd: number;
+    } = {
+      abierta: false,
+      responsable: null,
+      saldoArs: 0,
+      saldoUsd: 0,
+    };
+    if (cajaAbierta) {
+      const initArs = Number(cajaAbierta.montoInicial ?? 0);
+      const initUsd = Number(cajaAbierta.montoInicialUsd ?? 0);
+      const movsArs = cajaAbierta.movimientos
+        .filter((m) => (m.moneda ?? "ARS") === "ARS")
+        .reduce((s, m) => s + (m.tipo === "INGRESO" ? Number(m.monto) : -Number(m.monto)), 0);
+      const movsUsd = cajaAbierta.movimientos
+        .filter((m) => (m.moneda ?? "ARS") === "USD")
+        .reduce((s, m) => s + (m.tipo === "INGRESO" ? Number(m.monto) : -Number(m.monto)), 0);
+      cajaResumen = {
+        abierta: true,
+        responsable: cajaAbierta.user?.name ?? cajaAbierta.user?.email ?? "Turno actual",
+        saldoArs: initArs + movsArs,
+        saldoUsd: initUsd + movsUsd,
+      };
+    }
+
+    const ventasUltimos14Dias = Array.from({ length: 14 }, (_, i) => {
+      const fecha = siguienteDia(hoy, i - 13);
+      const filas = ventasGrafico.filter((v) => fechaNegocio(v.fecha) === fecha);
+      return {
         fecha,
-        label: new Date(fecha + "T12:00:00").toLocaleDateString("es-AR", {
+        label: inicioDiaNegocio(fecha).toLocaleDateString("es-AR", {
+          timeZone: "America/Argentina/Buenos_Aires",
           day: "2-digit",
           month: "short",
         }),
-        total: data.total,
-        cantidad: data.cantidad,
-      }));
-
-    // Por método de pago (mes): si hay pago dividido, reparte montos entre métodos
-    const porMetodoPago = ventasMes.reduce(
-      (acc, v) => {
-        const total = Number(v.total);
-        const sec = v.metodoPagoSecundario;
-        const m1 = v.montoPago1Ars != null ? Number(v.montoPago1Ars) : null;
-        const m2 = v.montoPago2Ars != null ? Number(v.montoPago2Ars) : null;
-        if (sec && m1 != null && m2 != null) {
-          const add = (metodo: string, monto: number, cuentaVenta: boolean) => {
-            if (!acc[metodo]) acc[metodo] = { total: 0, cantidad: 0 };
-            acc[metodo].total += monto;
-            if (cuentaVenta) acc[metodo].cantidad += 1;
-          };
-          add(v.metodoPago, m1, true);
-          add(sec, m2, false);
-        } else {
-          const metodo = v.metodoPago;
-          if (!acc[metodo]) acc[metodo] = { total: 0, cantidad: 0 };
-          acc[metodo].total += total;
-          acc[metodo].cantidad += 1;
-        }
-        return acc;
-      },
-      {} as Record<string, { total: number; cantidad: number }>
-    );
-
-    const metodoPagoChart = Object.entries(porMetodoPago).map(([metodo, data]) => ({
-      name: METODO_PAGO_LABEL[metodo] ?? metodo,
-      value: data.total,
-      cantidad: data.cantidad,
-    }));
-
-    // Productos bajo stock
-    const productosBajoStock = await prisma.producto.findMany({
-      where: { activo: true },
-      select: {
-        id: true,
-        sku: true,
-        nombre: true,
-        stockActual: true,
-        stockMinimo: true,
-      },
-    }).then((list) =>
-      list.filter((p) => p.stockActual <= p.stockMinimo)
-    );
-
-    // Últimas ventas
-    let ultimasVentasJson: Array<{
-      id: string;
-      numeroVenta: string;
-      fecha: Date;
-      total: unknown;
-      tieneUsd: boolean;
-      pagoDividido: boolean;
-    }>;
-    try {
-      const ultimasVentas = await prisma.venta.findMany({
-        where: { anulada: false },
-        take: 5,
-        orderBy: { fecha: "desc" },
-        select: {
-          id: true,
-          numeroVenta: true,
-          fecha: true,
-          total: true,
-          usdPago1: true,
-          usdPago2: true,
-          metodoPagoSecundario: true,
-        },
-      });
-      ultimasVentasJson = ultimasVentas.map((v) => ({
-        id: v.id,
-        numeroVenta: v.numeroVenta,
-        fecha: v.fecha,
-        total: v.total,
-        tieneUsd:
-          (v.usdPago1 != null && Number(v.usdPago1) > 0) ||
-          (v.usdPago2 != null && Number(v.usdPago2) > 0),
-        pagoDividido: Boolean(v.metodoPagoSecundario),
-      }));
-    } catch {
-      const ultimasVentas = await prisma.venta.findMany({
-        where: { anulada: false },
-        take: 5,
-        orderBy: { fecha: "desc" },
-        select: {
-          id: true,
-          numeroVenta: true,
-          fecha: true,
-          total: true,
-        },
-      });
-      ultimasVentasJson = ultimasVentas.map((v) => ({
-        ...v,
-        tieneUsd: false,
-        pagoDividido: false,
-      }));
-    }
-
-    // Deuda consignación pendiente (solo items NO rendidos en rendiciones previas)
-    const totalDeudaConsignacion = await totalDeudaConsignacionPendiente();
-
-    // Resumen inventario
-    const [totalProductos, productosActivos] = await Promise.all([
-      prisma.producto.count(),
-      prisma.producto.count({ where: { activo: true } }),
-    ]);
+        total: dinero(sumarImportes(filas.map((v) => v.total))).toNumber(),
+        cantidad: filas.length,
+      };
+    });
 
     return NextResponse.json({
       resumen: {
-        totalVentasMes,
-        totalGananciaMes,
-        cantidadVentasMes,
-        totalVentasHoy,
-        cantidadVentasHoy,
-        totalDeudaConsignacion,
+        totalVentasMes: mes.totalVentas,
+        totalGananciaMes: mes.totalGanancia,
+        cantidadVentasMes: mes.cantidadVentas,
+        totalVentasHoy: dia.totalVentas,
+        cantidadVentasHoy: dia.cantidadVentas,
+        totalCobradoMes: cobros.totalCobrado,
+        totalCobradoHoy: cobrosHoy.totalCobrado,
+        saldoPendiente: resumenVentas(pendientes).saldoPendiente,
+        totalDeudaConsignacion: dinero(deuda).toFixed(2),
         totalProductos,
-        productosActivos,
-        productosBajoStock: productosBajoStock.length,
-        totalUsdRecibidoMes,
-        ventasConUsdMes,
-        totalUsdRecibidoHoy,
-        ventasConUsdHoy,
+        productosActivos: productos.length,
+        productosBajoStock: ultimasUnidadesSalon.length,
+        productosEnSalon: productosEnSalon.length,
+        productosPorEncargo: productosPorEncargo.length,
+        unidadesEnSalon,
+        valorSalonArs: dinero(valorSalonArs).toFixed(2),
+        valorSalonUsd: dinero(valorSalonUsd).toFixed(2),
+        productosEnArs,
+        productosEnUsd,
+        productosSinPrecioCount: productosSinPrecio.length,
+        pedidosActivosCount: pedidosActivos.length,
+        pedidosListosCount,
+        totalUsdRecibidoMes: cobros.totalUsd,
+        ventasConUsdMes: cobros.cantidadConUsd,
+        totalUsdRecibidoHoy: cobrosHoy.totalUsd,
+        ventasConUsdHoy: cobrosHoy.cantidadConUsd,
       },
+      caja: cajaResumen,
+      pedidosActivos: pedidosActivos.slice(0, 5),
+      productosSinPrecio,
       ventasUltimos14Dias,
-      metodoPagoChart,
-      productosBajoStock: productosBajoStock.slice(0, 5),
-      ultimasVentas: ultimasVentasJson,
+      metodoPagoChart: Object.entries(cobros.porMetodo).map(([metodo, valor]) => ({
+        name: METODO_PAGO_LABEL[metodo] ?? metodo,
+        value: Number(valor.total),
+        cantidad: valor.cantidad,
+      })),
+      productosBajoStock: ultimasUnidadesSalon.slice(0, 5).map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        nombre: p.nombre,
+        stockActual: p.stockActual,
+        stockMinimo: p.stockMinimo,
+        categoria: p.categoria?.nombre ?? null,
+      })),
+      ultimasVentas: ultimasVentas.map((v) => {
+        const saldo = Number(calcularSaldoVenta(v.total, v.pagos));
+        return {
+          id: v.id,
+          numeroVenta: v.numeroVenta,
+          fecha: v.fecha,
+          total: v.total.toFixed(2),
+          cliente: v.cliente?.nombre ?? v.clienteNombre ?? "Consumidor final",
+          resumenItems: v.items.map((i) => `${i.cantidad}× ${i.productoNombre}`).join(", "),
+          esPedido: Boolean(v.pedido),
+          pedidoId: v.pedido?.id ?? null,
+          saldoPendiente: saldo,
+          metodoPagoLabel: METODO_PAGO_LABEL[v.metodoPago] ?? v.metodoPago,
+          tieneUsd: v.pagos.some((p) => p.montoUsd?.gt(0)),
+          pagoDividido: !!v.metodoPagoSecundario,
+        };
+      }),
     });
   } catch (error) {
     console.error("Error dashboard:", error);
-    return NextResponse.json(
-      { error: "Error al cargar dashboard" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error al cargar dashboard" }, { status: 500 });
   }
 }

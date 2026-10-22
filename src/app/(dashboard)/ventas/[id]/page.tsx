@@ -35,12 +35,15 @@ import { useAsyncAction } from "@/hooks/use-async-action";
 import { notificar } from "@/lib/notificar";
 import { METODO_PAGO_LABEL } from "@/lib/constants";
 import { formatARS } from "@/lib/formatCurrency";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface VentaDetalle {
   id: string;
   numeroVenta: string;
   fecha: string;
   anulada?: boolean;
+  pedido?: { id: string } | null;
   subtotal: number;
   descuento: number;
   total: number;
@@ -75,6 +78,7 @@ export default function VentaDetallePage() {
   const [venta, setVenta] = useState<VentaDetalle | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogAnularOpen, setDialogAnularOpen] = useState(false);
+  const [motivoAnulacion, setMotivoAnulacion] = useState("");
   // Cobros de la venta: total, cobrado, saldo y estado los calcula el servidor.
   const historialPagos = usePagosVenta(id);
   const pagos = historialPagos.datos;
@@ -118,7 +122,7 @@ export default function VentaDetallePage() {
       const res = await fetch(`/api/ventas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accion: "anular" }),
+        body: JSON.stringify({ accion: "anular", motivo: motivoAnulacion.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error al anular");
@@ -280,7 +284,7 @@ export default function VentaDetallePage() {
           usdPago2={venta.usdPago2}
           cotizacionUsd={venta.cotizacionUsd}
         />
-        {isAdmin && !venta.anulada && (
+        {isAdmin && !venta.anulada && !venta.pedido && pagos && pagos.pagos.length === 0 && (
           <AlertDialog open={dialogAnularOpen} onOpenChange={setDialogAnularOpen}>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">Anular venta</Button>
@@ -293,6 +297,8 @@ export default function VentaDetallePage() {
                   se puede deshacer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <Label htmlFor="motivo-anulacion">Motivo de anulación</Label>
+              <Textarea id="motivo-anulacion" value={motivoAnulacion} onChange={e => setMotivoAnulacion(e.target.value)} maxLength={1000} placeholder="Indicá por qué se anula esta venta" />
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
@@ -300,7 +306,7 @@ export default function VentaDetallePage() {
                     e.preventDefault();
                     void anular();
                   }}
-                  disabled={anulando}
+                  disabled={anulando || motivoAnulacion.trim().length < 5}
                   className="bg-destructive text-white hover:bg-destructive/90"
                 >
                   {anulando && <Spinner className="text-white" />}

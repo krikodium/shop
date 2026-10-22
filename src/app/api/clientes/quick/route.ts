@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { datosClienteVentaSchema } from "@/lib/validaciones/clienteSchema";
+import { auth } from "@/auth";
 
 /**
  * POST: Crear cliente rápido desde el punto de venta.
  * Todos los campos opcionales. Se necesita al menos uno.
  */
 export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (session.user.role === "VIEWER") return NextResponse.json({ error: "Usuario de solo lectura" }, { status: 403 });
   try {
     const body = await request.json();
     const data = datosClienteVentaSchema.parse(body);

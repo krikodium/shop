@@ -23,6 +23,8 @@ export const productoSchema = z.object({
   categoriaId: z.string().optional().nullable(),
   precioCompra: z.coerce.number().min(0).optional().nullable(),
   precioVenta: z.coerce.number().min(0, "Precio de venta requerido"),
+  precioCompraUsd: z.coerce.number().positive().optional().nullable(),
+  precioVentaUsd: z.coerce.number().positive().optional().nullable(),
   enConsignacion: z.boolean().default(false),
   comisionConsignacion: z.coerce.number().min(0).max(100).optional().nullable(),
   stockActual: z.coerce.number().int().min(0).default(0),

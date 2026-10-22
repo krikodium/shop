@@ -12,7 +12,7 @@
  * - `Number()` aparece solo dentro de `formatARS`, que es presentación.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,7 +36,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { METODO_PAGO_LABEL, METODOS_PAGO_INDIVIDUAL } from "@/lib/constants";
 import { formatARS } from "@/lib/formatCurrency";
-import { montoSugerido, validarMontoPago } from "@/lib/calculadores/pagosVenta";
+import {
+  aDecimal,
+  montoPorPorcentaje,
+  montoSugerido,
+  validarMontoPago,
+} from "@/lib/calculadores/pagosVenta";
 import { notificar } from "@/lib/notificar";
 
 type ModoImporte = "saldo" | "mitad" | "otro";
@@ -62,20 +67,50 @@ export function RegistrarPagoDialog({
   const [importeLibre, setImporteLibre] = useState("");
   const [metodoPago, setMetodoPago] = useState<string>("EFECTIVO");
   const [notas, setNotas] = useState("");
+  const operacion = useRef<{ huella: string; clave: string } | null>(null);
 
-  // El 100 % acotado al saldo es, por definición, el saldo. Se calcula con la
-  // misma función que la mitad para que ambos atajos compartan el tope.
-  const importeSaldo = useMemo(() => montoSugerido(total, 100, saldo).toFixed(2), [total, saldo]);
-  const importeMitad = useMemo(() => montoSugerido(total, 50, saldo).toFixed(2), [total, saldo]);
+  // El saldo completo y completar el 50 % acumulado son atajos distintos.
+  // Ninguno propone volver a cobrar una seña ya registrada.
+  const importeSaldo = useMemo(
+    () => montoSugerido(total, 100, saldo).toFixed(2),
+    [total, saldo],
+  );
+  const importeMitad = useMemo(() => {
+    const pendiente = montoPorPorcentaje(total, 50).minus(
+      aDecimal(total).minus(aDecimal(saldo)),
+    );
+    return pendiente.lte(0)
+      ? "0.00"
+      : pendiente.gt(aDecimal(saldo))
+        ? aDecimal(saldo).toFixed(2)
+        : pendiente.toFixed(2);
+  }, [total, saldo]);
 
   // Normalización de tipeo (coma decimal argentina), no aritmética.
   const importeOtro = importeLibre.trim().replace(",", ".");
 
-  const importe = modo === "saldo" ? importeSaldo : modo === "mitad" ? importeMitad : importeOtro;
+  const importe =
+    modo === "saldo"
+      ? importeSaldo
+      : modo === "mitad"
+        ? importeMitad
+        : importeOtro;
 
   const atajos: Array<{ id: ModoImporte; label: string; detalle?: string }> = [
-    { id: "saldo", label: "Saldo completo", detalle: formatARS(Number(importeSaldo)) },
-    { id: "mitad", label: "Mitad del saldo", detalle: formatARS(Number(importeMitad)) },
+    {
+      id: "saldo",
+      label: "Saldo completo",
+      detalle: formatARS(Number(importeSaldo)),
+    },
+    ...(importeMitad !== "0.00"
+      ? [
+          {
+            id: "mitad" as const,
+            label: "Completar hasta 50%",
+            detalle: formatARS(importeMitad),
+          },
+        ]
+      : []),
     { id: "otro", label: "Otro importe" },
   ];
 
@@ -94,16 +129,25 @@ export function RegistrarPagoDialog({
     }
 
     try {
+      const contenido = {
+        montoArs: importe,
+        metodoPago,
+        ...(notas.trim() ? { notas: notas.trim() } : {}),
+      };
+      const huella = JSON.stringify(contenido);
+      if (operacion.current?.huella !== huella)
+        operacion.current = { huella, clave: crypto.randomUUID() };
       const res = await fetch(`/api/ventas/${ventaId}/pagos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          montoArs: importe,
-          metodoPago,
-          ...(notas.trim() ? { notas: notas.trim() } : {}),
+          ...contenido,
+          claveIdempotencia: operacion.current.clave,
         }),
       });
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
       if (!res.ok) {
         throw new Error(data?.error ?? "No se pudo registrar el cobro");
       }
@@ -111,10 +155,13 @@ export function RegistrarPagoDialog({
         descripcion: `${formatARS(Number(importe))} · ${METODO_PAGO_LABEL[metodoPago] ?? metodoPago}`,
       });
       setAbierto(false);
+      operacion.current = null;
       reiniciar();
       await onRegistrado();
     } catch (e) {
-      notificar.error(e instanceof Error ? e.message : "No se pudo registrar el cobro");
+      notificar.error(
+        e instanceof Error ? e.message : "No se pudo registrar el cobro",
+      );
     }
   });
 
@@ -135,7 +182,8 @@ export function RegistrarPagoDialog({
         <DialogHeader>
           <DialogTitle>Registrar cobro</DialogTitle>
           <DialogDescription>
-            Saldo pendiente: {formatARS(Number(saldo))} sobre un total de {formatARS(Number(total))}.
+            Saldo pendiente: {formatARS(Number(saldo))} sobre un total de{" "}
+            {formatARS(Number(total))}.
           </DialogDescription>
         </DialogHeader>
 
@@ -147,7 +195,11 @@ export function RegistrarPagoDialog({
             >
               Importe
             </span>
-            <div className="flex flex-wrap gap-2" role="group" aria-labelledby="pago-importe-label">
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-labelledby="pago-importe-label"
+            >
               {atajos.map((a) => (
                 <Button
                   key={a.id}
@@ -156,7 +208,9 @@ export function RegistrarPagoDialog({
                   size="sm"
                   aria-pressed={modo === a.id}
                   onClick={() => setModo(a.id)}
-                  className={modo === a.id ? "border-foreground bg-accent" : undefined}
+                  className={
+                    modo === a.id ? "border-foreground bg-accent" : undefined
+                  }
                 >
                   {a.label}
                   {a.detalle && (

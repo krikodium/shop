@@ -19,6 +19,7 @@ import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
 import { Resumen } from "@/components/ui/resumen";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { METODO_PAGO_LABEL } from "@/lib/constants";
 import { formatARS } from "@/lib/formatCurrency";
 import { cn } from "@/lib/utils";
 
@@ -39,30 +40,48 @@ interface VentaRow {
   clienteNombre?: string | null;
 }
 
-function getDefaultDates() {
+type PresetFecha = "hoy" | "7dias" | "mes" | "todo";
+type FiltroEstado = "vigentes" | "todas" | "anuladas";
+
+function getDatesForPreset(preset: PresetFecha) {
   const hoy = new Date();
+  const hasta = hoy.toISOString().slice(0, 10);
+  if (preset === "hoy") {
+    return { desde: hasta, hasta };
+  }
+  if (preset === "7dias") {
+    const d = new Date(hoy);
+    d.setDate(d.getDate() - 6);
+    return { desde: d.toISOString().slice(0, 10), hasta };
+  }
+  if (preset === "todo") {
+    return { desde: "2024-01-01", hasta };
+  }
   const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
   return {
     desde: inicio.toISOString().slice(0, 10),
-    hasta: hoy.toISOString().slice(0, 10),
+    hasta,
   };
 }
 
 export function VentasTable() {
-  const { desde, hasta } = getDefaultDates();
-  const [fechaDesde, setFechaDesde] = useState(desde);
-  const [fechaHasta, setFechaHasta] = useState(hasta);
+  const initialDates = getDatesForPreset("mes");
+  const [preset, setPreset] = useState<PresetFecha | "custom">("mes");
+  const [fechaDesde, setFechaDesde] = useState(initialDates.desde);
+  const [fechaHasta, setFechaHasta] = useState(initialDates.hasta);
   const [busqueda, setBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("todas");
   const [ventas, setVentas] = useState<VentaRow[]>([]);
-  // Arranca en `true`: la primera carga ya se refleja en el estado inicial,
-  // así el efecto de montaje no necesita volver a pedirlo de forma síncrona.
   const [loading, setLoading] = useState(true);
 
+  const aplicarPreset = (nuevo: PresetFecha) => {
+    const rango = getDatesForPreset(nuevo);
+    setPreset(nuevo);
+    setFechaDesde(rango.desde);
+    setFechaHasta(rango.hasta);
+  };
+
   const cargar = useCallback(() => {
-    // Deferido a un microtask: evita marcar `setLoading(true)` de forma
-    // síncrona dentro del efecto que dispara esta función (el estado ya
-    // arranca en `true` para la primera carga; para los refetch de filtros
-    // alcanza con encenderlo un instante después, no antes del primer paint).
     Promise.resolve().then(() => setLoading(true));
     const params = new URLSearchParams();
     params.set("fechaDesde", fechaDesde);
@@ -102,63 +121,26 @@ export function VentasTable() {
   }, [cargar]);
 
   const termino = busqueda.trim().toLocaleLowerCase("es");
-  const ventasFiltradas = termino
+  const ventasPorTexto = termino
     ? ventas.filter((v) =>
-        `${v.numeroVenta} ${v.cliente?.nombre ?? v.clienteNombre ?? ""}`
+        `${v.numeroVenta} ${v.cliente?.nombre ?? v.clienteNombre ?? ""} ${METODO_PAGO_LABEL[v.metodoPago] ?? v.metodoPago}`
           .toLocaleLowerCase("es")
           .includes(termino)
       )
     : ventas;
 
-  // La API devuelve como máximo 100 ventas (take: 100 en /api/ventas). Los
-  // agregados de abajo suman SOLO lo listado, así que cuando se alcanza el tope
-  // hay que decirlo: si no, un total incompleto se lee como el total del período.
+  const ventasFiltradas = ventasPorTexto.filter((v) => {
+    if (filtroEstado === "vigentes") return !v.anulada;
+    if (filtroEstado === "anuladas") return Boolean(v.anulada);
+    return true;
+  });
+
   const topeAlcanzado = ventas.length >= 100;
-  const vigentes = ventasFiltradas.filter((v) => !v.anulada);
+  const vigentes = ventasPorTexto.filter((v) => !v.anulada);
   const totalPeriodo = vigentes.reduce((s, v) => s + v.total, 0);
   const gananciaPeriodo = vigentes.reduce((s, v) => s + v.gananciaBruta, 0);
-
-  const filtros = (
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <Input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Nº de venta o cliente"
-          className="h-10 w-44 pl-9 sm:w-52"
-          aria-label="Buscar ventas"
-        />
-      </div>
-      <div>
-        <Label htmlFor="ventas-desde" className="sr-only">
-          Desde
-        </Label>
-        <Input
-          id="ventas-desde"
-          type="date"
-          value={fechaDesde}
-          onChange={(e) => setFechaDesde(e.target.value)}
-          className="h-10 w-[9.5rem]"
-        />
-      </div>
-      <div>
-        <Label htmlFor="ventas-hasta" className="sr-only">
-          Hasta
-        </Label>
-        <Input
-          id="ventas-hasta"
-          type="date"
-          value={fechaHasta}
-          onChange={(e) => setFechaHasta(e.target.value)}
-          className="h-10 w-[9.5rem]"
-        />
-      </div>
-    </div>
-  );
+  const ticketPromedio = vigentes.length > 0 ? totalPeriodo / vigentes.length : 0;
+  const margenGlobal = totalPeriodo > 0 ? (gananciaPeriodo / totalPeriodo) * 100 : 0;
 
   if (loading && ventas.length === 0) {
     return (
@@ -171,31 +153,149 @@ export function VentasTable() {
 
   return (
     <div className="space-y-6">
-      {vigentes.length > 0 && (
-        <Resumen
-          className="anim-entrada"
-          items={[
-            {
-              label: "Ventas listadas",
-              valor: vigentes.length,
-              hint: topeAlcanzado ? "tope de 100 alcanzado" : "en el período elegido",
-            },
-            {
-              label: "Ganancia",
-              valor: formatARS(gananciaPeriodo),
-              hint: "suma de las ventas listadas",
-            },
-            {
-              label: "Total facturado",
-              valor: formatARS(totalPeriodo),
-              hint: "suma de las ventas listadas",
-            },
-          ]}
-        />
-      )}
+      <Resumen
+        className="anim-entrada"
+        items={[
+          {
+            label: "Total facturado",
+            valor: formatARS(totalPeriodo),
+            hint:
+              vigentes.length > 0
+                ? `${vigentes.length} ${vigentes.length === 1 ? "operación vigente" : "operaciones vigentes"}${topeAlcanzado ? " (tope 100)" : ""}`
+                : "Sin operaciones en el rango",
+          },
+          {
+            label: "Ganancia bruta",
+            valor: (
+              <span className={gananciaPeriodo >= 0 ? "text-num-positive" : "text-num-negative"}>
+                {formatARS(gananciaPeriodo)}
+              </span>
+            ),
+            hint: `Margen global ${margenGlobal.toFixed(1)}%`,
+          },
+          {
+            label: "Ticket promedio",
+            valor: vigentes.length > 0 ? formatARS(ticketPromedio) : "—",
+            hint: "Promedio por venta vigente",
+          },
+          {
+            label: "Ventas listadas",
+            valor: ventasFiltradas.length,
+            hint:
+              ventasPorTexto.length !== vigentes.length
+                ? `${ventasPorTexto.length - vigentes.length} anuladas en el período`
+                : "Todas las ventas activas",
+          },
+        ]}
+      />
 
       <Panel>
-        <PanelHeader title="Historial de ventas" acciones={filtros} />
+        <PanelHeader
+          title="Historial de operaciones"
+          descripcion={
+            <span className="font-mono text-xs tabular-nums">
+              {ventasFiltradas.length} {ventasFiltradas.length === 1 ? "registro" : "registros"}
+            </span>
+          }
+          acciones={
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  { id: "hoy", label: "Hoy" },
+                  { id: "7dias", label: "7 días" },
+                  { id: "mes", label: "Este mes" },
+                  { id: "todo", label: "Todo" },
+                ] as const
+              ).map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => aplicarPreset(p.id)}
+                  className={cn(
+                    "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                    preset === p.id
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          }
+        />
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/15 px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Nº de venta, cliente o medio de pago…"
+                className="h-9 w-56 pl-9 sm:w-64"
+                aria-label="Buscar ventas"
+              />
+            </div>
+
+            <div className="inline-flex rounded-lg border border-border bg-muted p-0.5">
+              {(
+                [
+                  { id: "todas", label: "Todas" },
+                  { id: "vigentes", label: "Vigentes" },
+                  { id: "anuladas", label: "Anuladas" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setFiltroEstado(tab.id)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    filtroEstado === tab.id
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Label htmlFor="ventas-desde" className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Desde
+            </Label>
+            <Input
+              id="ventas-desde"
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => {
+                setPreset("custom");
+                setFechaDesde(e.target.value);
+              }}
+              className="h-9 w-[9.25rem] font-mono text-xs tabular-nums"
+            />
+            <Label htmlFor="ventas-hasta" className="ml-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Hasta
+            </Label>
+            <Input
+              id="ventas-hasta"
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => {
+                setPreset("custom");
+                setFechaHasta(e.target.value);
+              }}
+              className="h-9 w-[9.25rem] font-mono text-xs tabular-nums"
+            />
+          </div>
+        </div>
+
         {ventasFiltradas.length === 0 ? (
           <PanelBody>
             <EmptyState
@@ -216,8 +316,8 @@ export function VentasTable() {
                 <TableHead>Nº</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Cliente</TableHead>
+                <TableHead>Medio de pago</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead>Pago</TableHead>
                 <TableHead className="text-right">Ganancia</TableHead>
                 <TableHead className="text-right">Margen</TableHead>
                 <TableHead className="text-right">Consignación</TableHead>
@@ -226,44 +326,48 @@ export function VentasTable() {
             </TableHeader>
             <TableBody>
               {ventasFiltradas.map((v) => {
-                const sinMedioDetectado =
-                  !v.metodoPagoSecundario &&
-                  !((v.usdPago1 ?? 0) > 0 || (v.usdPago2 ?? 0) > 0);
+                const labelMedio = METODO_PAGO_LABEL[v.metodoPago] ?? (v.metodoPago || "—");
+                const tieneUsd =
+                  (v.usdPago1 != null && v.usdPago1 > 0) ||
+                  (v.usdPago2 != null && v.usdPago2 > 0);
                 return (
                   <TableRow key={v.id} className={v.anulada ? "text-muted-foreground" : undefined}>
-                    <TableCell className={cn("font-medium", v.anulada && "line-through")}>
+                    <TableCell className={cn("font-mono text-xs font-medium", v.anulada && "line-through")}>
                       {v.numeroVenta}
                     </TableCell>
-                    <TableCell className={v.anulada ? "line-through" : undefined}>
-                      {new Date(v.fecha).toLocaleDateString("es-AR")}{" "}
-                      {new Date(v.fecha).toLocaleTimeString("es-AR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <TableCell className={cn("font-mono text-xs tabular-nums", v.anulada && "line-through")}>
+                      <span>{new Date(v.fecha).toLocaleDateString("es-AR")}</span>{" "}
+                      <span className="text-muted-foreground">
+                        {new Date(v.fecha).toLocaleTimeString("es-AR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
                     </TableCell>
-                    <TableCell className={v.anulada ? "line-through" : undefined}>
-                      {v.cliente?.nombre ?? v.clienteNombre ?? "—"}
+                    <TableCell className={cn("font-medium", v.anulada && "line-through")}>
+                      {v.cliente?.nombre ?? v.clienteNombre ?? (
+                        <span className="font-normal text-muted-foreground">Consumidor final</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-medium">{labelMedio}</span>
+                        {v.anulada && <Badge variant="outline">Anulada</Badge>}
+                        {v.metodoPagoSecundario && (
+                          <Badge variant="outline">
+                            + {METODO_PAGO_LABEL[v.metodoPagoSecundario] ?? v.metodoPagoSecundario}
+                          </Badge>
+                        )}
+                        {tieneUsd && <Badge variant="outline">USD</Badge>}
+                      </div>
                     </TableCell>
                     <TableCell
                       className={cn(
-                        "text-right font-mono tabular-nums",
+                        "text-right font-mono font-semibold tabular-nums",
                         v.anulada && "line-through"
                       )}
                     >
                       {formatARS(v.total)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {v.anulada && <Badge variant="outline">Anulada</Badge>}
-                        {v.metodoPagoSecundario && <Badge variant="outline">2 medios</Badge>}
-                        {((v.usdPago1 != null && v.usdPago1 > 0) ||
-                          (v.usdPago2 != null && v.usdPago2 > 0)) && (
-                          <Badge variant="outline">USD</Badge>
-                        )}
-                        {!v.anulada && sinMedioDetectado && (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </div>
                     </TableCell>
                     <TableCell
                       className={cn(
@@ -277,7 +381,7 @@ export function VentasTable() {
                     </TableCell>
                     <TableCell
                       className={cn(
-                        "text-right font-mono tabular-nums",
+                        "text-right font-mono text-xs tabular-nums text-muted-foreground",
                         v.anulada && "line-through"
                       )}
                     >

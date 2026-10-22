@@ -1,483 +1,107 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma, type MetodoPago } from "@prisma/client";
-import { ventaFindManySafe } from "@/lib/ventaFindManySafe";
+import { Prisma, MetodoPago } from "@prisma/client";
+import { z } from "zod";
+import { inicioDiaNegocio, siguienteDia } from "@/lib/fechasNegocio";
+import { dinero, resumenCobros, resumenVentas, sumarImportes } from "@/lib/resumenFinanciero";
 
-type RangoFechas = {
-  desde: Date | null;
-  hasta: Date | null;
-};
+const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => {
+  const d = new Date(`${v}T12:00:00Z`);
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}, "Fecha inválida");
+const consulta = z.object({
+  tipo: z.enum(["ventas", "inventario", "rentabilidad"]), desde: fecha.optional(), hasta: fecha.optional(),
+  metodoPago: z.enum(MetodoPago).optional(), proveedorId: z.string().max(100).optional(),
+  categoriaId: z.string().max(100).optional(), comparar: z.enum(["true", "false"]).optional(),
+}).refine(v => !v.desde || !v.hasta || v.desde <= v.hasta, "El rango de fechas es inválido");
 
-type FiltrosReporte = {
-  metodoPago: string | null;
-  proveedorId: string | null;
-  categoriaId: string | null;
-};
-
-function getPreviousRange(rango: RangoFechas): RangoFechas | null {
-  if (!rango.desde || !rango.hasta) return null;
-  const msDia = 24 * 60 * 60 * 1000;
-  const duracionMs = rango.hasta.getTime() - rango.desde.getTime();
-  const desdeAnterior = new Date(rango.desde.getTime() - duracionMs - msDia);
-  const hastaAnterior = new Date(rango.desde.getTime() - msDia);
-  return {
-    desde: new Date(desdeAnterior.toISOString().slice(0, 10) + "T00:00:00.000"),
-    hasta: new Date(hastaAnterior.toISOString().slice(0, 10) + "T23:59:59.999"),
-  };
-}
-
-function buildVentaWhere(
-  rango: RangoFechas,
-  filtros: FiltrosReporte
-): Prisma.VentaWhereInput {
-  const where: Prisma.VentaWhereInput = { anulada: false };
-  if (rango.desde || rango.hasta) {
-    where.fecha = {
-      ...(rango.desde ? { gte: rango.desde } : {}),
-      ...(rango.hasta ? { lte: rango.hasta } : {}),
-    };
-  }
-  if (filtros.metodoPago) {
-    where.OR = [
-      { metodoPago: filtros.metodoPago as MetodoPago },
-      { metodoPagoSecundario: filtros.metodoPago as MetodoPago },
-    ];
-  }
-  if (filtros.proveedorId || filtros.categoriaId) {
-    const andItems: Prisma.ItemVentaWhereInput[] = [];
-    if (filtros.proveedorId) {
-      andItems.push({
-        OR: [
-          { proveedorId: filtros.proveedorId },
-          { producto: { proveedorId: filtros.proveedorId } },
-        ],
-      });
-    }
-    if (filtros.categoriaId) {
-      andItems.push({ producto: { categoriaId: filtros.categoriaId } });
-    }
-    where.items = {
-      some: {
-        AND: andItems,
-      },
-    };
-  }
-  return where;
-}
-
-function delta(actual: number, anterior: number) {
-  const d = actual - anterior;
-  const pct = anterior !== 0 ? (d / anterior) * 100 : null;
-  return { actual, anterior, delta: d, deltaPct: pct };
+function comparativa(actual: string, anterior: string) {
+  const a = new Prisma.Decimal(actual), b = new Prisma.Decimal(anterior);
+  return { actual: a.toNumber(), anterior: b.toNumber(), delta: a.minus(b).toNumber(),
+    deltaPct: b.isZero() ? null : a.minus(b).div(b).mul(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toNumber() };
 }
 
 export async function GET(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   try {
-    const { searchParams } = new URL(request.url);
-    const tipo = searchParams.get("tipo"); // ventas | inventario | rentabilidad
-    const desde = searchParams.get("desde");
-    const hasta = searchParams.get("hasta");
-    const metodoPago = searchParams.get("metodoPago");
-    const proveedorId = searchParams.get("proveedorId");
-    const categoriaId = searchParams.get("categoriaId");
-    const comparar = searchParams.get("comparar") === "true";
+    const params = Object.fromEntries(new URL(request.url).searchParams);
+    for (const key of ["metodoPago", "proveedorId", "categoriaId"]) if (params[key] === "__all__") delete params[key];
+    const validacion = consulta.safeParse(params);
+    if (!validacion.success) return NextResponse.json({ error: "Filtros inválidos" }, { status: 400 });
+    const filtros = validacion.data;
+    if (filtros.tipo === "inventario") {
+      const productos = await prisma.producto.findMany({ where: { activo: true,
+        ...(filtros.proveedorId ? { proveedorId: filtros.proveedorId } : {}),
+        ...(filtros.categoriaId ? { categoriaId: filtros.categoriaId } : {}),
+      } });
+      return NextResponse.json({ cantidadProductos: productos.length,
+        valorInventarioCompra: dinero(sumarImportes(productos.map(p => new Prisma.Decimal(p.precioCompra ?? 0).mul(p.stockActual)))).toFixed(2),
+        valorInventarioVenta: dinero(sumarImportes(productos.map(p => p.precioVenta.mul(p.stockActual)))).toFixed(2),
+        productosBajoStock: productos.filter(p => p.stockActual <= p.stockMinimo).map(p => ({ id: p.id, nombre: p.nombre,
+          sku: p.sku, stockActual: p.stockActual, stockMinimo: p.stockMinimo })), comparativa: null,
+      });
+    }
 
-    const rango: RangoFechas = {
-      desde: desde ? new Date(desde + "T00:00:00.000") : null,
-      hasta: hasta ? new Date(hasta + "T23:59:59.999") : null,
+    const items: Prisma.ItemVentaWhereInput = {
+      ...(filtros.proveedorId ? { OR: [{ proveedorId: filtros.proveedorId }, { producto: { proveedorId: filtros.proveedorId } }] } : {}),
+      ...(filtros.categoriaId ? { producto: { categoriaId: filtros.categoriaId } } : {}),
     };
-    const filtros: FiltrosReporte = {
-      metodoPago: metodoPago && metodoPago !== "__all__" ? metodoPago : null,
-      proveedorId: proveedorId && proveedorId !== "__all__" ? proveedorId : null,
-      categoriaId: categoriaId && categoriaId !== "__all__" ? categoriaId : null,
+    const base: Prisma.VentaWhereInput = { anulada: false,
+      ...(filtros.metodoPago ? { pagos: { some: { metodoPago: filtros.metodoPago } } } : {}),
+      ...(filtros.proveedorId || filtros.categoriaId ? { items: { some: items } } : {}),
     };
-
-    if (tipo === "ventas") {
-      const where = buildVentaWhere(rango, filtros);
-
-      type VentaRepFila = {
-        total: unknown;
-        subtotal: unknown;
-        descuento: unknown;
-        costoTotal: unknown;
-        gananciaBruta: unknown;
-        margenPorcentaje: unknown;
-        metodoPago: string;
-        metodoPagoSecundario: string | null;
-        montoPago1Ars: unknown;
-        montoPago2Ars: unknown;
-        usdPago1: unknown;
-        usdPago2: unknown;
-        cotizacionUsd: unknown;
-        fecha: Date;
-      };
-      type VentaRepBasica = Omit<
-        VentaRepFila,
-        | "metodoPagoSecundario"
-        | "montoPago1Ars"
-        | "montoPago2Ars"
-        | "usdPago1"
-        | "usdPago2"
-        | "cotizacionUsd"
-      >;
-
-      const ventas = await ventaFindManySafe<VentaRepFila, VentaRepBasica>(prisma, {
-        where,
-        selectFull: {
-          total: true,
-          subtotal: true,
-          descuento: true,
-          costoTotal: true,
-          gananciaBruta: true,
-          margenPorcentaje: true,
-          metodoPago: true,
-          metodoPagoSecundario: true,
-          montoPago1Ars: true,
-          montoPago2Ars: true,
-          usdPago1: true,
-          usdPago2: true,
-          cotizacionUsd: true,
-          fecha: true,
-        },
-        selectBasic: {
-          total: true,
-          subtotal: true,
-          descuento: true,
-          costoTotal: true,
-          gananciaBruta: true,
-          margenPorcentaje: true,
-          metodoPago: true,
-          fecha: true,
-        },
-        mapBasic: (rows) =>
-          rows.map((v) => ({
-            ...v,
-            metodoPagoSecundario: null,
-            montoPago1Ars: null,
-            montoPago2Ars: null,
-            usdPago1: null,
-            usdPago2: null,
-            cotizacionUsd: null,
-          })),
-      });
-
-      const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0);
-      const totalCosto = ventas.reduce((s, v) => s + Number(v.costoTotal), 0);
-      const totalGanancia = ventas.reduce((s, v) => s + Number(v.gananciaBruta), 0);
-      const margenProm = ventas.length > 0
-        ? ventas.reduce((s, v) => s + Number(v.margenPorcentaje), 0) / ventas.length
-        : 0;
-
-      const porMetodoPago = ventas.reduce(
-        (acc, v) => {
-          const total = Number(v.total);
-          const sec = v.metodoPagoSecundario;
-          const m1 = v.montoPago1Ars != null ? Number(v.montoPago1Ars) : null;
-          const m2 = v.montoPago2Ars != null ? Number(v.montoPago2Ars) : null;
-          if (sec && m1 != null && m2 != null) {
-            const add = (metodo: string, monto: number, cuentaVenta: boolean) => {
-              if (!acc[metodo]) acc[metodo] = { cantidad: 0, total: 0 };
-              acc[metodo].total += monto;
-              if (cuentaVenta) acc[metodo].cantidad += 1;
-            };
-            add(v.metodoPago, m1, true);
-            add(sec, m2, false);
-          } else {
-            const metodo = v.metodoPago;
-            if (!acc[metodo]) acc[metodo] = { cantidad: 0, total: 0 };
-            acc[metodo].cantidad += 1;
-            acc[metodo].total += total;
-          }
-          return acc;
-        },
-        {} as Record<string, { cantidad: number; total: number }>
-      );
-
-      let totalUsdRecibido = 0;
-      let equivalenteArsDesdeUsd = 0;
-      let ventasConUsd = 0;
-      for (const v of ventas) {
-        const u1 = v.usdPago1 != null ? Number(v.usdPago1) : 0;
-        const u2 = v.usdPago2 != null ? Number(v.usdPago2) : 0;
-        const sumUsd = u1 + u2;
-        if (sumUsd > 0) {
-          ventasConUsd += 1;
-          totalUsdRecibido += sumUsd;
-          const cot = v.cotizacionUsd != null ? Number(v.cotizacionUsd) : 0;
-          if (cot > 0) equivalenteArsDesdeUsd += sumUsd * cot;
-        }
-      }
-
-      const itemsRanking = await prisma.itemVenta.findMany({
-        where: { venta: where },
-        select: {
-          productoId: true,
-          productoNombre: true,
-          productoSku: true,
-          subtotal: true,
-          costoTotal: true,
-          cantidad: true,
-          proveedorId: true,
-          producto: {
-            select: {
-              proveedorId: true,
-            },
-          },
-        },
-      });
-
-      const topProductosMap: Record<
-        string,
-        { nombre: string; sku: string; cantidad: number; venta: number; ganancia: number }
-      > = {};
-      const topProveedoresMap: Record<string, { proveedorId: string; venta: number }> = {};
-
-      for (const item of itemsRanking) {
-        if (!topProductosMap[item.productoId]) {
-          topProductosMap[item.productoId] = {
-            nombre: item.productoNombre,
-            sku: item.productoSku,
-            cantidad: 0,
-            venta: 0,
-            ganancia: 0,
-          };
-        }
-        topProductosMap[item.productoId].cantidad += item.cantidad;
-        topProductosMap[item.productoId].venta += Number(item.subtotal);
-        topProductosMap[item.productoId].ganancia +=
-          Number(item.subtotal) - Number(item.costoTotal);
-
-        const pid = item.proveedorId ?? item.producto?.proveedorId ?? "SIN_PROVEEDOR";
-        if (!topProveedoresMap[pid]) {
-          topProveedoresMap[pid] = { proveedorId: pid, venta: 0 };
-        }
-        topProveedoresMap[pid].venta += Number(item.subtotal);
-      }
-
-      const topProductosPorVenta = Object.values(topProductosMap)
-        .sort((a, b) => b.venta - a.venta)
-        .slice(0, 10);
-      const topProductosPorGanancia = Object.values(topProductosMap)
-        .sort((a, b) => b.ganancia - a.ganancia)
-        .slice(0, 10);
-      const topProveedores = Object.values(topProveedoresMap)
-        .sort((a, b) => b.venta - a.venta)
-        .slice(0, 10);
-
-      let comparativa = null;
-      if (comparar) {
-        const rangoAnterior = getPreviousRange(rango);
-        if (rangoAnterior) {
-          const whereAnterior = buildVentaWhere(rangoAnterior, filtros);
-          const ventasAnterior = await ventaFindManySafe<VentaRepFila, VentaRepBasica>(prisma, {
-            where: whereAnterior,
-            selectFull: {
-              total: true,
-              subtotal: true,
-              descuento: true,
-              costoTotal: true,
-              gananciaBruta: true,
-              margenPorcentaje: true,
-              metodoPago: true,
-              metodoPagoSecundario: true,
-              montoPago1Ars: true,
-              montoPago2Ars: true,
-              usdPago1: true,
-              usdPago2: true,
-              cotizacionUsd: true,
-              fecha: true,
-            },
-            selectBasic: {
-              total: true,
-              subtotal: true,
-              descuento: true,
-              costoTotal: true,
-              gananciaBruta: true,
-              margenPorcentaje: true,
-              metodoPago: true,
-              fecha: true,
-            },
-            mapBasic: (rows) =>
-              rows.map((v) => ({
-                ...v,
-                metodoPagoSecundario: null,
-                montoPago1Ars: null,
-                montoPago2Ars: null,
-                usdPago1: null,
-                usdPago2: null,
-                cotizacionUsd: null,
-              })),
-          });
-          const totalVentasAnterior = ventasAnterior.reduce((s, v) => s + Number(v.total), 0);
-          const totalGananciaAnterior = ventasAnterior.reduce(
-            (s, v) => s + Number(v.gananciaBruta),
-            0
-          );
-          const margenAnterior =
-            ventasAnterior.length > 0
-              ? ventasAnterior.reduce((s, v) => s + Number(v.margenPorcentaje), 0) /
-                ventasAnterior.length
-              : 0;
-          comparativa = {
-            totalVentas: delta(totalVentas, totalVentasAnterior),
-            totalGanancia: delta(totalGanancia, totalGananciaAnterior),
-            margenPromedio: delta(margenProm, margenAnterior),
-          };
-        }
-      }
-
-      return NextResponse.json({
-        totalVentas,
-        cantidadVentas: ventas.length,
-        totalCosto,
-        totalGanancia,
-        margenPromedio: margenProm,
-        porMetodoPago,
-        usd: {
-          totalUsdRecibido,
-          ventasConUsd,
-          /** Suma de (USD × cotización) por venta donde hubo USD y cotización guardada */
-          equivalenteArsDesdeUsd,
-        },
-        rankings: {
-          topProductosPorVenta,
-          topProductosPorGanancia,
-          topProveedores,
-        },
-        comparativa,
-      });
+    const rango = {
+      ...(filtros.desde ? { gte: inicioDiaNegocio(filtros.desde) } : {}),
+      ...(filtros.hasta ? { lt: inicioDiaNegocio(siguienteDia(filtros.hasta)) } : {}),
+    };
+    const where: Prisma.VentaWhereInput = { ...base, fecha: rango };
+    const [ventas, cobros] = await Promise.all([
+      prisma.venta.findMany({ where, include: { pagos: true, items: { include: { producto: { select: { proveedorId: true } } } } } }),
+      prisma.pagoVenta.findMany({ where: { fecha: rango, venta: { ...base, pagos: undefined },
+        ...(filtros.metodoPago ? { metodoPago: filtros.metodoPago } : {}),
+      } }),
+    ]);
+    const resumen = resumenVentas(ventas), resumenPagos = resumenCobros(cobros);
+    const totalCosto = dinero(sumarImportes(ventas.map(v => v.costoTotal)));
+    const total = new Prisma.Decimal(resumen.totalVentas), ganancia = new Prisma.Decimal(resumen.totalGanancia);
+    const margen = total.isZero() ? new Prisma.Decimal(0) : ganancia.div(total).mul(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+    const porProducto: Record<string, { nombre: string; sku: string; cantidad: number; venta: Prisma.Decimal; costo: Prisma.Decimal }> = {};
+    const porProveedor: Record<string, Prisma.Decimal> = {};
+    for (const v of ventas) for (const item of v.items) {
+      const p = porProducto[item.productoId] ?? { nombre: item.productoNombre, sku: item.productoSku, cantidad: 0,
+        venta: new Prisma.Decimal(0), costo: new Prisma.Decimal(0) };
+      p.cantidad += item.cantidad; p.venta = p.venta.plus(item.subtotal); p.costo = p.costo.plus(item.costoTotal);
+      porProducto[item.productoId] = p;
+      const proveedor = item.proveedorId ?? item.producto.proveedorId ?? "SIN_PROVEEDOR";
+      porProveedor[proveedor] = (porProveedor[proveedor] ?? new Prisma.Decimal(0)).plus(item.subtotal);
     }
-
-    if (tipo === "inventario") {
-      const productos = await prisma.producto.findMany({
-        where: {
-          activo: true,
-          ...(filtros.proveedorId ? { proveedorId: filtros.proveedorId } : {}),
-          ...(filtros.categoriaId ? { categoriaId: filtros.categoriaId } : {}),
-        },
-        include: { proveedor: true },
-      });
-
-      let valorCompra = 0;
-      let valorVenta = 0;
-      const bajoStock: typeof productos = [];
-
-      for (const p of productos) {
-        const costo = Number(p.precioCompra ?? 0);
-        const venta = Number(p.precioVenta);
-        valorCompra += costo * p.stockActual;
-        valorVenta += venta * p.stockActual;
-        if (p.stockActual <= p.stockMinimo) {
-          bajoStock.push(p);
-        }
-      }
-
-      return NextResponse.json({
-        cantidadProductos: productos.length,
-        valorInventarioCompra: valorCompra,
-        valorInventarioVenta: valorVenta,
-        productosBajoStock: bajoStock.map((p) => ({
-          id: p.id,
-          sku: p.sku,
-          nombre: p.nombre,
-          stockActual: p.stockActual,
-          stockMinimo: p.stockMinimo,
-        })),
-        comparativa: null,
-      });
+    const productos = Object.values(porProducto).map(p => ({ nombre: p.nombre, sku: p.sku, cantidad: p.cantidad,
+      venta: dinero(p.venta).toFixed(2), costo: dinero(p.costo).toFixed(2), ganancia: dinero(p.venta.minus(p.costo)).toFixed(2) }));
+    const ordenar = (campo: "venta" | "ganancia") => [...productos].sort((a, b) => new Prisma.Decimal(b[campo]).cmp(a[campo]));
+    let comparacion = null;
+    if (filtros.comparar === "true" && filtros.desde && filtros.hasta) {
+      const inicio = inicioDiaNegocio(filtros.desde), fin = inicioDiaNegocio(siguienteDia(filtros.hasta));
+      const anteriores = await prisma.venta.findMany({ where: { ...base, fecha: { gte: new Date(inicio.getTime() - (fin.getTime() - inicio.getTime())), lt: inicio } }, include: { pagos: true } });
+      const anterior = resumenVentas(anteriores), costoAnterior = sumarImportes(anteriores.map(v => v.costoTotal));
+      const margenAnterior = new Prisma.Decimal(anterior.totalVentas).isZero() ? new Prisma.Decimal(0) : new Prisma.Decimal(anterior.totalGanancia).div(anterior.totalVentas).mul(100);
+      comparacion = { totalVentas: comparativa(resumen.totalVentas, anterior.totalVentas),
+        totalGanancia: comparativa(resumen.totalGanancia, anterior.totalGanancia), totalCosto: comparativa(totalCosto.toFixed(2), costoAnterior.toFixed(2)),
+        margenPromedio: comparativa(margen.toFixed(2), margenAnterior.toFixed(2)), margenPorcentaje: comparativa(margen.toFixed(2), margenAnterior.toFixed(2)) };
     }
-
-    if (tipo === "rentabilidad") {
-      const where = buildVentaWhere(rango, filtros);
-
-      const ventas = await prisma.venta.findMany({
-        where,
-        include: { items: true },
-      });
-
-      const totalVentas = ventas.reduce((s, v) => s + Number(v.total), 0);
-      const totalCosto = ventas.reduce((s, v) => s + Number(v.costoTotal), 0);
-      const totalGanancia = ventas.reduce((s, v) => s + Number(v.gananciaBruta), 0);
-      const margenPorc = totalVentas > 0 ? (totalGanancia / totalVentas) * 100 : 0;
-
-      // Rentabilidad por producto (agregado de items)
-      const porProducto: Record<
-        string,
-        { nombre: string; sku: string; cantidad: number; venta: number; costo: number; ganancia: number }
-      > = {};
-
-      for (const v of ventas) {
-        for (const item of v.items) {
-          const key = item.productoId;
-          if (!porProducto[key]) {
-            porProducto[key] = {
-              nombre: item.productoNombre,
-              sku: item.productoSku,
-              cantidad: 0,
-              venta: 0,
-              costo: 0,
-              ganancia: 0,
-            };
-          }
-          porProducto[key].cantidad += item.cantidad;
-          porProducto[key].venta += Number(item.subtotal);
-          porProducto[key].costo += Number(item.costoTotal);
-          porProducto[key].ganancia += Number(item.subtotal) - Number(item.costoTotal);
-        }
-      }
-
-      let comparativa = null;
-      if (comparar) {
-        const rangoAnterior = getPreviousRange(rango);
-        if (rangoAnterior) {
-          const whereAnterior = buildVentaWhere(rangoAnterior, filtros);
-          const ventasAnterior = await prisma.venta.findMany({
-            where: whereAnterior,
-            include: { items: true },
-          });
-          const totalVentasAnterior = ventasAnterior.reduce((s, v) => s + Number(v.total), 0);
-          const totalCostoAnterior = ventasAnterior.reduce((s, v) => s + Number(v.costoTotal), 0);
-          const totalGananciaAnterior = ventasAnterior.reduce(
-            (s, v) => s + Number(v.gananciaBruta),
-            0
-          );
-          const margenAnterior =
-            totalVentasAnterior > 0
-              ? (totalGananciaAnterior / totalVentasAnterior) * 100
-              : 0;
-          comparativa = {
-            totalVentas: delta(totalVentas, totalVentasAnterior),
-            totalCosto: delta(totalCosto, totalCostoAnterior),
-            totalGanancia: delta(totalGanancia, totalGananciaAnterior),
-            margenPorcentaje: delta(margenPorc, margenAnterior),
-          };
-        }
-      }
-
-      return NextResponse.json({
-        totalVentas,
-        totalCosto,
-        totalGanancia,
-        margenPorcentaje: margenPorc,
-        porProducto: Object.values(porProducto).sort((a, b) => b.ganancia - a.ganancia),
-        rankings: {
-          topProductosPorGanancia: Object.values(porProducto)
-            .sort((a, b) => b.ganancia - a.ganancia)
-            .slice(0, 10),
-          topProductosPorVenta: Object.values(porProducto)
-            .sort((a, b) => b.venta - a.venta)
-            .slice(0, 10),
-        },
-        comparativa,
-      });
-    }
-
-    return NextResponse.json({ error: "Tipo de reporte no válido" }, { status: 400 });
+    return NextResponse.json({ ...resumen, alcance: "Ventas completas que contienen los productos filtrados, incluidos todos sus ítems y cobros", totalCobradoPeriodo: resumenPagos.totalCobrado,
+      totalCosto: totalCosto.toFixed(2), margenPromedio: margen.toNumber(), margenPorcentaje: margen.toNumber(),
+      porMetodoPago: resumenPagos.porMetodo,
+      usd: { totalUsdRecibido: resumenPagos.totalUsd, ventasConUsd: resumenPagos.cantidadConUsd,
+        equivalenteArsDesdeUsd: dinero(sumarImportes(cobros.filter(p => p.montoUsd != null).map(p => p.montoArs))).toFixed(2) },
+      porProducto: ordenar("ganancia"), rankings: { topProductosPorVenta: ordenar("venta").slice(0, 10),
+        topProductosPorGanancia: ordenar("ganancia").slice(0, 10), topProveedores: Object.entries(porProveedor)
+          .sort(([, a], [, b]) => b.cmp(a)).slice(0, 10).map(([proveedorId, venta]) => ({ proveedorId, venta: dinero(venta).toFixed(2) })) },
+      comparativa: comparacion,
+    });
   } catch (error) {
     console.error("Error en reportes:", error);
-    return NextResponse.json(
-      { error: "Error al generar reporte" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error al generar reporte" }, { status: 500 });
   }
 }

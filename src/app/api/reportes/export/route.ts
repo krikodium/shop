@@ -1,150 +1,41 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma, type MetodoPago } from "@prisma/client";
-import { auth } from "@/auth";
+import { MetodoPago, Prisma } from "@prisma/client";
+import { GET as obtenerReporte } from "@/app/api/reportes/route";
+import { inicioDiaNegocio, siguienteDia } from "@/lib/fechasNegocio";
+import { dinero, resumenVentas, sumarImportes } from "@/lib/resumenFinanciero";
 
-function escapeCsv(v: string | number | null | undefined): string {
-  const s = v == null ? "" : String(v);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
+function csv(valor: unknown) {
+  const texto = valor == null ? "" : String(valor);
+  // El archivo puede abrirse en Excel: evitar fórmulas desde datos de clientas/notas.
+  const seguro = /^\s*[=+@-]/.test(texto) || /^[\t\r\n]/.test(texto) ? `'${texto}` : texto;
+  return `"${seguro.replace(/"/g, '""')}"`;
 }
-
-/**
- * CSV de ventas del período (columnas ARS + USD cuando existan en BD).
- * GET /api/reportes/export?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
- */
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const desde = searchParams.get("desde");
-  const hasta = searchParams.get("hasta");
-  const metodoPago = searchParams.get("metodoPago");
-  const proveedorId = searchParams.get("proveedorId");
-  const categoriaId = searchParams.get("categoriaId");
-  const fechaDesde = desde ? new Date(desde + "T00:00:00.000") : null;
-  const fechaHasta = hasta ? new Date(hasta + "T23:59:59.999") : null;
-
-  const where: Prisma.VentaWhereInput = { anulada: false };
-  if (fechaDesde || fechaHasta) {
-    where.fecha = {
-      ...(fechaDesde ? { gte: fechaDesde } : {}),
-      ...(fechaHasta ? { lte: fechaHasta } : {}),
-    };
-  }
-  if (metodoPago && metodoPago !== "__all__") {
-    where.OR = [
-      { metodoPago: metodoPago as MetodoPago },
-      { metodoPagoSecundario: metodoPago as MetodoPago },
-    ];
-  }
-  if ((proveedorId && proveedorId !== "__all__") || (categoriaId && categoriaId !== "__all__")) {
-    const andItems: Prisma.ItemVentaWhereInput[] = [];
-    if (proveedorId && proveedorId !== "__all__") {
-      andItems.push({
-        OR: [
-          { proveedorId },
-          { producto: { proveedorId } },
-        ],
-      });
-    }
-    if (categoriaId && categoriaId !== "__all__") {
-      andItems.push({ producto: { categoriaId } });
-    }
-    where.items = { some: { AND: andItems } };
-  }
-
-  type Fila = {
-    numeroVenta: string;
-    fecha: Date;
-    total: unknown;
-    metodoPago: string;
-    metodoPagoSecundario: string | null;
-    usdPago1: unknown;
-    usdPago2: unknown;
-    cotizacionUsd: unknown;
+  const url = new URL(request.url);
+  const validacionUrl = new URL(url); validacionUrl.searchParams.set("tipo", "ventas");
+  const validacion = await obtenerReporte(new Request(validacionUrl, { headers: request.headers }));
+  if (!validacion.ok) return validacion;
+  const desde = url.searchParams.get("desde"), hasta = url.searchParams.get("hasta");
+  const metodo = url.searchParams.get("metodoPago"), proveedorId = url.searchParams.get("proveedorId"), categoriaId = url.searchParams.get("categoriaId");
+  const where: Prisma.VentaWhereInput = { anulada: false, fecha: {
+    ...(desde ? { gte: inicioDiaNegocio(desde) } : {}), ...(hasta ? { lt: inicioDiaNegocio(siguienteDia(hasta)) } : {}),
+  }, ...(metodo && metodo !== "__all__" ? { pagos: { some: { metodoPago: metodo as MetodoPago } } } : {}) };
+  const filtroItems: Prisma.ItemVentaWhereInput = {
+    ...(proveedorId && proveedorId !== "__all__" ? { OR: [{ proveedorId }, { producto: { proveedorId } }] } : {}),
+    ...(categoriaId && categoriaId !== "__all__" ? { producto: { categoriaId } } : {}),
   };
-
-  let rows: Fila[];
-  try {
-    rows = await prisma.venta.findMany({
-      where,
-      orderBy: { fecha: "desc" },
-      select: {
-        numeroVenta: true,
-        fecha: true,
-        total: true,
-        metodoPago: true,
-        metodoPagoSecundario: true,
-        usdPago1: true,
-        usdPago2: true,
-        cotizacionUsd: true,
-      },
-    });
-  } catch {
-    const basic = await prisma.venta.findMany({
-      where,
-      orderBy: { fecha: "desc" },
-      select: {
-        numeroVenta: true,
-        fecha: true,
-        total: true,
-        metodoPago: true,
-      },
-    });
-    rows = basic.map((r) => ({
-      ...r,
-      metodoPagoSecundario: null,
-      usdPago1: null,
-      usdPago2: null,
-      cotizacionUsd: null,
-    }));
+  if (Object.keys(filtroItems).length) where.items = { some: filtroItems };
+  const ventas = await prisma.venta.findMany({ where, orderBy: { fecha: "desc" }, include: { pagos: true, cliente: { select: { nombre: true } } } });
+  const filas = [["numeroVenta", "fechaVenta", "clienta", "vendidoARS", "cobradoAcumuladoARS", "saldoARS", "estadoPago", "usdRecibidosAcumulados", "alcance"].map(csv).join(",")];
+  for (const v of ventas) {
+    const resumen = resumenVentas([v]);
+    filas.push([v.numeroVenta, v.fecha.toISOString(), v.cliente?.nombre ?? v.clienteNombre,
+      v.total.toFixed(2), resumen.totalCobradoVentas, resumen.saldoPendiente, v.estadoPago,
+      dinero(sumarImportes(v.pagos.map(p => p.montoUsd ?? 0))).toFixed(2),
+      "Venta completa; cobrado acumulado incluye pagos posteriores al período de venta",
+    ].map(csv).join(","));
   }
-
-  const header = [
-    "numeroVenta",
-    "fecha",
-    "totalARS",
-    "metodoPago",
-    "metodoPagoSecundario",
-    "usdPago1",
-    "usdPago2",
-    "cotizacionUsd",
-    "usdTotal",
-    "pagoDividido",
-  ];
-
-  const lines = [header.join(",")];
-  for (const r of rows) {
-    const u1 = r.usdPago1 != null ? Number(r.usdPago1) : 0;
-    const u2 = r.usdPago2 != null ? Number(r.usdPago2) : 0;
-    const usdTotal = u1 + u2;
-    const line = [
-      escapeCsv(r.numeroVenta),
-      escapeCsv(new Date(r.fecha).toISOString()),
-      escapeCsv(Number(r.total).toFixed(2)),
-      escapeCsv(r.metodoPago),
-      escapeCsv(r.metodoPagoSecundario ?? ""),
-      escapeCsv(u1 || ""),
-      escapeCsv(u2 || ""),
-      escapeCsv(r.cotizacionUsd != null ? Number(r.cotizacionUsd) : ""),
-      escapeCsv(usdTotal || ""),
-      escapeCsv(r.metodoPagoSecundario ? "si" : "no"),
-    ].join(",");
-    lines.push(line);
-  }
-
-  const csv = "\uFEFF" + lines.join("\r\n");
-  const name = `ventas_${desde ?? "inicio"}_${hasta ?? "fin"}.csv`;
-
-  return new NextResponse(csv, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${name}"`,
-    },
-  });
+  return new NextResponse("\uFEFF" + filas.join("\r\n"), { headers: { "Content-Type": "text/csv; charset=utf-8",
+    "Content-Disposition": `attachment; filename="ventas_${desde ?? "inicio"}_${hasta ?? "fin"}.csv"` } });
 }

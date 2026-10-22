@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     const proveedorId = searchParams.get("proveedorId");
     const enConsignacion = searchParams.get("enConsignacion");
     const stockBajo = searchParams.get("stockBajo");
+    const conStock = searchParams.get("conStock");
     const activo = searchParams.get("activo");
     const q = searchParams.get("q")?.trim();
     const pageParam = searchParams.get("page");
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
       proveedorId,
       enConsignacion,
       stockBajo,
+      conStock,
       activo,
       q,
     });
@@ -107,6 +109,8 @@ export async function POST(request: Request) {
         categoriaId: data.categoriaId || null,
         precioCompra: data.precioCompra ?? null,
         precioVenta: data.precioVenta,
+        precioCompraUsd: data.precioCompraUsd ?? null,
+        precioVentaUsd: data.precioVentaUsd ?? null,
         enConsignacion: data.enConsignacion,
         comisionConsignacion: data.comisionConsignacion ?? null,
         stockActual: data.stockActual,

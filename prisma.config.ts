@@ -3,12 +3,19 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+// CLI de migraciones usa conexión directa; la app conserva el pooler.
+const conexionCli = process.env.DIRECT_URL || process.env.DATABASE_URL;
+const urlCli = conexionCli ? new URL(conexionCli) : null;
+if (!process.env.DIRECT_URL && urlCli?.hostname.endsWith(".neon.tech")) {
+  urlCli.hostname = urlCli.hostname.replace(/-pooler(?=\.)/, "");
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: urlCli?.toString(),
   },
 });

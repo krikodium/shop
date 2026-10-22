@@ -1,91 +1,77 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 import { datosClienteVentaSchema } from "@/lib/validaciones/clienteSchema";
-
-/**
- * POST: Guardar o actualizar datos del cliente asociados a una venta.
- * Todos los campos son opcionales. Si la venta ya tiene cliente, se actualiza.
- * Si no, se crea uno nuevo y se vincula.
- */
+import { dinero, serializable } from "@/lib/calculadores/finanzasServidor";
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  try {
-    const { id: ventaId } = await params;
-    const body = await request.json();
-    const data = datosClienteVentaSchema.parse(body);
-
-    const nombre = (data.nombre ?? "").trim();
-    const email = (data.email ?? "").trim() || null;
-    const telefono = (data.telefono ?? "").trim() || null;
-    const dni = (data.dni ?? "").trim() || null;
-
-    // Si no hay ningún dato, no hacer nada
-    if (!nombre && !email && !telefono && !dni) {
-      return NextResponse.json(
-        { error: "Agregá al menos un dato (nombre, email, teléfono o DNI)" },
-        { status: 400 }
-      );
-    }
-
-    const venta = await prisma.venta.findUnique({
-      where: { id: ventaId },
-      include: { cliente: true },
-    });
-
-    if (!venta) {
-      return NextResponse.json({ error: "Venta no encontrada" }, { status: 404 });
-    }
-
-    let clienteId: string;
-    let clienteNombre: string;
-
-    if (venta.clienteId && venta.cliente) {
-      // Actualizar cliente existente
-      const updated = await prisma.cliente.update({
-        where: { id: venta.clienteId },
-        data: {
-          ...(nombre && { nombre }),
-          ...(email !== null && { email }),
-          ...(telefono !== null && { telefono }),
-          ...(dni !== null && { dni }),
-        },
-      });
-      clienteId = updated.id;
-      clienteNombre = updated.nombre;
-    } else {
-      // Crear nuevo cliente
-      const nuevo = await prisma.cliente.create({
-        data: {
-          nombre: nombre || "Cliente",
-          email,
-          telefono,
-          dni,
-        },
-      });
-      clienteId = nuevo.id;
-      clienteNombre = nuevo.nombre;
-    }
-
-    // Vincular venta al cliente
-    await prisma.venta.update({
-      where: { id: ventaId },
-      data: { clienteId, clienteNombre },
-    });
-
-    return NextResponse.json({ clienteId, clienteNombre });
-  } catch (error) {
-    if (error instanceof Error && "issues" in error) {
-      return NextResponse.json(
-        { error: "Datos inválidos", details: error },
-        { status: 400 }
-      );
-    }
-    console.error("Error guardando datos cliente:", error);
+  const sesion = await auth();
+  if (!sesion?.user?.id)
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (sesion.user.role === "VIEWER")
     return NextResponse.json(
-      { error: "Error al guardar datos del cliente" },
-      { status: 500 }
+      { error: "Usuario de solo lectura" },
+      { status: 403 },
+    );
+  try {
+    const { id } = await params;
+    const datos = datosClienteVentaSchema.parse(await request.json());
+    const nombre = datos.nombre?.trim(),
+      email = datos.email?.trim(),
+      telefono = datos.telefono?.trim(),
+      dni = datos.dni?.trim();
+    if (!nombre && !email && !telefono && !dni)
+      return NextResponse.json(
+        { error: "Agregá al menos un dato de la clienta" },
+        { status: 400 },
+      );
+    const resultado = await serializable(async (tx) => {
+      const venta = await tx.venta.findUnique({
+        where: { id },
+        include: { cliente: true },
+      });
+      if (!venta) throw new Error("Venta no encontrada");
+      if (venta.anulada) throw new Error("La venta está anulada");
+      const campos = {
+        ...(nombre ? { nombre } : {}),
+        ...(email ? { email } : {}),
+        ...(telefono ? { telefono } : {}),
+        ...(dni ? { dni } : {}),
+      };
+      const cliente = venta.cliente
+        ? await tx.cliente.update({
+            where: { id: venta.cliente.id },
+            data: campos,
+          })
+        : await tx.cliente.create({
+            data: {
+              ...campos,
+              nombre: nombre || "Clienta",
+              totalCompras: venta.total,
+              cantidadCompras: 1,
+              ticketPromedio: dinero(venta.total),
+              ultimaCompra: venta.fecha,
+            },
+          });
+      await tx.venta.update({
+        where: { id },
+        data: {
+          clienteId: cliente.id,
+          clienteNombre: cliente.nombre,
+          notas: `${venta.notas ?? ""}\nDatos de clienta actualizados por ${sesion.user.id}`,
+        },
+      });
+      return { clienteId: cliente.id, clienteNombre: cliente.nombre };
+    });
+    return NextResponse.json(resultado);
+  } catch (error) {
+    if (error instanceof Error && !("code" in error))
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error("Error actualizando clienta de venta", error);
+    return NextResponse.json(
+      { error: "No se pudo actualizar la clienta" },
+      { status: 500 },
     );
   }
 }

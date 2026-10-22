@@ -63,6 +63,12 @@ export async function PATCH(
           categoriaId: data.categoriaId || null,
           precioCompra: data.precioCompra ?? null,
           precioVenta: data.precioVenta,
+          ...(data.precioCompraUsd !== undefined
+            ? { precioCompraUsd: data.precioCompraUsd }
+            : {}),
+          ...(data.precioVentaUsd !== undefined
+            ? { precioVentaUsd: data.precioVentaUsd }
+            : {}),
           enConsignacion: data.enConsignacion,
           comisionConsignacion: data.comisionConsignacion ?? null,
           stockActual: data.stockActual,
@@ -106,6 +112,9 @@ export async function PATCH(
     });
     return NextResponse.json(producto);
   } catch (error) {
+    if (error instanceof Error && error.message === "COTIZACION_USD_PENDIENTE") {
+      return NextResponse.json({ error: "El precio de catálogo está en USD. Falta definir la cotización antes de habilitar su venta en ARS." }, { status: 400 });
+    }
     if (error instanceof Error && "issues" in error) {
       return NextResponse.json(
         { error: "Datos inválidos", details: error },

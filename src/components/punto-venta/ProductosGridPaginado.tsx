@@ -25,7 +25,7 @@ import {
   type VistaCatalogo,
 } from "@/components/punto-venta/SelectorVistaCatalogo";
 import { usePreferenciaLocal } from "@/hooks/use-preferencia-local";
-import { formatARS } from "@/lib/formatCurrency";
+import { formatARS, formatUSD } from "@/lib/formatCurrency";
 import { cn } from "@/lib/utils";
 import type { ProductoConProveedor } from "@/types";
 import { calcularCostosItemVenta } from "@/lib/calculadores/ventasCalculator";
@@ -33,10 +33,26 @@ import type { ItemVentaInput } from "@/types";
 
 const CLAVE_VISTA = "punto-venta:vista-catalogo";
 
+function precioCatalogo(p: ProductoConProveedor): string {
+  const usd = (p as ProductoConProveedor & { precioVentaUsd?: unknown }).precioVentaUsd;
+  if (usd != null && Number(usd) > 0 && Number(p.precioVenta) === 0) {
+    return formatUSD(Number(usd));
+  }
+  return formatARS(Number(p.precioVenta));
+}
+
+function descripcionLimpia(desc?: string | null): string {
+  if (!desc) return "";
+  const idx = desc.indexOf("IMPORTACION_HC_SHA256:");
+  return (idx >= 0 ? desc.slice(0, idx) : desc).trim();
+}
+
 interface ProductosGridPaginadoProps {
   onAgregar: (item: ItemVentaInput) => void;
   /** Cantidad ya cargada en la venta, por productoId. Solo para mostrarla. */
   enCarrito?: ReadonlyMap<string, number>;
+  /** Permite seleccionar productos sin stock físico (para Pedidos por encargo). */
+  permitirSinStock?: boolean;
 }
 
 type EstadoStock = "sin" | "bajo" | "ok";
@@ -60,8 +76,13 @@ const TONO_STOCK: Record<EstadoStock, string> = {
   ok: "text-foreground",
 };
 
-export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPaginadoProps) {
+export function ProductosGridPaginado({
+  onAgregar,
+  enCarrito,
+  permitirSinStock = false,
+}: ProductosGridPaginadoProps) {
   const [query, setQuery] = useState("");
+  const [soloConStock, setSoloConStock] = useState(!permitirSinStock);
   const [productos, setProductos] = useState<ProductoConProveedor[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -78,36 +99,40 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
   // Descarta respuestas que llegan después de una búsqueda más nueva.
   const ultimaConsulta = useRef(0);
 
-  const cargar = useCallback(async (q: string, p: number, limite: number) => {
-    const consulta = ++ultimaConsulta.current;
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("page", String(p));
-      params.set("limit", String(limite));
-      if (q && q.length >= 1) params.set("q", q);
-      const res = await fetch(`/api/productos?${params}`);
-      const data = await res.json();
-      if (consulta !== ultimaConsulta.current) return;
-      if (data.productos && typeof data.total === "number") {
-        setProductos(data.productos);
-        setTotal(data.total);
-      } else {
-        setProductos(Array.isArray(data) ? data : []);
-        setTotal(Array.isArray(data) ? data.length : 0);
+  const cargar = useCallback(
+    async (q: string, p: number, limite: number, filtrarConStock: boolean) => {
+      const consulta = ++ultimaConsulta.current;
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(p));
+        params.set("limit", String(limite));
+        if (q && q.length >= 1) params.set("q", q);
+        if (filtrarConStock) params.set("conStock", "true");
+        const res = await fetch(`/api/productos?${params}`);
+        const data = await res.json();
+        if (consulta !== ultimaConsulta.current) return;
+        if (data.productos && typeof data.total === "number") {
+          setProductos(data.productos);
+          setTotal(data.total);
+        } else {
+          setProductos(Array.isArray(data) ? data : []);
+          setTotal(Array.isArray(data) ? data.length : 0);
+        }
+      } catch {
+        if (consulta !== ultimaConsulta.current) return;
+        setProductos([]);
+        setTotal(0);
+      } finally {
+        if (consulta === ultimaConsulta.current) setLoading(false);
       }
-    } catch {
-      if (consulta !== ultimaConsulta.current) return;
-      setProductos([]);
-      setTotal(0);
-    } finally {
-      if (consulta === ultimaConsulta.current) setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
-    cargar(query, page, porPagina);
-  }, [query, page, porPagina, cargar]);
+    cargar(query, page, porPagina, soloConStock);
+  }, [query, page, porPagina, soloConStock, cargar]);
 
   const totalPaginas = Math.ceil(total / porPagina);
 
@@ -147,7 +172,7 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
     if (!texto) return;
     const exacto = productos.find((p) => p.sku.toLowerCase() === texto);
     const candidato = exacto ?? (productos.length === 1 ? productos[0] : undefined);
-    if (!candidato || candidato.stockActual <= 0) return;
+    if (!candidato) return;
     e.preventDefault();
     handleAgregar(candidato);
     setQuery("");
@@ -164,16 +189,16 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
         descripcion={
           loading && total === 0
             ? "Cargando productos…"
-            : `${total} producto${total !== 1 ? "s" : ""}${query.trim() ? " para la búsqueda" : " activos"}`
+            : `${total} producto${total !== 1 ? "s" : ""}${query.trim() ? " para la búsqueda" : soloConStock ? " con stock" : " activos"}`
         }
         acciones={<SelectorVistaCatalogo valor={vista} onCambiar={cambiarVista} />}
       />
 
-      <div className="border-b border-border px-4 py-3 sm:px-5">
+      <div className="flex flex-col gap-2.5 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:px-5">
         <Label htmlFor="pv-buscar" className="sr-only">
           Buscar producto por nombre o SKU
         </Label>
-        <div className="relative">
+        <div className="relative flex-1">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden="true"
@@ -189,9 +214,38 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
               setPage(1);
             }}
             onKeyDown={alPresionarEnBuscador}
-            className="h-11 pl-9 text-sm"
+            className="h-10 pl-9 text-sm"
           />
         </div>
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={soloConStock}
+          onClick={() => {
+            setSoloConStock((prev) => !prev);
+            setPage(1);
+          }}
+          className={cn(
+            "inline-flex h-10 shrink-0 items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors",
+            soloConStock
+              ? "border-foreground bg-accent text-foreground"
+              : "border-border bg-surface text-muted-foreground hover:bg-accent hover:text-foreground",
+          )}
+          title={
+            soloConStock
+              ? "Mostrando solo productos con stock disponible. Clic para incluir sin stock."
+              : "Mostrando todos los productos (incluye sin stock). Clic para ocultar sin stock."
+          }
+        >
+          <span
+            className={cn(
+              "size-2 rounded-full transition-colors",
+              soloConStock ? "bg-foreground" : "bg-muted-foreground/40",
+            )}
+          />
+          <span>{soloConStock ? "Ocultando sin stock" : "Incluyendo sin stock"}</span>
+        </button>
       </div>
 
       <div aria-busy={loading || undefined}>
@@ -204,8 +258,27 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
               titulo="Sin productos"
               descripcion={
                 query.trim()
-                  ? `No hay coincidencias para “${query.trim()}”. Probá con parte del nombre o el SKU.`
-                  : "No hay productos activos para vender."
+                  ? soloConStock
+                    ? `No hay coincidencias con stock para “${query.trim()}”. Si faltó actualizar el stock, podés mostrar también los productos sin stock.`
+                    : `No hay coincidencias para “${query.trim()}”. Probá con parte del nombre o el SKU.`
+                  : soloConStock
+                    ? "No hay productos con stock cargado en este momento."
+                    : "No hay productos activos para vender."
+              }
+              accion={
+                soloConStock ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSoloConStock(false);
+                      setPage(1);
+                    }}
+                  >
+                    Mostrar también sin stock
+                  </Button>
+                ) : undefined
               }
             />
           </div>
@@ -215,6 +288,7 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
               <VistaFotos
                 productos={productos}
                 enCarrito={enCarrito}
+                permitirSinStock={true}
                 onAgregar={handleAgregar}
                 onDetalle={setDetalleProducto}
               />
@@ -223,6 +297,7 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
               <VistaLista
                 productos={productos}
                 enCarrito={enCarrito}
+                permitirSinStock={true}
                 onAgregar={handleAgregar}
                 onDetalle={setDetalleProducto}
               />
@@ -231,6 +306,7 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
               <VistaCompacta
                 productos={productos}
                 enCarrito={enCarrito}
+                permitirSinStock={true}
                 onAgregar={handleAgregar}
               />
             )}
@@ -268,6 +344,7 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
 
       <DetalleProducto
         producto={detalleProducto}
+        permitirSinStock={true}
         onCerrar={() => setDetalleProducto(null)}
         onAgregar={(p) => {
           handleAgregar(p);
@@ -285,6 +362,7 @@ export function ProductosGridPaginado({ onAgregar, enCarrito }: ProductosGridPag
 interface VistaProps {
   productos: ProductoConProveedor[];
   enCarrito?: ReadonlyMap<string, number>;
+  permitirSinStock?: boolean;
   onAgregar: (p: ProductoConProveedor) => void;
   onDetalle?: (p: ProductoConProveedor) => void;
 }
@@ -298,7 +376,13 @@ function EnLaVenta({ cantidad }: { cantidad?: number }) {
   );
 }
 
-function VistaFotos({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) {
+function VistaFotos({
+  productos,
+  enCarrito,
+  permitirSinStock,
+  onAgregar,
+  onDetalle,
+}: VistaProps) {
   return (
     <ul className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:p-5 2xl:grid-cols-4">
       {productos.map((p) => {
@@ -315,8 +399,8 @@ function VistaFotos({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) 
             <button
               type="button"
               onClick={() => onAgregar(p)}
-              disabled={estado === "sin"}
-              aria-label={`Agregar ${p.nombre}, ${formatARS(Number(p.precioVenta))}`}
+              disabled={!permitirSinStock && estado === "sin"}
+              aria-label={`Agregar ${p.nombre}, ${precioCatalogo(p)}`}
               className="flex flex-1 flex-col text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
             >
               <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
@@ -341,10 +425,14 @@ function VistaFotos({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) 
                 <span className="font-mono text-[11px] text-muted-foreground">{p.sku}</span>
                 <span className="mt-auto flex items-baseline justify-between gap-2 pt-1">
                   <span className="font-mono text-sm font-semibold tabular-nums">
-                    {formatARS(Number(p.precioVenta))}
+                    {precioCatalogo(p)}
                   </span>
                   <span className={cn("font-mono text-[11px] tabular-nums", TONO_STOCK[estado])}>
-                    {estado === "sin" ? "sin stock" : `${p.stockActual} u.`}
+                    {estado === "sin"
+                      ? permitirSinStock
+                        ? "por encargo"
+                        : "sin stock"
+                      : `${p.stockActual} u.`}
                   </span>
                 </span>
               </span>
@@ -374,7 +462,13 @@ function VistaFotos({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) 
   );
 }
 
-function VistaLista({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) {
+function VistaLista({
+  productos,
+  enCarrito,
+  permitirSinStock,
+  onAgregar,
+  onDetalle,
+}: VistaProps) {
   return (
     <div>
       <div
@@ -395,8 +489,8 @@ function VistaLista({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) 
               <button
                 type="button"
                 onClick={() => onAgregar(p)}
-                disabled={estado === "sin"}
-                aria-label={`Agregar ${p.nombre}, ${formatARS(Number(p.precioVenta))}`}
+                disabled={!permitirSinStock && estado === "sin"}
+                aria-label={`Agregar ${p.nombre}, ${precioCatalogo(p)}`}
                 className="grid min-h-12 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:grid-cols-[minmax(0,1fr)_5.5rem_7.5rem] sm:pl-5 touch-manipulation"
               >
                 <span className="min-w-0">
@@ -415,17 +509,25 @@ function VistaLista({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) 
                     TONO_STOCK[estado]
                   )}
                 >
-                  {estado === "sin" ? "sin stock" : `${p.stockActual} u.`}
+                  {estado === "sin"
+                    ? permitirSinStock
+                      ? "por encargo"
+                      : "sin stock"
+                    : `${p.stockActual} u.`}
                 </span>
                 <span className="text-right font-mono text-sm font-semibold tabular-nums">
-                  {formatARS(Number(p.precioVenta))}
+                  {precioCatalogo(p)}
                   <span
                     className={cn(
                       "block text-[11px] font-normal sm:hidden",
                       TONO_STOCK[estado]
                     )}
                   >
-                    {estado === "sin" ? "sin stock" : `${p.stockActual} u.`}
+                    {estado === "sin"
+                      ? permitirSinStock
+                        ? "por encargo"
+                        : "sin stock"
+                      : `${p.stockActual} u.`}
                   </span>
                 </span>
               </button>
@@ -447,7 +549,12 @@ function VistaLista({ productos, enCarrito, onAgregar, onDetalle }: VistaProps) 
   );
 }
 
-function VistaCompacta({ productos, enCarrito, onAgregar }: VistaProps) {
+function VistaCompacta({
+  productos,
+  enCarrito,
+  permitirSinStock,
+  onAgregar,
+}: VistaProps) {
   return (
     <ul className="divide-y divide-border">
       {productos.map((p) => {
@@ -458,9 +565,9 @@ function VistaCompacta({ productos, enCarrito, onAgregar }: VistaProps) {
             <button
               type="button"
               onClick={() => onAgregar(p)}
-              disabled={estado === "sin"}
+              disabled={!permitirSinStock && estado === "sin"}
               title={`${p.nombre} · ${TEXTO_STOCK[estado]}`}
-              aria-label={`Agregar ${p.sku} ${p.nombre}, ${formatARS(Number(p.precioVenta))}`}
+              aria-label={`Agregar ${p.sku} ${p.nombre}, ${precioCatalogo(p)}`}
               className="grid min-h-9 w-full grid-cols-[6.5rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 px-4 py-1 text-left text-xs outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 touch-manipulation"
             >
               <span className="truncate font-mono text-muted-foreground">{p.sku}</span>
@@ -474,7 +581,7 @@ function VistaCompacta({ productos, enCarrito, onAgregar }: VistaProps) {
                 {estado === "sin" ? "0" : p.stockActual}
               </span>
               <span className="min-w-[5.5rem] text-right font-mono font-semibold tabular-nums">
-                {formatARS(Number(p.precioVenta))}
+                {precioCatalogo(p)}
               </span>
             </button>
           </li>
@@ -531,10 +638,12 @@ function FilaDato({ label, children }: { label: string; children: ReactNode }) {
 
 function DetalleProducto({
   producto,
+  permitirSinStock,
   onCerrar,
   onAgregar,
 }: {
   producto: ProductoConProveedor | null;
+  permitirSinStock?: boolean;
   onCerrar: () => void;
   onAgregar: (p: ProductoConProveedor) => void;
 }) {
@@ -581,13 +690,13 @@ function DetalleProducto({
               </DialogHeader>
 
               <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
-                {producto.descripcion?.trim() || "Sin descripción."}
+                {descripcionLimpia(producto.descripcion) || "Sin descripción."}
               </p>
 
               <dl className="mt-4 divide-y divide-border border-y border-border text-[13px]">
                 <FilaDato label="Precio de venta">
                   <span className="font-mono text-sm font-semibold tabular-nums">
-                    {formatARS(Number(producto.precioVenta))}
+                    {precioCatalogo(producto)}
                   </span>
                 </FilaDato>
                 {!producto.enConsignacion && producto.precioCompra != null && (
@@ -628,7 +737,7 @@ function DetalleProducto({
               <Button
                 type="button"
                 className="h-10"
-                disabled={estado === "sin"}
+                disabled={!permitirSinStock && estado === "sin"}
                 onClick={() => onAgregar(producto)}
               >
                 Agregar a la venta

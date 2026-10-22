@@ -9,6 +9,7 @@ export interface FiltrosProductos {
   proveedorId?: string | null;
   enConsignacion?: string | null;
   stockBajo?: string | null;
+  conStock?: string | null;
   activo?: string | null;
   q?: string | null;
 }
@@ -32,7 +33,15 @@ export interface FiltrosProductos {
 export function construirWhereProductos(
   filtros: FiltrosProductos
 ): Prisma.ProductoWhereInput {
-  const { categoriaId, proveedorId, enConsignacion, stockBajo, activo, q } = filtros;
+  const {
+    categoriaId,
+    proveedorId,
+    enConsignacion,
+    stockBajo,
+    conStock,
+    activo,
+    q,
+  } = filtros;
 
   const condiciones: Prisma.ProductoWhereInput[] = [];
 
@@ -57,7 +66,11 @@ export function construirWhereProductos(
     ...(enConsignacion === "true" ? { enConsignacion: true } : {}),
     ...(enConsignacion === "false" ? { enConsignacion: false } : {}),
     ...(activo !== "false" ? { activo: true } : {}),
-    ...(stockBajo === "sin" ? { stockActual: 0 } : {}),
+    ...(stockBajo === "sin"
+      ? { stockActual: 0 }
+      : conStock === "true"
+        ? { stockActual: { gt: 0 } }
+        : {}),
     ...(condiciones.length > 0 ? { AND: condiciones } : {}),
   };
 }

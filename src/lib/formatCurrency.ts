@@ -17,13 +17,15 @@ const intlUsd = new Intl.NumberFormat("es-AR", {
 });
 
 /** Pesos argentinos (ARS) para tableros, listas y KPIs */
-export function formatARS(n: number): string {
-  return intlArs.format(Number.isFinite(n) ? n : 0);
+export function formatARS(n: number | string): string {
+  const valor = Number(n);
+  return intlArs.format(Number.isFinite(valor) ? valor : 0);
 }
 
 /** Dólares estadounidenses (USD) — caja, ventas en USD, equivalentes */
-export function formatUSD(n: number): string {
-  return intlUsd.format(Number.isFinite(n) ? n : 0);
+export function formatUSD(n: number | string): string {
+  const valor = Number(n);
+  return intlUsd.format(Number.isFinite(valor) ? valor : 0);
 }
 
 /**

@@ -17,7 +17,7 @@ export function SidebarNav() {
     <nav className="flex flex-col gap-5">
       {grupos.map((grupo) => (
         <div key={grupo.titulo}>
-          <p className="px-3 pb-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="px-3 pb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/75">
             {grupo.titulo}
           </p>
           <div className="flex flex-col gap-0.5">
@@ -30,13 +30,19 @@ export function SidebarNav() {
                   href={item.href}
                   aria-current={activo ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-[--dur-fast]",
+                    "relative flex items-center gap-2.5 rounded-md px-3 py-2 text-[13.5px] transition-colors duration-[--dur-fast]",
                     activo
-                      ? "bg-accent font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                      ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-foreground"
+                      : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
                   )}
                 >
-                  <Icono className="size-4 shrink-0" aria-hidden="true" />
+                  <Icono
+                    className={cn(
+                      "size-4 shrink-0 transition-colors",
+                      activo ? "text-foreground" : "text-muted-foreground"
+                    )}
+                    aria-hidden="true"
+                  />
                   <span className="truncate">{item.label}</span>
                 </Link>
               );
