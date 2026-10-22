@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Panel, PanelHeader } from "@/components/ui/panel";
+import { BotonTutorial } from "@/components/tutorial/BotonTutorial";
 
 const claseLink =
   "inline-flex rounded-sm text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -146,7 +147,9 @@ export default function AyudaPage() {
         overline="Administración · Ayuda"
         title="Centro de ayuda"
         description="Guía práctica del sistema: primeros pasos, cómo se usa cada módulo y accesos rápidos."
-      />
+      >
+        <BotonTutorial texto="Iniciar tutorial interactivo" />
+      </PageHeader>
 
       <Panel>
         <PanelHeader title="Inicio rápido" descripcion="Lo mínimo para arrancar la primera vez." />

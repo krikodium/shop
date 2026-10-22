@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { ForzarCambioPasswordDialog } from "@/components/layout/ForzarCambioPasswordDialog";
+import { TutorialGuiado } from "@/components/tutorial/TutorialGuiado";
 
 export default async function DashboardLayout({
   children,
@@ -28,6 +29,9 @@ export default async function DashboardLayout({
           userEmail={session.user.email}
         />
       )}
+
+      {/* Tutorial guiado paso a paso interactivo */}
+      <TutorialGuiado bloqueado={Boolean(session.user.debeCambiarPassword)} />
 
       {/* Header móvil: no scrollea, no tapa el contenido (el main es el que scrollea). */}
       <header className="flex shrink-0 items-center gap-2.5 border-b border-border bg-card px-3.5 py-2.5 lg:hidden">

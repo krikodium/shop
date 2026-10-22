@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useSession } from "next-auth/react";
 import {
@@ -10,8 +11,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { LogOut, KeyRound } from "lucide-react";
+import { LogOut, KeyRound, HelpCircle } from "lucide-react";
 import { CambiarPasswordDialog } from "./CambiarPasswordDialog";
+import { reiniciarTutorialGlobal } from "@/components/tutorial/TutorialGuiado";
 
 function getInitials(name: string | null | undefined, email: string | null | undefined) {
   if (name) {
@@ -28,6 +30,7 @@ function getInitials(name: string | null | undefined, email: string | null | und
 export function UserMenu() {
   const { data: session } = useSession();
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const router = useRouter();
 
   if (!session?.user) return null;
 
@@ -59,6 +62,13 @@ export function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuItem
+          onClick={() => reiniciarTutorialGlobal(router)}
+          className="min-h-10 gap-2"
+        >
+          <HelpCircle className="size-4" aria-hidden="true" />
+          Ver tutorial del sistema
+        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => setPasswordOpen(true)}
           className="min-h-10 gap-2"

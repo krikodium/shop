@@ -42,6 +42,7 @@ import {
   tooltipGrafico,
 } from "@/lib/chart-theme";
 import { cn } from "@/lib/utils";
+import { BotonTutorial } from "@/components/tutorial/BotonTutorial";
 
 interface DashboardData {
   resumen: {
@@ -334,6 +335,7 @@ export default function DashboardPage() {
           </span>
         }
       >
+        <BotonTutorial texto="Tutorial" className="h-10" />
         <Button asChild variant="outline" className="h-10">
           <Link href="/pedidos/nuevo">
             <Plus className="size-4" aria-hidden="true" />
