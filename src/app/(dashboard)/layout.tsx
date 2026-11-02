@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Plus } from "lucide-react";
 import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
@@ -40,13 +41,19 @@ export default async function DashboardLayout({
           href="/"
           className="mr-auto flex min-w-0 items-center gap-2 truncate rounded-sm text-base font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded bg-foreground font-mono text-[10px] font-bold text-background">
-            HC
-          </span>
+          {/* Logo HC: negro sobre transparente, se invierte en tema oscuro. */}
+          <Image
+            src="/logo.png"
+            alt="HC"
+            width={24}
+            height={24}
+            className="size-6 shrink-0 object-contain dark:invert"
+            priority
+          />
           <span className="truncate">Shop</span>
         </Link>
         <Button asChild size="sm" className="shrink-0">
-          <Link href="/ventas/nueva">
+          <Link href="/ventas/rapida">
             <Plus aria-hidden="true" />
             Venta
           </Link>
@@ -60,9 +67,14 @@ export default async function DashboardLayout({
             href="/"
             className="flex items-center gap-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border-strong bg-foreground font-mono text-xs font-semibold tracking-tighter text-background">
-              HC
-            </span>
+            <Image
+              src="/logo.png"
+              alt="HC"
+              width={32}
+              height={32}
+              className="size-8 shrink-0 object-contain dark:invert"
+              priority
+            />
             <span className="min-w-0">
               <span className="block font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                 Gestión
