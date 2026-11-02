@@ -5,6 +5,7 @@ import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { METODO_PAGO_LABEL } from "@/lib/constants";
 import { formatCurrencyDisplay } from "@/lib/formatCurrency";
+import { haySaldo } from "@/components/ventas/usePagosVenta";
 
 interface ItemTicket {
   productoNombre: string;
@@ -31,6 +32,13 @@ interface TicketVentaProps {
   usdPago1?: number | null;
   usdPago2?: number | null;
   cotizacionUsd?: number | null;
+  /**
+   * Cobros de la venta, como strings de dos decimales tal cual los calcula el
+   * servidor. Sin ellos el papel no puede decir que quedó un saldo, y una seña
+   * se lleva un comprobante que parece saldado.
+   */
+  cobrado?: string | null;
+  saldoPendiente?: string | null;
 }
 
 function fmt(n: number) {
@@ -53,6 +61,8 @@ export function TicketVenta({
   usdPago1,
   usdPago2,
   cotizacionUsd,
+  cobrado,
+  saldoPendiente,
 }: TicketVentaProps) {
   const ticketRef = useRef<HTMLDivElement>(null);
 
@@ -166,6 +176,20 @@ export function TicketVenta({
             <span>TOTAL</span>
             <span className="tabular-nums">{fmt(total)}</span>
           </div>
+          {/* El saldo se compara como string contra "0.00": nunca se suma ni se
+              resta en el cliente. El `Number` es solo para formatear. */}
+          {haySaldo(saldoPendiente) && (
+            <>
+              <div className="mt-2 flex justify-between border-t border-dashed border-border pt-2">
+                <span>Cobrado</span>
+                <span className="tabular-nums">{fmt(Number(cobrado ?? 0))}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold">
+                <span>SALDO PENDIENTE</span>
+                <span className="tabular-nums">{fmt(Number(saldoPendiente))}</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Pie */}

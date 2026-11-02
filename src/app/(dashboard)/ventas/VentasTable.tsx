@@ -304,7 +304,7 @@ export function VentasTable() {
               descripcion="Ajustá el rango de fechas o el buscador, o registrá una venta nueva."
               accion={
                 <Button asChild size="sm">
-                  <Link href="/ventas/nueva">Registrar una venta</Link>
+                  <Link href="/ventas/rapida">Registrar una venta</Link>
                 </Button>
               }
             />

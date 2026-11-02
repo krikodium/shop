@@ -267,9 +267,9 @@ export default function DashboardPage() {
 
   const modulosPrincipales = [
     {
-      href: "/ventas/nueva",
+      href: "/ventas/rapida",
       titulo: "Registro de venta",
-      descripcion: "Cobro en salón, pago mixto ARS/USD o seña",
+      descripcion: "Cobro en salón, pago dividido o seña",
       meta: "Iniciar operación",
       icon: ShoppingCart,
       destacado: true,
@@ -318,20 +318,21 @@ export default function DashboardPage() {
         description={
           <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <span>Centro de control comercial, encargos a medida y patrimonio en salón.</span>
-            <Link
-              href="/caja-chica"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 font-mono text-xs text-foreground transition-colors hover:bg-muted"
-            >
-              <Wallet className="size-3 text-muted-foreground" aria-hidden="true" />
-              {caja.abierta ? (
+            {/* La caja chica es opcional: si no hay turno abierto no se muestra
+                nada. Vender nunca depende de abrirla, así que el inicio no la
+                pide; el saldo solo aparece cuando efectivamente hay uno. */}
+            {caja.abierta && (
+              <Link
+                href="/caja-chica"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 font-mono text-xs text-foreground transition-colors hover:bg-muted"
+              >
+                <Wallet className="size-3 text-muted-foreground" aria-hidden="true" />
                 <span>
                   Caja abierta: <strong className="tabular-nums">{formatARS(caja.saldoArs)}</strong>
                   {caja.saldoUsd > 0 ? ` · ${formatUSD(caja.saldoUsd)}` : ""}
                 </span>
-              ) : (
-                <span className="text-muted-foreground">Caja cerrada · Abrir turno</span>
-              )}
-            </Link>
+              </Link>
+            )}
           </span>
         }
       >
@@ -343,7 +344,7 @@ export default function DashboardPage() {
           </Link>
         </Button>
         <Button asChild className="h-10">
-          <Link href="/ventas/nueva">
+          <Link href="/ventas/rapida">
             <ShoppingCart className="size-4" aria-hidden="true" />
             Nueva venta
           </Link>
@@ -562,7 +563,7 @@ export default function DashboardPage() {
                   accion={
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       <Button asChild size="sm">
-                        <Link href="/ventas/nueva">Registrar venta</Link>
+                        <Link href="/ventas/rapida">Registrar venta</Link>
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link href="/pedidos/nuevo">Cargar encargo</Link>

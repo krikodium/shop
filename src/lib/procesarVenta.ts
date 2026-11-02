@@ -34,10 +34,22 @@ export async function procesarVenta(entrada: VentaInput) {
     const encargo =
       input.items.some((i) => i.modalidad === "ENCARGO") ||
       Boolean(input.pedido);
-    const cliente = input.clienteId
+    let cliente = input.clienteId
       ? await tx.cliente.findUnique({ where: { id: input.clienteId } })
       : null;
     if (input.clienteId && !cliente) throw new Error("Clienta no encontrada");
+    // El alta comparte transacción e idempotencia con la venta: un rechazo
+    // revierte también la ficha y un reintento no crea otra clienta.
+    if (input.nuevoCliente) {
+      cliente = await tx.cliente.create({
+        data: {
+          nombre: input.nuevoCliente.nombre,
+          telefono: input.nuevoCliente.telefono || null,
+          email: input.nuevoCliente.email || null,
+          recibeNotificaciones: false,
+        },
+      });
+    }
     const nombreClienta =
       cliente?.nombre?.trim() || input.clienteNombre?.trim();
     if (encargo && !nombreClienta)
@@ -167,6 +179,14 @@ export async function procesarVenta(entrada: VentaInput) {
       throw new Error(
         "Un pedido con saldo no puede entregar líneas inmediatas. Registralas por encargo y entregá al saldar",
       );
+    // Las columnas de pago dividido de `Venta` describen cómo se pagó LA VENTA
+    // entera: así las leen el ticket y el panel de detalle, que no las
+    // contrastan contra el saldo. Una seña dividida en dos medios es otra cosa,
+    // y guardarla ahí haría que el comprobante diga que la venta quedó saldada.
+    // En ese caso la división vive solo en `PagoVenta`, que es la verdad
+    // derivada y se muestra completa en el historial de cobros.
+    const divisionParcial =
+      Boolean(input.metodoPagoSecundario) && !cobro.eq(total);
     const ultima = await tx.venta.findFirst({
       orderBy: { numeroVenta: "desc" },
       select: { numeroVenta: true },
@@ -191,12 +211,14 @@ export async function procesarVenta(entrada: VentaInput) {
         notas: input.notas,
         claveIdempotencia: input.claveIdempotencia,
         huellaSolicitud: fingerprint,
-        metodoPagoSecundario: input.metodoPagoSecundario,
-        montoPago1Ars: input.montoPago1Ars,
-        montoPago2Ars: input.montoPago2Ars,
-        usdPago1: input.usdPago1,
-        usdPago2: input.usdPago2,
-        cotizacionUsd: input.cotizacionUsd,
+        metodoPagoSecundario: divisionParcial
+          ? null
+          : input.metodoPagoSecundario,
+        montoPago1Ars: divisionParcial ? null : input.montoPago1Ars,
+        montoPago2Ars: divisionParcial ? null : input.montoPago2Ars,
+        usdPago1: divisionParcial ? null : input.usdPago1,
+        usdPago2: divisionParcial ? null : input.usdPago2,
+        cotizacionUsd: divisionParcial ? null : input.cotizacionUsd,
         items: { create: lineas },
         pagos: {
           create: pagos.map((p) => ({

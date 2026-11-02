@@ -59,7 +59,7 @@ export const PASOS_TUTORIAL: PasoTutorial[] = [
       "Emisión y visualización inmediata del ticket.",
     ],
     icono: ShoppingCart,
-    linkDirecto: { href: "/ventas/nueva", label: "Abrir Punto de Venta" },
+    linkDirecto: { href: "/ventas/rapida", label: "Abrir venta rápida" },
   },
   {
     id: "productos",

@@ -27,7 +27,9 @@ export type NavItem = {
 export const navBase: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/agenda", label: "Agenda Gledys", icon: CalendarClock },
-  { href: "/ventas/nueva", label: "Nueva venta", icon: ShoppingCart },
+  // La vista habitual (/ventas/nueva) ya no se lista: se entra solo desde el
+  // botón "Usar vista habitual" de la venta rápida.
+  { href: "/ventas/rapida", label: "Nueva venta", icon: ShoppingCart },
   { href: "/ventas", label: "Ventas", icon: Receipt },
   { href: "/pedidos", label: "Pedidos", icon: ClipboardList },
   { href: "/productos", label: "Productos", icon: Package },
@@ -84,7 +86,7 @@ export function gruposNav(esAdmin: boolean): GrupoNav[] {
       items: [
         buscar("/"),
         buscar("/agenda"),
-        buscar("/ventas/nueva"),
+        buscar("/ventas/rapida"),
         buscar("/ventas"),
         buscar("/pedidos"),
         buscar("/clientes"),

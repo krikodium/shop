@@ -32,7 +32,7 @@ describe("Tutorial Guiado del Sistema", () => {
 
   it("los enlaces directos apuntan a rutas existentes", () => {
     const rutasPermitidas = [
-      "/ventas/nueva",
+      "/ventas/rapida",
       "/productos",
       "/clientes",
       "/agenda",

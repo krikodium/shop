@@ -62,14 +62,59 @@ async function main() {
       claveIdempotencia: "verificacion-precio-cambiado", items: [{ productoId: producto.id, cantidad: 1, modalidad: "INMEDIATA" }] }));
     assert.equal(await db.venta.count(), 2);
     await db.producto.update({ where: { id: producto.id }, data: { precioVenta: "333.25" } });
-    console.log("PASS: migraciones, alta idempotente, autorización, señas, concurrencia sin sobrecobro, saldo, recepción/entrega parcial y stock inmediato.");
+    const clientesAntes = await db.cliente.count();
+    const nuevaClientaEntrada = {
+      nuevoCliente: { nombre: "Clienta de venta rápida", telefono: "1155551234", email: "nueva-clienta@shop.local" },
+      items: [{ productoId: producto.id, cantidad: 1, modalidad: "INMEDIATA" as const }],
+      descuento: "0", totalEsperado: "333.25", metodoPago: "TRANSFERENCIA" as const,
+      cobroInicial: { montoArs: "333.25", metodoPago: "TRANSFERENCIA" as const },
+      claveIdempotencia: "verificacion-venta-rapida-cliente", usuarioId: admin.id,
+    };
+    const conNuevaClienta = await procesarVenta(nuevaClientaEntrada);
+    assert.equal(conNuevaClienta.estadoPago, "PAGADO");
+    assert.equal(conNuevaClienta.total.toFixed(2), "333.25");
+    assert.equal(conNuevaClienta.pagos.length, 1);
+    assert.equal(conNuevaClienta.pagos[0].montoArs.toFixed(2), "333.25");
+    assert.equal(conNuevaClienta.pagos[0].metodoPago, "TRANSFERENCIA");
+    assert.equal(conNuevaClienta.cliente?.nombre, nuevaClientaEntrada.nuevoCliente.nombre);
+    assert.equal(conNuevaClienta.cliente?.telefono, nuevaClientaEntrada.nuevoCliente.telefono);
+    assert.equal(conNuevaClienta.cliente?.email, nuevaClientaEntrada.nuevoCliente.email);
+    assert.equal(conNuevaClienta.cliente?.recibeNotificaciones, false);
+    assert.equal(conNuevaClienta.cliente?.cantidadCompras, 1);
+    assert.equal(conNuevaClienta.cliente?.totalCompras.toFixed(2), "333.25");
+    assert.equal(await db.cliente.count(), clientesAntes + 1);
+    assert.equal(await db.venta.count(), 3);
+    const repetida = await procesarVenta(nuevaClientaEntrada);
+    assert.equal(repetida.id, conNuevaClienta.id);
+    assert.equal(repetida.clienteId, conNuevaClienta.clienteId);
+    assert.equal(await db.cliente.count(), clientesAntes + 1);
+    assert.equal(await db.venta.count(), 3);
+    assert.equal(await db.pagoVenta.count({ where: { ventaId: conNuevaClienta.id } }), 1);
+    assert.equal((await db.producto.findUniqueOrThrow({ where: { id: producto.id } })).stockActual, 3);
+    // La ficha se crea antes del cálculo de precios: un fallo debe revertirla también.
+    await assert.rejects(procesarVenta({
+      ...nuevaClientaEntrada,
+      nuevoCliente: { nombre: "No debe persistir", telefono: "1155559999", email: "revertida@shop.local" },
+      totalEsperado: "333.24", claveIdempotencia: "verificacion-cliente-rollback",
+    }), /Los precios cambiaron/);
+    assert.equal(await db.cliente.count(), clientesAntes + 1);
+    assert.equal(await db.cliente.count({ where: { email: "revertida@shop.local" } }), 0);
+    assert.equal(await db.venta.count(), 3);
+    assert.equal((await db.producto.findUniqueOrThrow({ where: { id: producto.id } })).stockActual, 3);
+    console.log("PASS: migraciones, alta idempotente, autorización, señas, concurrencia sin sobrecobro, saldo, recepción/entrega parcial, stock inmediato y ficha de clienta atómica con reintento y rollback real.");
     await db.$disconnect();
     if (process.argv.includes("--serve")) {
       await mkdir(resolve("output/playwright"), { recursive: true });
       await writeFile(resolve("output/playwright/verification-schema.json"), JSON.stringify({ schema }));
       console.log("Servidor verificación: http://localhost:3100 · usuario verificacion@shop.local (datos aislados)");
-      const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--port", "3100"], { stdio: "inherit", env: { ...process.env, NODE_ENV: "development" } });
-      await new Promise<void>(r => { child.once("exit", () => r()); process.once("SIGINT", () => { child.kill(); r(); }); });
+      const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--port", "3100"], { stdio: "inherit", env: { ...process.env, NODE_ENV: "development", SHOP_VERIFICACION: "1" } });
+      await new Promise<void>((r, reject) => {
+        const stop = () => { child.kill(); };
+        child.once("exit", () => { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); r(); });
+        child.once("error", reject);
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
+      });
     }
   } finally {
     await pg.query('SET search_path TO public');

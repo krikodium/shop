@@ -21,6 +21,7 @@ describe("Seguridad y reseteo de usuarios", () => {
 
     expect(nuevaIgual === defaultPassword).toBe(true);
     expect(nuevaCorta.length < 6).toBe(true);
-    expect(nuevaValida !== defaultPassword && nuevaValida.length >= 6).toBe(true);
+    expect(nuevaValida).not.toBe(defaultPassword);
+    expect(nuevaValida.length).toBeGreaterThanOrEqual(6);
   });
 });

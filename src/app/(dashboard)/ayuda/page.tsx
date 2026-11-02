@@ -23,8 +23,8 @@ const inicioRapido = [
   {
     titulo: "Registrá una venta",
     detalle: "Carrito, cliente y método de pago.",
-    href: "/ventas/nueva",
-    cta: "Ir a nueva venta",
+    href: "/ventas/rapida",
+    cta: "Ir a venta rápida",
   },
 ];
 
@@ -124,7 +124,7 @@ const preguntas = [
 
 const accesosRapidos = [
   { href: "/", label: "Inicio" },
-  { href: "/ventas/nueva", label: "Nueva venta" },
+  { href: "/ventas/rapida", label: "Nueva venta" },
   { href: "/productos/nuevo", label: "Nuevo producto" },
   { href: "/proveedores/nuevo", label: "Nuevo proveedor" },
   { href: "/consignacion/rendiciones/nueva", label: "Nueva rendición" },

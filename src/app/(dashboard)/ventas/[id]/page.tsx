@@ -283,6 +283,8 @@ export default function VentaDetallePage() {
           usdPago1={venta.usdPago1}
           usdPago2={venta.usdPago2}
           cotizacionUsd={venta.cotizacionUsd}
+          cobrado={pagos?.totalPagado}
+          saldoPendiente={pagos?.saldoPendiente}
         />
         {isAdmin && !venta.anulada && !venta.pedido && pagos && pagos.pagos.length === 0 && (
           <AlertDialog open={dialogAnularOpen} onOpenChange={setDialogAnularOpen}>
@@ -317,7 +319,7 @@ export default function VentaDetallePage() {
           </AlertDialog>
         )}
         <Button asChild>
-          <Link href="/ventas/nueva">Nueva venta</Link>
+          <Link href="/ventas/rapida">Nueva venta</Link>
         </Button>
       </PageHeader>
 

@@ -13,7 +13,7 @@ export default function VentasPage() {
         description="Historial y detalle de ventas."
       >
         <Button asChild className="h-11 w-full sm:w-auto">
-          <Link href="/ventas/nueva">
+          <Link href="/ventas/rapida">
             <ShoppingCart className="size-4" aria-hidden="true" />
             Nueva venta
           </Link>

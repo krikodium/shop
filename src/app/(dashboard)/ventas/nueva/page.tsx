@@ -272,6 +272,10 @@ export default function NuevaVentaPage() {
         <Button asChild variant="outline">
           <Link href="/pedidos/nuevo">Nuevo pedido con seña</Link>
         </Button>
+        {/* Única salida de vuelta: esta vista ya no figura en el menú. */}
+        <Button asChild variant="outline">
+          <Link href="/ventas/rapida">Volver a venta rápida</Link>
+        </Button>
       </PageHeader>
 
       <GuiaCargaVenta carritoVacio={items.length === 0} />

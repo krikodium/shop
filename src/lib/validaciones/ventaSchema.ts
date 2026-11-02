@@ -29,8 +29,17 @@ export const cobroSchema = z.object({
 export const pagoSchema = cobroSchema.extend({
   claveIdempotencia: claveSchema,
 });
+export const nuevoClienteVentaSchema = z.object({
+  nombre: z.string().trim().min(1, "Indicá el nombre de la clienta").max(200),
+  telefono: z.string().trim().max(100).optional(),
+  email: z.string().trim().max(200).pipe(z.union([z.string().email("Email inválido"), z.literal("")])).optional(),
+}).refine((cliente) => Boolean(cliente.telefono || cliente.email), {
+  message: "Indicá un teléfono o email para poder contactar a la clienta",
+  path: ["telefono"],
+});
 export const ventaSchema = z.object({
   clienteId: z.string().min(1).nullish(),
+  nuevoCliente: nuevoClienteVentaSchema.optional(),
   clienteNombre: z.string().trim().max(200).optional(),
   clienteTelefono: z.string().trim().max(100).nullish(),
   clienteEmail: z.string().trim().max(200).nullish(),
@@ -67,6 +76,9 @@ export const ventaSchema = z.object({
       notas: z.string().trim().max(2000).nullish(),
     })
     .optional(),
+}).refine((venta) => !(venta.clienteId && venta.nuevoCliente), {
+  message: "Elegí una clienta existente o registrá una nueva, no ambas",
+  path: ["nuevoCliente"],
 });
 export const eventoSchema = z.object({
   tipo: z.enum([
