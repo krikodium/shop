@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,23 +15,35 @@ import { MarcoAcceso, MarcoAccesoCargando } from "./MarcoAcceso";
 // Recuperación por mail: apagada hasta configurar SMTP (NEXT_PUBLIC_EMAIL_ENABLED)
 const EMAIL_ENABLED = process.env.NEXT_PUBLIC_EMAIL_ENABLED === "true";
 
+/** Solo rutas internas: evita que un callbackUrl externo redirija fuera del sitio. */
+function destinoSeguro(destino: string | null): string {
+  if (!destino || !destino.startsWith("/") || destino.startsWith("//") || destino.includes("\\")) {
+    return "/";
+  }
+  return destino;
+}
+
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verPassword, setVerPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const callbackUrl = destinoSeguro(searchParams.get("callbackUrl"));
 
   const { run: ingresar, loading } = useAsyncAction(async () => {
+    setError(null);
     try {
       const res = await signIn("credentials", {
-        email,
+        email: email.trim(),
         password,
         redirect: false,
       });
 
       if (res?.error) {
-        notificar.error("Email o contraseña incorrectos");
+        setError("Email o contraseña incorrectos");
+        setPassword("");
         return;
       }
 
@@ -55,25 +68,53 @@ function LoginForm() {
             id="email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@shop.com"
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError(null);
+            }}
+            placeholder="nombre@empresa.com"
             required
-            autoComplete="email"
+            autoFocus
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-invalid={error ? true : undefined}
             className="h-10"
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="password">Contraseña</Label>
-          <Input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            className="h-10"
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              type={verPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError(null);
+              }}
+              required
+              autoComplete="current-password"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "login-error" : undefined}
+              className="h-10 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setVerPassword((v) => !v)}
+              aria-label={verPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={verPassword}
+              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {verPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
         </div>
+        {error && (
+          <p id="login-error" role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
         <Button type="submit" className="w-full" loading={loading} loadingText="Entrando…">
           Ingresar
         </Button>

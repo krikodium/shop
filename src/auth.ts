@@ -3,6 +3,9 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
+// Hash bcrypt (cost 10) de un valor descartable; nunca coincide con una clave real.
+const HASH_SENTINELA = "$2b$10$zQ7SqdWmxr8arqxY/KXHmupwf5U.QdVDTJDtq1ygYXwvtq7vOmv8e";
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   providers: [
@@ -15,13 +18,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: String(credentials.email) },
+        const user = await prisma.user.findFirst({
+          where: { email: { equals: String(credentials.email).trim(), mode: "insensitive" } },
         });
-        if (!user || !user.password) return null;
 
-        const ok = await bcrypt.compare(String(credentials.password), user.password);
-        if (!ok) return null;
+        // Se compara siempre contra un hash (aunque el usuario no exista) para que
+        // el tiempo de respuesta no revele qué emails están registrados.
+        const ok = await bcrypt.compare(
+          String(credentials.password),
+          user?.password ?? HASH_SENTINELA,
+        );
+        if (!user || !user.password || !ok) return null;
 
         return {
           id: user.id,
