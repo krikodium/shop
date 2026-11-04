@@ -153,6 +153,9 @@ model Venta {
   usdPago2             Decimal?    @db.Decimal(12, 2)
   /// Cotización ARS por 1 USD usada al registrar (referencia)
   cotizacionUsd        Decimal?    @db.Decimal(12, 4)
+  /// Cotización ARS por 1 USD con la que se convirtieron los productos con precio en USD
+  /// (null si la venta no tiene ninguno). Es distinta de la de los cobros en USD.
+  cotizacionItemsUsd   Decimal?    @db.Decimal(12, 4)
 
   // RELACIONES
   items ItemVenta[]
@@ -192,6 +195,9 @@ model ItemVenta {
   cantidad       Int
   precioUnitario Decimal @db.Decimal(10, 2)
   subtotal       Decimal @db.Decimal(10, 2) // cantidad * precioUnitario
+  /// Precio de catálogo en USD cuando el producto se vende en dólares; `precioUnitario`
+  /// queda como su conversión a ARS con `Venta.cotizacionItemsUsd` (null si el precio es en ARS).
+  precioUnitarioUsd Decimal? @db.Decimal(10, 2)
 
   // COSTOS - CRÍTICO PARA CONSIGNACIÓN
   costoUnitario Decimal @db.Decimal(10, 2) // Costo real del producto

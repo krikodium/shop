@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
     user: { findUnique: vi.fn() },
     venta: {
       findUnique: vi.fn(),
-      findFirst: vi.fn(),
+      findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -134,6 +134,7 @@ describe("Alta desde catálogo servidor", () => {
   };
   beforeEach(() => {
     mocks.tx.venta.findUnique.mockResolvedValue(null);
+    mocks.tx.venta.findMany.mockResolvedValue([]);
     mocks.tx.cliente.findUnique.mockResolvedValue({
       id: "c",
       nombre: "Ana",
@@ -219,7 +220,8 @@ describe("Alta desde catálogo servidor", () => {
     });
     await expect(procesarVenta(venta)).rejects.toThrow("consignación");
   });
-  it("permite registrar venta inmediata aunque el producto figure sin stock si se confirma ignorarStock", async () => {
+  it("permite a un administrador registrar una venta inmediata sin stock con la excepción explícita", async () => {
+    mocks.tx.user.findUnique.mockResolvedValue({ id: "u", role: "ADMIN" });
     mocks.tx.producto.findUniqueOrThrow.mockResolvedValue({
       id: "x",
       nombre: "Anillo",
@@ -237,6 +239,17 @@ describe("Alta desde catálogo servidor", () => {
       where: { id: "x" },
       data: { stockActual: 0 },
     });
+  });
+  it("rechaza ignorar stock para un vendedor antes de registrar la venta", async () => {
+    await expect(procesarVenta({
+      ...venta,
+      items: [{ productoId: "x", cantidad: 1, modalidad: "INMEDIATA" }],
+      totalEsperado: "333.25",
+      cobroInicial: undefined,
+      ignorarStock: true,
+    })).rejects.toThrow(/administrador/i);
+    expect(mocks.tx.venta.create).not.toHaveBeenCalled();
+    expect(mocks.tx.producto.update).not.toHaveBeenCalled();
   });
 });
 describe("Entregas y cantidades", () => {

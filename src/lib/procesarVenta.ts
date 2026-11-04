@@ -56,6 +56,14 @@ export async function procesarVenta(entrada: VentaInput) {
       throw new Error(
         "Indicá el nombre de la clienta para registrar el pedido",
       );
+    if (input.ignorarStock && autor.role !== "ADMIN")
+      throw new Error("Solo un administrador puede vender sin stock cargado");
+    const tcItems = input.cotizacionItemsUsd
+      ? new Prisma.Decimal(input.cotizacionItemsUsd)
+      : null;
+    if (tcItems && (tcItems.lte(0) || tcItems.gt("99999999")))
+      throw new Error("La cotización del dólar debe ser positiva");
+    let hayItemsUsd = false;
     const lineas: Prisma.ItemVentaCreateManyVentaInput[] = [];
     for (const item of input.items) {
       const p = await tx.producto.findUnique({
@@ -67,6 +75,25 @@ export async function procesarVenta(entrada: VentaInput) {
         throw new Error(
           "Los pedidos con consignación están deshabilitados hasta definir su liquidación",
         );
+      // Mezcla de divisas: un producto con precio en USD se convierte a ARS con la
+      // cotización de la venta; el resto se vende a su precio en pesos.
+      const enUsd = p.precioVentaUsd != null;
+      if (enUsd && !tcItems)
+        throw new Error(
+          `Indicá la cotización del dólar para vender ${p.nombre} (precio en USD)`,
+        );
+      if (!enUsd && !p.enConsignacion && p.precioCompraUsd != null)
+        throw new Error(`${p.nombre} tiene costo en USD: revisá la moneda del costo antes de venderlo en ARS`);
+      const precioArs = enUsd
+        ? dinero(p.precioVentaUsd!.times(tcItems!))
+        : p.precioVenta;
+      if (precioArs.lte(0))
+        throw new Error(`${p.nombre} no tiene un precio de venta cargado`);
+      if (enUsd && p.enConsignacion)
+        throw new Error(
+          `${p.nombre} está en consignación con precio en USD: la deuda al proveedor en dólares todavía no está definida`,
+        );
+      if (enUsd) hayItemsUsd = true;
       const comision = p.enConsignacion
         ? new Prisma.Decimal(
             p.comisionConsignacion ?? p.proveedor?.comisionPorDefecto ?? 30,
@@ -76,18 +103,19 @@ export async function procesarVenta(entrada: VentaInput) {
         throw new Error("Comisión de consignación inválida");
       const costo = dinero(
         p.enConsignacion
-          ? p.precioVenta
-              .times(new Prisma.Decimal(100).minus(comision!))
-              .div(100)
-          : (p.precioCompra ?? 0),
+          ? precioArs.times(new Prisma.Decimal(100).minus(comision!)).div(100)
+          : p.precioCompraUsd != null && tcItems
+            ? p.precioCompraUsd.times(tcItems)
+            : (p.precioCompra ?? 0),
       );
       lineas.push({
         productoId: p.id,
         productoNombre: p.nombre,
         productoSku: p.sku,
         cantidad: item.cantidad,
-        precioUnitario: p.precioVenta,
-        subtotal: dinero(p.precioVenta.times(item.cantidad)),
+        precioUnitario: precioArs,
+        precioUnitarioUsd: enUsd ? p.precioVentaUsd : null,
+        subtotal: dinero(precioArs.times(item.cantidad)),
         costoUnitario: costo,
         costoTotal: dinero(costo.times(item.cantidad)),
         esConsignacion: p.enConsignacion,
@@ -115,6 +143,8 @@ export async function procesarVenta(entrada: VentaInput) {
       throw new Error(
         "El total debe ser positivo y el descuento no puede superar el subtotal",
       );
+    if (subtotal.gt("99999999.99"))
+      throw new Error("El total supera el máximo permitido (ARS 99.999.999,99)");
     // Una actualización del catálogo no puede inventar un cobro mayor al confirmado.
     // La comparación ocurre dentro de la misma transacción que congela precios y pagos.
     if (!total.eq(input.totalEsperado)) {
@@ -166,6 +196,17 @@ export async function procesarVenta(entrada: VentaInput) {
             ? new Prisma.Decimal(input.cotizacionUsd ?? 0)
             : null,
       });
+    // Una sola cotización por venta: si no coincidieran, dos cotizaciones
+    // distintas permitirían saldar con menos dólares de los que valen los productos.
+    if (
+      hayItemsUsd &&
+      pagos.some(
+        (p) => p.cotizacionUsd != null && !p.cotizacionUsd.eq(tcItems!),
+      )
+    )
+      throw new Error(
+        "La cotización de los cobros en USD debe ser la misma que la de los productos",
+      );
     for (const p of pagos) {
       if (p.montoArs.lte(0))
         throw new Error("Cada tramo de pago debe ser positivo");
@@ -187,11 +228,17 @@ export async function procesarVenta(entrada: VentaInput) {
     // derivada y se muestra completa en el historial de cobros.
     const divisionParcial =
       Boolean(input.metodoPagoSecundario) && !cobro.eq(total);
-    const ultima = await tx.venta.findFirst({
-      orderBy: { numeroVenta: "desc" },
+    // El número se ordena como entero: como texto, "V-99999" le gana a "V-100000".
+    const recientes = await tx.venta.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
       select: { numeroVenta: true },
     });
-    const numeroVenta = `V-${String(Number(ultima?.numeroVenta.replace("V-", "") ?? 0) + 1).padStart(5, "0")}`;
+    const ultimoNumero = recientes.reduce((max, v) => {
+      const n = /^V-(\d+)$/.exec(v.numeroVenta);
+      return n ? Math.max(max, Number(n[1])) : max;
+    }, 0);
+    const numeroVenta = `V-${String(ultimoNumero + 1).padStart(5, "0")}`;
     const gananciaBruta = total.minus(costoTotal);
     const venta = await tx.venta.create({
       data: {
@@ -214,11 +261,13 @@ export async function procesarVenta(entrada: VentaInput) {
         metodoPagoSecundario: divisionParcial
           ? null
           : input.metodoPagoSecundario,
-        montoPago1Ars: divisionParcial ? null : input.montoPago1Ars,
-        montoPago2Ars: divisionParcial ? null : input.montoPago2Ars,
-        usdPago1: divisionParcial ? null : input.usdPago1,
-        usdPago2: divisionParcial ? null : input.usdPago2,
-        cotizacionUsd: divisionParcial ? null : input.cotizacionUsd,
+        // Sin segundo medio no hay tramos: no se copian importes sueltos del input.
+        montoPago1Ars: !input.metodoPagoSecundario || divisionParcial ? null : pagos[0].montoArs,
+        montoPago2Ars: !input.metodoPagoSecundario || divisionParcial ? null : pagos[1].montoArs,
+        usdPago1: divisionParcial ? null : (pagos[0]?.montoUsd ?? null),
+        usdPago2: divisionParcial ? null : (pagos[1]?.montoUsd ?? null),
+        cotizacionUsd: divisionParcial ? null : (pagos.find((p) => p.montoUsd != null)?.cotizacionUsd ?? null),
+        cotizacionItemsUsd: hayItemsUsd ? tcItems : null,
         items: { create: lineas },
         pagos: {
           create: pagos.map((p) => ({

@@ -68,6 +68,8 @@ export const ventaSchema = z.object({
   usdPago1: importeSchema.nullish(),
   usdPago2: importeSchema.nullish(),
   cotizacionUsd: cobroSchema.shape.cotizacionUsd,
+  /** Cotización para convertir a ARS los productos con precio en USD. */
+  cotizacionItemsUsd: cobroSchema.shape.cotizacionUsd,
   cobroInicial: cobroSchema.nullish(),
   pedido: z
     .object({

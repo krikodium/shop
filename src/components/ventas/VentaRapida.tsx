@@ -10,9 +10,17 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Panel, PanelBody, PanelHeader } from "@/components/ui/panel";
 import { Figure, FigureGrid } from "@/components/ui/figure";
 import { cn } from "@/lib/utils";
-import { formatARS } from "@/lib/formatCurrency";
-import { escala, importe } from "@/components/punto-venta/dinero-venta";
+import { formatARS, formatUSD } from "@/lib/formatCurrency";
 import {
+  convertirUsd,
+  escala,
+  importe,
+} from "@/components/punto-venta/dinero-venta";
+import { TicketVenta } from "@/components/ventas/TicketVenta";
+import {
+  cotizacionValida,
+  hayProductosUsd,
+  precioUnitarioArs,
   prepararVentaRapida,
   totalVentaRapida,
   type LineaRapida,
@@ -142,6 +150,11 @@ export function VentaRapida() {
   const [metodo, setMetodo] = useState<MetodoRapido | "">("");
   const [metodo2, setMetodo2] = useState<MetodoRapido | "">("");
   const [montoMetodo1, setMontoMetodo1] = useState("");
+  const [cotizacion, setCotizacion] = useState("");
+  const [usdRecibidos, setUsdRecibidos] = useState("");
+  const [metodoUsd, setMetodoUsd] = useState<"EFECTIVO" | "TRANSFERENCIA">(
+    "EFECTIVO",
+  );
   const [notas, setNotas] = useState("");
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -156,6 +169,7 @@ export function VentaRapida() {
     cobrado: string | null;
     saldo: string | null;
     medios: { metodoPago: string; montoArs: string }[];
+    registro: Record<string, unknown>;
   } | null>(null);
   const bloqueo = useRef(false);
   const pendiente = useRef<{
@@ -234,7 +248,7 @@ export function VentaRapida() {
     total = BigInt(0),
     errorImportes = "";
   try {
-    ({ subtotal, total } = totalVentaRapida(lineas, descuento));
+    ({ subtotal, total } = totalVentaRapida(lineas, descuento, cotizacion));
   } catch (err) {
     errorImportes = err instanceof Error ? err.message : "Revisá los importes.";
   }
@@ -245,6 +259,17 @@ export function VentaRapida() {
     /* La validación muestra el error al confirmar. */
   }
   const saldo = total - cobrado;
+  const hayUsd = hayProductosUsd(lineas);
+  const tcValida = cotizacionValida(cotizacion);
+  // Dólares recibidos y su equivalente en pesos, para mostrar cuánto resta cobrar en ARS.
+  let usdArs = BigInt(0);
+  try {
+    if (usdRecibidos.trim() && tcValida)
+      usdArs = convertirUsd(importe(escala(usdRecibidos)), tcValida);
+  } catch {
+    /* La validación muestra el error al confirmar. */
+  }
+  const restoArs = cobrado - usdArs;
   // Lo que entra por cada forma de pago cuando el cobro se divide. El segundo
   // tramo siempre es el resto: no hay dos importes sueltos que puedan no sumar.
   let tramo1 = BigInt(0);
@@ -264,7 +289,10 @@ export function VentaRapida() {
     Boolean(clienta.nombre.trim()) &&
     Boolean(clienta.telefono.trim() || clienta.email.trim());
   const paso2Ok = lineas.length > 0 && !errorImportes;
-  const paso3Ok = cobro === "pendiente" || Boolean(metodo);
+  const paso3Ok =
+    cobro === "pendiente" ||
+    Boolean(metodo) ||
+    (Boolean(usdRecibidos.trim()) && restoArs <= BigInt(0));
   const completoPaso = (numero: number) =>
     numero === 1 ? paso1Ok : numero === 2 ? paso2Ok : paso3Ok;
   // Un paso se habilita solo cuando los anteriores están completos: así el
@@ -293,9 +321,14 @@ export function VentaRapida() {
   function importeLinea(linea: LineaRapida) {
     if (!/^\d+$/.test(linea.cantidad) || Number(linea.cantidad) > 10000)
       return null;
-    return importe(
-      escala(linea.producto.precioVenta) * BigInt(linea.cantidad),
-    );
+    const unitario = precioUnitarioArs(linea.producto, cotizacion);
+    return unitario == null ? null : importe(unitario * BigInt(linea.cantidad));
+  }
+
+  /** Precio unitario en ARS (convertido si el producto se vende en USD). */
+  function precioLinea(producto: ProductoRapido) {
+    const unitario = precioUnitarioArs(producto, cotizacion);
+    return unitario == null ? null : importe(unitario);
   }
 
   function agregar(producto: ProductoRapido) {
@@ -373,6 +406,9 @@ export function VentaRapida() {
             metodo,
             metodo2,
             montoMetodo1,
+            cotizacion,
+            usdRecibidos,
+            metodoUsd,
             notas,
           }),
           clave: crypto.randomUUID(),
@@ -433,6 +469,7 @@ export function VentaRapida() {
         cobrado: cobradoConfirmado,
         saldo: saldoConfirmado,
         medios,
+        registro: data,
       });
       pendiente.current = null;
       setIncierta(false);
@@ -461,6 +498,9 @@ export function VentaRapida() {
     setMontoCobrado("");
     setMetodo("");
     dejarDeDividir();
+    setCotizacion("");
+    setUsdRecibidos("");
+    setMetodoUsd("EFECTIVO");
     setNotas("");
     setError("");
     setRevision((r) => r + 1);
@@ -504,26 +544,29 @@ export function VentaRapida() {
           />
         </FigureGrid>
 
-        {venta.medios.length > 1 && (
-          <Panel>
-            <PanelHeader title="Cómo se cobró" />
-            <PanelBody className="py-1">
-              <ul className="divide-y divide-border">
-                {venta.medios.map((m, i) => (
-                  <li
-                    key={`${m.metodoPago}-${i}`}
-                    className="flex items-center justify-between gap-3 py-3 text-sm"
-                  >
-                    <span>{NOMBRE_METODO(m.metodoPago)}</span>
-                    <span className="font-mono tabular-nums">
-                      {formatARS(m.montoArs)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </PanelBody>
-          </Panel>
-        )}
+        <TicketVenta
+          variante="inline"
+          numeroVenta={venta.numeroVenta}
+          fecha={String(venta.registro.fecha ?? new Date().toISOString())}
+          clienteNombre={venta.cliente?.nombre ?? clienta.nombre}
+          metodoPago={String(venta.registro.metodoPago ?? "")}
+          items={
+            (venta.registro.items as Parameters<typeof TicketVenta>[0]["items"]) ??
+            []
+          }
+          subtotal={String(venta.registro.subtotal ?? "0")}
+          descuento={String(venta.registro.descuento ?? "0")}
+          total={venta.total}
+          cotizacionItemsUsd={
+            venta.registro.cotizacionItemsUsd as string | null | undefined
+          }
+          pagos={
+            (venta.registro.pagos as Parameters<typeof TicketVenta>[0]["pagos"]) ??
+            []
+          }
+          cobrado={venta.cobrado}
+          saldoPendiente={venta.saldo}
+        />
 
         <div className="flex flex-wrap justify-center gap-3">
           <Button size="lg" onClick={nueva}>
@@ -576,8 +619,8 @@ export function VentaRapida() {
                     Number(
                       lineas.find((l) => l.producto.id === p.id)?.cantidad ?? 0,
                     ) &&
-                  p.precioVentaUsd == null &&
-                  escala(p.precioVenta) > BigInt(0),
+                  (p.precioVentaUsd != null ||
+                    escala(p.precioVenta) > BigInt(0)),
               );
               const primero =
                 disponibles.find(
@@ -788,8 +831,8 @@ export function VentaRapida() {
                       );
                       const noDisponible =
                         p.stockActual <= elegida ||
-                        p.precioVentaUsd != null ||
-                        escala(p.precioVenta) <= BigInt(0);
+                        (p.precioVentaUsd == null &&
+                          escala(p.precioVenta) <= BigInt(0));
                       return (
                         <div
                           key={p.id}
@@ -892,17 +935,18 @@ export function VentaRapida() {
                             />
                           </td>
                           <td className="p-3 text-right tabular-nums">
-                            {formatARS(l.producto.precioVenta)}
+                            {precioLinea(l.producto) != null
+                              ? formatARS(precioLinea(l.producto)!)
+                              : "—"}
+                            {l.producto.precioVentaUsd != null && (
+                              <span className="block text-xs font-normal text-muted-foreground">
+                                {formatUSD(l.producto.precioVentaUsd)}
+                              </span>
+                            )}
                           </td>
                           <td className="p-3 text-right font-medium tabular-nums">
-                            {/^\d+$/.test(l.cantidad) &&
-                            Number(l.cantidad) <= 10000
-                              ? formatARS(
-                                  importe(
-                                    escala(l.producto.precioVenta) *
-                                      BigInt(l.cantidad),
-                                  ),
-                                )
+                            {importeLinea(l) != null
+                              ? formatARS(importeLinea(l)!)
                               : "—"}
                           </td>
                           <td className="p-2">
@@ -945,6 +989,26 @@ export function VentaRapida() {
                   />
                 </div>
               </div>
+              {hayUsd && (
+                <div className="mt-4 rounded-md border border-dashed p-3">
+                  <Label htmlFor="cotizacion-items">
+                    Cotización del dólar (ARS por 1 USD)
+                  </Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Hay productos con precio en USD: se pasan a pesos con esta
+                    cotización y queda guardada en la venta.
+                  </p>
+                  <Input
+                    id="cotizacion-items"
+                    inputMode="decimal"
+                    placeholder="Ej.: 1200"
+                    value={cotizacion}
+                    onChange={(e) => setCotizacion(e.target.value)}
+                    aria-invalid={!tcValida || undefined}
+                    className="mt-2 h-11 w-40 text-right"
+                  />
+                </div>
+              )}
               {lineas.length > 0 && (
                 <Button
                   type="button"
@@ -1009,9 +1073,103 @@ export function VentaRapida() {
               </div>
             )}
             {cobro !== "pendiente" && (
+              <div className="mt-5 space-y-3 rounded-md border border-dashed p-3">
+                <div>
+                  <p className="text-sm font-medium">
+                    ¿Recibió dólares?{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (opcional)
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Se pueden mezclar: dólares y el resto en pesos.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="usd-recibidos">Dólares (USD)</Label>
+                    <Input
+                      id="usd-recibidos"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={usdRecibidos}
+                      onChange={(e) => {
+                        setUsdRecibidos(e.target.value);
+                        if (e.target.value.trim()) dejarDeDividir();
+                      }}
+                      className="h-11 text-right"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cotizacion-cobro">Cotización</Label>
+                    <Input
+                      id="cotizacion-cobro"
+                      inputMode="decimal"
+                      placeholder="Ej.: 1200"
+                      value={cotizacion}
+                      onChange={(e) => setCotizacion(e.target.value)}
+                      className="h-11 text-right"
+                    />
+                  </div>
+                </div>
+                {usdRecibidos.trim() && (
+                  <>
+                    <div
+                      className="grid grid-cols-2 gap-2"
+                      role="group"
+                      aria-label="Cómo entraron los dólares"
+                    >
+                      {(
+                        [
+                          { id: "EFECTIVO", nombre: "Billetes" },
+                          { id: "TRANSFERENCIA", nombre: "Transferencia" },
+                        ] as const
+                      ).map((m) => (
+                        <Button
+                          key={m.id}
+                          type="button"
+                          variant={metodoUsd === m.id ? "default" : "outline"}
+                          className="h-10"
+                          aria-pressed={metodoUsd === m.id}
+                          onClick={() => setMetodoUsd(m.id)}
+                        >
+                          {m.nombre}
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Equivalen a</span>
+                      <span className="font-mono tabular-nums">
+                        {tcValida
+                          ? formatARS(importe(usdArs))
+                          : "Falta cotización"}
+                      </span>
+                    </p>
+                    <p className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Resta cobrar en pesos
+                      </span>
+                      <span
+                        className={cn(
+                          "font-mono tabular-nums",
+                          restoArs < BigInt(0) && "text-destructive",
+                        )}
+                      >
+                        {formatARS(importe(restoArs))}
+                      </span>
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+            {cobro !== "pendiente" && (
               <div className="mt-5">
                 <p className="mb-2 text-sm font-medium">
-                  {metodo2 ? "Primera forma de pago" : "Forma de pago"}
+                  {usdRecibidos.trim()
+                    ? "Forma de pago del resto (pesos)"
+                    : metodo2
+                      ? "Primera forma de pago"
+                      : "Forma de pago"}
                 </p>
                 <div
                   className="grid grid-cols-2 gap-2"
@@ -1102,6 +1260,7 @@ export function VentaRapida() {
                     type="button"
                     variant="outline"
                     className="mt-2 h-11 w-full justify-start"
+                    disabled={Boolean(usdRecibidos.trim())}
                     onClick={() =>
                       setMetodo2(
                         METODOS.find((m) => m.id !== (metodo || "EFECTIVO"))!.id,
@@ -1112,9 +1271,6 @@ export function VentaRapida() {
                     Dividir entre dos formas de pago
                   </Button>
                 )}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Cobros en pesos. Para pagos en dólares, usá la vista habitual.
-                </p>
               </div>
             )}
             {cobro !== "total" && (
@@ -1201,7 +1357,11 @@ export function VentaRapida() {
                               </span>
                               <span className="block font-mono text-xs text-muted-foreground">
                                 {l.cantidad} ×{" "}
-                                {formatARS(l.producto.precioVenta)}
+                                {precioLinea(l.producto) != null
+                                  ? formatARS(precioLinea(l.producto)!)
+                                  : "—"}
+                                {l.producto.precioVentaUsd != null &&
+                                  ` (${formatUSD(l.producto.precioVentaUsd)})`}
                               </span>
                             </span>
                             <span className="shrink-0 font-mono tabular-nums">
@@ -1244,7 +1404,15 @@ export function VentaRapida() {
                       {formatARS(importe(cobrado))}
                     </span>
                   </div>
-                  {metodo && cobro !== "pendiente" && (
+                  {usdRecibidos.trim() && cobro !== "pendiente" && (
+                    <p className="text-right text-xs text-muted-foreground">
+                      USD {usdRecibidos.trim()} → {formatARS(importe(usdArs))}
+                      {restoArs > BigInt(0) && metodo
+                        ? ` · ${NOMBRE_METODO(metodo)} ${formatARS(importe(restoArs))}`
+                        : ""}
+                    </p>
+                  )}
+                  {metodo && !usdRecibidos.trim() && cobro !== "pendiente" && (
                     <p className="text-right text-xs text-muted-foreground">
                       {metodo2
                         ? `${NOMBRE_METODO(metodo)} ${formatARS(importe(tramo1))} · ${NOMBRE_METODO(metodo2)} ${formatARS(importe(tramo2))}`

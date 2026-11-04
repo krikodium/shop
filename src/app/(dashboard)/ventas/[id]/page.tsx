@@ -58,11 +58,13 @@ interface VentaDetalle {
   usdPago1?: number | null;
   usdPago2?: number | null;
   cotizacionUsd?: number | null;
+  cotizacionItemsUsd?: string | null;
   items: Array<{
     productoNombre: string;
     productoSku: string;
     cantidad: number;
     precioUnitario: number;
+    precioUnitarioUsd?: string | null;
     subtotal: number;
     esConsignacion: boolean;
   }>;
@@ -283,6 +285,8 @@ export default function VentaDetallePage() {
           usdPago1={venta.usdPago1}
           usdPago2={venta.usdPago2}
           cotizacionUsd={venta.cotizacionUsd}
+          cotizacionItemsUsd={venta.cotizacionItemsUsd}
+          pagos={pagos?.pagos}
           cobrado={pagos?.totalPagado}
           saldoPendiente={pagos?.saldoPendiente}
         />

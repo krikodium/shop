@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   tx: {
     user: { findUnique: vi.fn() },
-    venta: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), findUniqueOrThrow: vi.fn() },
+    venta: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), findUniqueOrThrow: vi.fn() },
     cliente: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
     producto: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn() },
     movimientoStock: { create: vi.fn() },
@@ -33,6 +33,7 @@ beforeEach(() => {
   mocks.transaction.mockImplementation((fn: (tx: typeof mocks.tx) => unknown) => fn(mocks.tx));
   mocks.tx.user.findUnique.mockResolvedValue({ id: "operadora", role: "VENDEDOR" });
   mocks.tx.venta.findUnique.mockResolvedValue(null);
+  mocks.tx.venta.findMany.mockResolvedValue([]);
   mocks.tx.cliente.create.mockResolvedValue({
     id: "clienta-nueva", nombre: "Ana Pérez", telefono: "1155558888",
     totalCompras: decimal("0"), cantidadCompras: 0,
@@ -129,8 +130,8 @@ describe("Pago dividido en el registro de venta", () => {
     });
     const data = mocks.tx.venta.create.mock.calls[0][0].data;
     expect(data.metodoPagoSecundario).toBe("TRANSFERENCIA");
-    expect(data.montoPago1Ars).toBe("100.00");
-    expect(data.montoPago2Ars).toBe("233.25");
+    expect(data.montoPago1Ars.toFixed(2)).toBe("100.00");
+    expect(data.montoPago2Ars.toFixed(2)).toBe("233.25");
     expect(data.pagos.create).toHaveLength(2);
     expect(data.estadoPago).toBe("PAGADO");
   });

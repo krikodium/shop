@@ -11,6 +11,7 @@ import type { Usuario } from "./types";
 import { UsuariosSkeleton } from "./UsuariosSkeleton";
 import { UsuariosList } from "./UsuariosList";
 import { UsuarioFormDialog } from "./UsuarioFormDialog";
+import { CambiarPasswordDialog } from "./CambiarPasswordDialog";
 
 function sortUsuarios(list: Usuario[]): Usuario[] {
   return [...list].sort((a, b) => {
@@ -27,6 +28,7 @@ export default function UsuariosPage() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<Usuario | null>(null);
+  const [userPassword, setUserPassword] = useState<Usuario | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -162,10 +164,19 @@ export default function UsuariosPage() {
             onRoleFilterChange={setRoleFilter}
             totalBeforeFilter={usuarios.length}
             onEdit={openEdit}
+            onCambiarPassword={setUserPassword}
             onResend={handleResend}
           />
         </>
       )}
+
+      <CambiarPasswordDialog
+        usuario={userPassword}
+        onOpenChange={(open) => {
+          if (!open) setUserPassword(null);
+        }}
+        onSaved={(u) => handleSaved(u, "update")}
+      />
 
       <UsuarioFormDialog
         open={dialogOpen}

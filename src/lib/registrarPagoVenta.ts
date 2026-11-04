@@ -90,6 +90,10 @@ export async function registrarPagoVenta(
           throw new ErrorPagoVenta(validacion.error!, "MONTO_INVALIDO");
         try {
           validarMoneda(datos);
+          if (venta.cotizacionItemsUsd != null && datos.montoUsd != null &&
+              !venta.cotizacionItemsUsd.eq(datos.cotizacionUsd ?? "0")) {
+            throw new Error("Usá la misma cotización que se aplicó a los productos de esta venta");
+          }
         } catch (error) {
           throw new ErrorPagoVenta((error as Error).message, "MONTO_INVALIDO");
         }

@@ -37,6 +37,7 @@ interface UsuariosListProps {
   onRoleFilterChange: (role: string) => void;
   totalBeforeFilter: number;
   onEdit: (u: Usuario) => void;
+  onCambiarPassword: (u: Usuario) => void;
   onResend: (u: Usuario) => Promise<void> | void;
 }
 
@@ -107,6 +108,7 @@ export function UsuariosList({
   onRoleFilterChange,
   totalBeforeFilter,
   onEdit,
+  onCambiarPassword,
   onResend,
 }: UsuariosListProps) {
   const showNoResults = totalBeforeFilter > 0 && usuarios.length === 0;
@@ -225,6 +227,14 @@ export function UsuariosList({
                 <TableCell className="text-right">
                   <span className="inline-flex items-center justify-end gap-1">
                     {EMAIL_ENABLED && <BotonReenviar usuario={u} onResend={onResend} />}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onCambiarPassword(u)}
+                    >
+                      Contraseña
+                    </Button>
                     <Button type="button" variant="ghost" size="sm" onClick={() => onEdit(u)}>
                       Editar
                     </Button>
