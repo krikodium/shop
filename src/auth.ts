@@ -18,9 +18,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await prisma.user.findFirst({
-          where: { email: { equals: String(credentials.email).trim(), mode: "insensitive" } },
-        });
+        // Comparación con lower() parametrizado: sin comodines LIKE (% y _) en el email.
+        const email = String(credentials.email).trim();
+        const coincidencias = await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM "User" WHERE lower(email) = lower(${email}) LIMIT 2`;
+        // Si dos cuentas difieren solo por mayúsculas, el acceso es ambiguo: se rechaza.
+        const user =
+          coincidencias.length === 1
+            ? await prisma.user.findUnique({ where: { id: coincidencias[0].id } })
+            : null;
 
         // Se compara siempre contra un hash (aunque el usuario no exista) para que
         // el tiempo de respuesta no revele qué emails están registrados.

@@ -17,10 +17,16 @@ const EMAIL_ENABLED = process.env.NEXT_PUBLIC_EMAIL_ENABLED === "true";
 
 /** Solo rutas internas: evita que un callbackUrl externo redirija fuera del sitio. */
 function destinoSeguro(destino: string | null): string {
-  if (!destino || !destino.startsWith("/") || destino.startsWith("//") || destino.includes("\\")) {
+  if (!destino) return "/";
+  // Los navegadores ignoran tabs/saltos de línea dentro de una URL ("/\t/x.com" → "//x.com").
+  const limpio = destino.replace(/[\u0000-\u001f\u007f]/g, "");
+  try {
+    const u = new URL(limpio, "http://localhost");
+    if (u.origin !== "http://localhost" || u.pathname.startsWith("//")) return "/";
+    return u.pathname + u.search + u.hash;
+  } catch {
     return "/";
   }
-  return destino;
 }
 
 function LoginForm() {
