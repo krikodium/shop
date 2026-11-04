@@ -86,6 +86,13 @@ model Producto {
   @@index([proveedorId])
 }
 
+// Los binarios se consultan únicamente al pedir la imagen, nunca al listar productos.
+model FotoProducto {
+  id        String   @id
+  contenido Bytes
+  createdAt DateTime @default(now())
+}
+
 model ProductoParteProveedor {
   id          String    @id @default(cuid())
   producto    Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)

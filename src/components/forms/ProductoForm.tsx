@@ -33,6 +33,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import { notificar } from "@/lib/notificar";
 import { formatARS, formatUSD } from "@/lib/formatCurrency";
+import { prepararFotoProducto } from "@/lib/prepararFotoProducto";
 import { cn } from "@/lib/utils";
 import { Reveal } from "@/components/ui/reveal";
 import {
@@ -255,9 +256,9 @@ export function ProductoForm({
 
   const { run: subirImagen, loading: imagenUploading } = useAsyncAction(
     async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
       try {
+        const formData = new FormData();
+        formData.append("file", await prepararFotoProducto(file));
         const res = await fetch("/api/upload", {
           method: "POST",
           body: formData,
@@ -276,9 +277,10 @@ export function ProductoForm({
             shouldDirty: true,
             shouldValidate: true,
           });
+          notificar.ok("Foto lista. Guardá el producto para aplicar el cambio.");
         }
-      } catch {
-        notificar.error("Error de red al subir la imagen");
+      } catch (error) {
+        notificar.error(error instanceof Error ? error.message : "No se pudo subir la foto");
       }
     }
   );
@@ -529,8 +531,9 @@ export function ProductoForm({
                               document.getElementById(imagenInputId)?.click()
                             }
                           >
-                            Subir archivo
+                            {field.value ? "Cambiar foto" : "Agregar foto"}
                           </Button>
+                          {field.value && <Button type="button" variant="ghost" disabled={ocupado || imagenUploading} onClick={() => field.onChange("")}>Quitar foto</Button>}
                         </div>
                       </FormControl>
                       <button

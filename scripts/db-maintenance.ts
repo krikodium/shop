@@ -5,7 +5,7 @@ import { resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
 
 // Hijos primero. Ningún usuario, token ni jornada se borra.
-export const BUSINESS_TABLES = ["EventoPedido", "Pedido", "PagoVenta", "ItemVenta", "ItemOrdenCompra", "MovimientoStock", "MovimientoCaja", "ProductoParteProveedor", "CajaChica", "Rendicion", "OrdenCompra", "Venta", "Producto", "Cliente", "Proveedor", "Categoria"] as const;
+export const BUSINESS_TABLES = ["EventoPedido", "Pedido", "PagoVenta", "ItemVenta", "ItemOrdenCompra", "MovimientoStock", "MovimientoCaja", "ProductoParteProveedor", "CajaChica", "Rendicion", "OrdenCompra", "Venta", "Producto", "FotoProducto", "Cliente", "Proveedor", "Categoria"] as const;
 export const PRESERVED_TABLES = ["User", "PasswordToken", "JornadaLaboral", "_prisma_migrations"] as const;
 type Snapshot = { format: "shop-reset-v1"; createdAt: string; target: string; schema: string; tables: Record<string, string[]>; checksum: string };
 type Db = Prisma.TransactionClient;
